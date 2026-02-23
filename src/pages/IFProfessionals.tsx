@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Briefcase, Users, MapPin, GraduationCap, ChevronRight } from 'lucide-react'
+import { Briefcase, MapPin, GraduationCap, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

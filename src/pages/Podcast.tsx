@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Mic, Play, Pause, Clock, Headphones } from 'lucide-react'
+import { Play, Pause, Clock, Headphones } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
