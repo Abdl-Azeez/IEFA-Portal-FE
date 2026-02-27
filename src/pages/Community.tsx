@@ -1,11 +1,53 @@
 import { motion } from 'framer-motion'
-import { Search, MessageSquare, Users, Calendar } from 'lucide-react'
+import {
+  Search,
+  MessageSquare,
+  Users,
+  Calendar,
+  Heart,
+  Eye,
+  Bookmark,
+  Filter,
+  X,
+  Share2,
+  Flag,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from "react";
+import type {
+  CommunityCategory,
+  DiscussionPost,
+  DetailedDiscussionPost,
+  UserProfile,
+  FilterOptions,
+} from "@/types/community";
+import DiscussionDetailPage from "@/components/community/DiscussionDetailPage";
+import StartDiscussionModal from "@/components/community/StartDiscussionModal";
+import PosterProfilePopup from "@/components/community/PosterProfilePopup";
+
+const CATEGORIES: CommunityCategory[] = [
+  "Markets & Investing",
+  "Savings",
+  "Zakat",
+  "Every day islamic finance",
+  "General Discussion",
+  "Q&A",
+  "Resources",
+];
+
+const categoryColors: Record<CommunityCategory, string> = {
+  "Markets & Investing": "bg-[#D52B1E]",
+  Savings: "bg-blue-600",
+  Zakat: "bg-green-600",
+  "Every day islamic finance": "bg-orange-600",
+  "General Discussion": "bg-purple-600",
+  "Q&A": "bg-yellow-600",
+  Resources: "bg-indigo-600",
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -25,315 +67,1120 @@ const itemVariants = {
 }
 
 export default function Community() {
-  const [selectedTab, setSelectedTab] = useState('discussions')
+  const [selectedTab, setSelectedTab] = useState("discussions");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FilterOptions>({
+    sortBy: "latest",
+    timeRange: "all",
+  });
+  const [savedPosts, setSavedPosts] = useState<string[]>([]);
+  const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [reportedPosts, setReportedPosts] = useState<string[]>([]);
+  const [showStartDiscussionModal, setShowStartDiscussionModal] =
+    useState(false);
+  const [selectedPost, setSelectedPost] =
+    useState<DetailedDiscussionPost | null>(null);
+  const [showPosterProfile, setShowPosterProfile] = useState(false);
+  const [selectedPoster, setSelectedPoster] = useState<UserProfile | null>(
+    null,
+  );
+  const [isModerator] = useState(false); // Set based on actual user role
 
-  const discussions = [
+  // state to track hover card
+  const [hoverProfile, setHoverProfile] = useState<{
+    post: DiscussionPost;
+    pos: "top" | "bottom";
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleProfileHover = (
+    post: DiscussionPost,
+    e: React.MouseEvent<HTMLDivElement, MouseEvent>,
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cardHeight = 200; // approximate height of card
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const pos = spaceBelow < cardHeight ? "top" : "bottom";
+    const x = rect.left;
+    const y = pos === "bottom" ? rect.bottom : rect.top;
+    setHoverProfile({ post, pos, x, y });
+  };
+
+  const clearProfileHover = () => {
+    setHoverProfile(null);
+  };
+
+  // Scroll to top on page load and when viewing discussion details
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [selectedPost]);
+
+  const [discussionPosts, setDiscussionPosts] = useState<DiscussionPost[]>([
     {
-      title: 'Understanding Shariah Compliance in Murabaha Transactions',
-      description: 'Can Someone calrify how late payment penalties are treated under AAOIFI standards?',
-      poster: 'A. Musa',
-      time: '2 hours ago',
-      module: 'Module 4',
-      moduleColor: 'bg-[#D52B1E]',
-      replies: 12
+      id: "1",
+      title: "Understanding Shariah Compliance in Murabaha Transactions",
+      description:
+        "Can Someone clarify how late payment penalties are treated under AAOIFI standards?",
+      category: "Markets & Investing",
+      poster: "A. Musa",
+      posterId: "user-1",
+      posterAvatar: "👨‍💼",
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      replies: 12,
+      views: 145,
+      likes: 8,
+      shares: 3,
+      isAnswered: true,
     },
     {
-      title: 'The Role of Risk Sharing in Islamic Finance',
-      description: 'What measures are in place to ensure risk is fairly distributed among parties?',
-      poster: 'S. Khan',
-      time: '3 hours ago',
-      module: 'Module 3',
-      moduleColor: 'bg-orange-600',
-      replies: 5
+      id: "2",
+      title: "The Role of Risk Sharing in Islamic Finance",
+      description:
+        "What measures are in place to ensure risk is fairly distributed among parties?",
+      category: "General Discussion",
+      poster: "S. Khan",
+      posterId: "user-2",
+      posterAvatar: "👩‍💼",
+      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+      updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      replies: 5,
+      views: 98,
+      likes: 6,
+      shares: 1,
     },
     {
-      title: 'Islamic Banking vs Conventional Banking',
-      description: 'How do profit-sharing models differ from interest-based lending?',
-      poster: 'L. Ahmed',
-      time: '1 hour ago',
-      module: 'Module 2',
-      moduleColor: 'bg-blue-600',
-      replies: 8
+      id: "3",
+      title: "Islamic Banking vs Conventional Banking",
+      description:
+        "How do profit-sharing models differ from interest-based lending?",
+      category: "Q&A",
+      poster: "L. Ahmed",
+      posterId: "user-3",
+      posterAvatar: "👨‍💼",
+      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+      updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+      replies: 8,
+      views: 234,
+      likes: 15,
+      shares: 5,
+      isAnswered: true,
     },
     {
-      title: 'The Impact of Zakat on Economic Development',
-      description: 'Can we discuss how zakat contributes to societal welfare?',
-      poster: 'F. Rahman',
-      time: '15 minutes ago',
-      module: 'Module 5',
-      moduleColor: 'bg-purple-600',
-      replies: 2
-    }
-  ]
+      id: "4",
+      title: "The Impact of Zakat on Economic Development",
+      description:
+        "Can we discuss how zakat contributes to societal welfare and community development?",
+      category: "Zakat",
+      poster: "F. Rahman",
+      posterId: "user-4",
+      posterAvatar: "👨‍💼",
+      createdAt: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      updatedAt: new Date(Date.now() - 15 * 60 * 1000),
+      replies: 2,
+      views: 45,
+      likes: 3,
+      shares: 0,
+    },
+    {
+      id: "5",
+      title: "Daily Islamic Finance Habits",
+      description:
+        "What simple habits can we adopt daily to integrate Islamic finance principles in our lives?",
+      category: "Every day islamic finance",
+      poster: "M. Hassan",
+      posterId: "user-5",
+      posterAvatar: "👨‍💼",
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+      updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+      replies: 18,
+      views: 267,
+      likes: 22,
+      shares: 8,
+      tags: ["habits", "personal-finance"],
+    },
+    {
+      id: "6",
+      title: "Savings Strategies in Islamic Finance",
+      description:
+        "Looking for practical savings strategies that comply with Islamic principles",
+      category: "Savings",
+      poster: "N. Ali",
+      posterId: "user-6",
+      posterAvatar: "👩‍💼",
+      createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
+      updatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
+      replies: 9,
+      views: 156,
+      likes: 11,
+      shares: 2,
+    },
+    {
+      id: "7",
+      title: "Best Resources for Learning Islamic Finance",
+      description:
+        "Can anyone recommend quality resources, books, or courses for deepening Islamic finance knowledge?",
+      category: "Resources",
+      poster: "Z. Khan",
+      posterId: "user-7",
+      posterAvatar: "👨‍💼",
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      replies: 24,
+      views: 412,
+      likes: 34,
+      shares: 12,
+      tags: ["resources", "learning"],
+      isPinned: true,
+    },
+  ]);
 
   const mentors = [
     {
-      name: 'Dr. Salman Al-Farsi',
-      role: 'Senior Portfolio Manager',
-      organization: 'ESG',
-      image: '👨‍💼',
+      name: "Dr. Salman Al-Farsi",
+      role: "Senior Portfolio Manager",
+      organization: "ESG",
+      image: "👨‍💼",
       available: true,
-      expertise: ["Shari'ah Audit", "Career Advice"]
+      expertise: ["Shari'ah Audit", "Career Advice"],
     },
     {
-      name: 'Dr. Fatima Al-Farruq',
-      role: 'Senior Portfolio Manager',
-      organization: 'ESG',
-      image: '👩‍💼',
+      name: "Dr. Fatima Al-Farruq",
+      role: "Senior Portfolio Manager",
+      organization: "ESG",
+      image: "👩‍💼",
       available: true,
-      expertise: ["Career Advice"]
+      expertise: ["Career Advice"],
     },
     {
-      name: 'Dr. Ali Badar',
-      role: 'Senior Portfolio Manager',
-      organization: 'ESG',
-      image: '👨‍💼',
+      name: "Dr. Ali Badar",
+      role: "Senior Portfolio Manager",
+      organization: "ESG",
+      image: "👨‍💼",
       available: true,
-      expertise: ["Shari'ah Audit", "Career Advice"]
+      expertise: ["Shari'ah Audit", "Career Advice"],
+    },
+  ];
+
+  // Filter and sort discussions
+  const filteredDiscussions = useMemo(() => {
+    let filtered = discussionPosts;
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (post) =>
+          post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          post.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          post.poster.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
     }
-  ]
 
-  return (
-    <motion.div
-      className="space-y-6"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
-      <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">Community</h1>
-        <p className="text-[#737692] mt-2">
-          Engage with fellow learners, instructor and professional. Ask questions, share insights, and grow
-          together within IEFA's learning community.
-        </p>
-      </motion.div>
+    // Category filter
+    if (filters.category) {
+      filtered = filtered.filter((post) => post.category === filters.category);
+    }
 
-      {/* Search and Action Button */}
-      <motion.div variants={itemVariants} className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder={selectedTab === 'mentorship' ? 'Search discussions, topics or members' : 'Search discussions, topics or members'}
-            className="pl-10"
-          />
-        </div>
-        {selectedTab === 'discussions' && (
-          <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-            Start a Discussion
-          </Button>
-        )}
-        {selectedTab === 'mentorship' && (
-          <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-            Mentorship
-          </Button>
-        )}
-      </motion.div>
+    // Answered/Unanswered filter
+    if (filters.sortBy === "unanswered") {
+      filtered = filtered.filter((post) => !post.isAnswered);
+    }
 
-      {/* Main Tabs */}
-      <Tabs defaultValue="discussions" className="w-full" onValueChange={setSelectedTab}>
-        <TabsList className="bg-transparent h-auto p-0 mb-6 gap-2 border-b-0 w-full justify-start overflow-x-auto scrollbar-hide -mx-2 px-2 flex-nowrap md:flex-wrap md:overflow-visible md:px-0">
-          <TabsTrigger 
-            value="discussions"
-            className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
-          >
-            Discussions
-          </TabsTrigger>
-          <TabsTrigger 
-            value="study-groups"
-            className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
-          >
-            Study Groups
-          </TabsTrigger>
-          <TabsTrigger 
-            value="mentorship"
-            className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
-          >
-            Mentorship
-          </TabsTrigger>
-          <TabsTrigger 
-            value="events"
-            className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
-          >
-            Events
-          </TabsTrigger>
-        </TabsList>
+    // Saved posts filter
+    if (filters.savedOnly) {
+      filtered = filtered.filter((post) => savedPosts.includes(post.id));
+    }
 
-        {/* Discussions Tab */}
-        <TabsContent value="discussions" className="mt-6">
-          <div className="space-y-4">
-            {discussions.map((discussion, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <Card className="hover:shadow-lg transition-all cursor-pointer border-l-0">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <h3 className="text-lg font-semibold text-[#000000]">{discussion.title}</h3>
-                          <Badge className={`${discussion.moduleColor} text-white hover:${discussion.moduleColor}`}>
-                            {discussion.module}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-[#737692] mb-3">{discussion.description}</p>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#737692]">
-                          <span>Posted by {discussion.poster}</span>
-                          <span>• {discussion.time}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-[#737692] sm:mt-1">
-                        <MessageSquare className="h-4 w-4" />
-                        <span className="text-sm font-medium">{discussion.replies} replies</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+    // Time range filter
+    const now = new Date();
+    if (filters.timeRange && filters.timeRange !== "all") {
+      filtered = filtered.filter((post) => {
+        const postTime = new Date(post.createdAt);
+        const hoursAgo =
+          (now.getTime() - postTime.getTime()) / (1000 * 60 * 60);
+
+        switch (filters.timeRange) {
+          case "day":
+            return hoursAgo < 24;
+          case "week":
+            return hoursAgo < 168; // 7 days
+          case "month":
+            return hoursAgo < 720; // 30 days
+          default:
+            return true;
+        }
+      });
+    }
+
+    if (filters.sortBy === "latest") {
+      filtered.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    } else if (filters.sortBy === "earliest") {
+      filtered.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+    } else if (filters.sortBy === "mostPopular") {
+      filtered.sort(
+        (a, b) =>
+          b.views +
+          b.likes +
+          b.replies * 2 -
+          (a.views + a.likes + a.replies * 2),
+      );
+    }
+
+    // After sorting by chosen criterion, ensure pinned posts bubble to top
+    filtered.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return 0;
+    });
+
+    return filtered;
+  }, [discussionPosts, searchQuery, filters, savedPosts]);
+
+  // Format time for posts
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const hoursAgo = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
+    );
+
+    if (hoursAgo === 0) {
+      const minutesAgo = Math.floor(
+        (now.getTime() - date.getTime()) / (1000 * 60),
+      );
+      return `${minutesAgo}m ago`;
+    } else if (hoursAgo < 24) {
+      return `${hoursAgo}h ago`;
+    } else if (hoursAgo < 168) {
+      const daysAgo = Math.floor(hoursAgo / 24);
+      return `${daysAgo}d ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Format join date for profile hover card
+  const formatJoinDate = (date: Date) =>
+    date.toLocaleString("default", { month: "long", year: "numeric" });
+
+  const toggleSavePost = (postId: string) => {
+    setSavedPosts((prev) =>
+      prev.includes(postId)
+        ? prev.filter((id) => id !== postId)
+        : [...prev, postId],
+    );
+  };
+
+  const toggleLikePost = (postId: string) => {
+    setLikedPosts((prev) =>
+      prev.includes(postId)
+        ? prev.filter((id) => id !== postId)
+        : [...prev, postId],
+    );
+  };
+
+  const handleShare = async (post: DiscussionPost) => {
+    const url = `${window.location.origin}/community/${post.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post.title,
+          text: post.description,
+          url,
+        });
+      } catch (err) {
+        console.log("Share cancelled");
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      alert("Link copied to clipboard!");
+    }
+  };
+
+  const handleReport = (postId: string) => {
+    if (reportedPosts.includes(postId)) {
+      alert("You've already reported this post.");
+      return;
+    }
+    setReportedPosts((prev) => [...prev, postId]);
+    // stub for backend call
+    alert("Thank you. The post has been reported to moderators.");
+  };
+
+  const handlePostClick = (post: DiscussionPost) => {
+    // Mock user profile - in real app, fetch from backend
+    const posterProfile: UserProfile = {
+      id: post.posterId,
+      name: post.poster,
+      title: "Islamic Finance Professional",
+      displayPicture: post.posterAvatar || "👤",
+      bio: "Passionate about Islamic finance education",
+      joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000), // 6 months ago
+      totalPosts: 25,
+      totalViews: 1200,
+      totalReplies: 85,
+      totalLikes: 340,
+      isVerified: Math.random() > 0.5,
+      isModerator: Math.random() > 0.8,
+      rating: 4.5,
+    };
+
+    const detailedPost: DetailedDiscussionPost = {
+      ...post,
+      content:
+        "This is the full discussion content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      posterDetails: posterProfile,
+      attachments: [],
+      repliesList: [],
+      mentions: [],
+    };
+
+    setSelectedPost(detailedPost);
+  };
+
+  const handlePosterProfileClick = (
+    post: DiscussionPost,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+
+    const posterProfile: UserProfile = {
+      id: post.posterId,
+      name: post.poster,
+      title: "Islamic Finance Professional",
+      displayPicture: post.posterAvatar || "👤",
+      bio: "Passionate about Islamic finance education",
+      joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
+      totalPosts: 25,
+      totalViews: 1200,
+      totalReplies: 85,
+      totalLikes: 340,
+      isVerified: Math.random() > 0.5,
+      isModerator: Math.random() > 0.8,
+      rating: 4.5,
+    };
+
+    setSelectedPoster(posterProfile);
+    setShowPosterProfile(true);
+  };
+
+  const handlePinPost = (postId: string) => {
+    // toggle pin state in local data (would call backend in real app)
+    setDiscussionPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, isPinned: !p.isPinned } : p)),
+    );
+  };
+
+  const handleDeletePost = (postId: string) => {
+    if (window.confirm("Are you sure you want to delete this post?")) {
+      alert(`Post ${postId} deleted!`);
+    }
+  };
+
+  const handleCreateDiscussion = (data: any) => {
+    alert(`Discussion created: "${data.title}" in ${data.category}`);
+    // In real app, send to backend and add to discussionPosts
+  };
+
+  // Show detail page if post is selected
+  if (selectedPost) {
+    return (
+      <DiscussionDetailPage
+        post={selectedPost}
+        onBack={() => setSelectedPost(null)}
+        isModerator={isModerator}
+        onPin={handlePinPost}
+        onDelete={handleDeletePost}
+      />
+    );
+  }
+
+  // Hover profile card overlay
+  const renderHoverCard = () => {
+    if (!hoverProfile) return null;
+    const { post, pos, x, y } = hoverProfile;
+    const style: React.CSSProperties = {
+      position: "fixed",
+      left: x,
+      transform: "translateX(-50%)",
+      zIndex: 1000,
+    };
+    if (pos === "bottom") {
+      style.top = y + 8;
+    } else {
+      style.bottom = window.innerHeight - y + 8;
+    }
+    return (
+      <div
+        style={style}
+        className="w-64 bg-white rounded-lg shadow-lg p-4"
+        onMouseEnter={() => {}}
+        onMouseLeave={clearProfileHover}
+      >
+        <div className="flex flex-col items-center text-center">
+          <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-2xl mb-2">
+            {post.posterAvatar}
           </div>
-        </TabsContent>
+          <h3 className="font-semibold text-[#000000]">{post.poster}</h3>
+          <p className="text-xs text-[#737692]">Islamic Finance Professional</p>
+          <p className="text-xs text-[#737692]">
+            Joined{" "}
+            {formatJoinDate(new Date(Date.now() - 180 * 24 * 60 * 60 * 1000))}
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#737692]">
+            <div className="flex flex-col items-center">
+              <span className="font-semibold">25</span>
+              <span>Posts</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="font-semibold">85</span>
+              <span>Replies</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="font-semibold">1.2k</span>
+              <span>Views</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="font-semibold">340</span>
+              <span>Likes</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  return (
+    <>
+      {renderHoverCard()}
+      <motion.div
+        className="space-y-6"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <motion.div variants={itemVariants}>
+          <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
+            Community
+          </h1>
+          <p className="text-[#737692] mt-2">
+            Engage with fellow learners, instructor and professional. Ask
+            questions, share insights, and grow together within IEFA's learning
+            community.
+          </p>
+        </motion.div>
 
-        {/* Study Groups Tab */}
-        <TabsContent value="study-groups" className="mt-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {[
-              { name: 'CIFP Study Group', members: 45, topic: 'Module 4 Discussion', nextSession: 'Tomorrow, 3:00 PM' },
-              { name: 'Sukuk Investment Circle', members: 28, topic: 'Market Analysis', nextSession: 'Wednesday, 5:00 PM' },
-              { name: 'ESG Finance Enthusiasts', members: 32, topic: 'Sustainable Finance', nextSession: 'Friday, 2:00 PM' },
-              { name: 'Shariah Compliance Hub', members: 56, topic: 'AAOIFI Standards', nextSession: 'Thursday, 4:00 PM' }
-            ].map((group, index) => (
+        {/* Search and Action Button */}
+        <motion.div
+          variants={itemVariants}
+          className="flex items-center gap-4 flex-col sm:flex-row"
+        >
+          <div className="relative flex-1 w-full sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder={
+                selectedTab === "mentorship"
+                  ? "Search discussions, topics or members"
+                  : "Search discussions, topics or members"
+              }
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto">
+            {selectedTab === "discussions" && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2 border-gray-200"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </Button>
+                <Button
+                  onClick={() => setShowStartDiscussionModal(true)}
+                  className="bg-[#D52B1E] hover:bg-[#B8241B] text-white"
+                >
+                  Start a Discussion
+                </Button>
+              </>
+            )}
+            {selectedTab === "mentorship" && (
+              <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
+                Mentorship
+              </Button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Main Tabs */}
+        <Tabs
+          defaultValue="discussions"
+          className="w-full"
+          onValueChange={setSelectedTab}
+        >
+          <TabsList className="bg-transparent h-auto p-0 mb-6 gap-2 border-b-0 w-full justify-start overflow-x-auto scrollbar-hide -mx-2 px-2 flex-nowrap md:flex-wrap md:overflow-visible md:px-0">
+            <TabsTrigger
+              value="discussions"
+              className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
+            >
+              Discussions
+            </TabsTrigger>
+            <TabsTrigger
+              value="study-groups"
+              className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
+            >
+              Study Groups
+            </TabsTrigger>
+            <TabsTrigger
+              value="mentorship"
+              className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
+            >
+              Mentorship
+            </TabsTrigger>
+            <TabsTrigger
+              value="events"
+              className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
+            >
+              Events
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Discussions Tab */}
+          <TabsContent value="discussions" className="mt-6 space-y-6">
+            {/* Filter Panel - Creative Design */}
+            {showFilters && (
               <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden mb-6"
               >
-                <Card className="hover:shadow-lg transition-all">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-[#000000] mb-2">{group.name}</CardTitle>
-                        <div className="flex items-center gap-2 text-sm text-[#737692]">
-                          <Users className="h-4 w-4" />
-                          <span>{group.members} members</span>
+                <Card className="bg-gradient-to-br from-white to-gray-50 border-2 border-[#D52B1E]/20 shadow-xl">
+                  <CardHeader className="pb-4 bg-gradient-to-r from-[#D52B1E]/5 to-transparent border-b-2 border-[#D52B1E]/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#D52B1E] to-[#B8241B] flex items-center justify-center">
+                          <Filter className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg text-[#000000]">
+                            Advanced Filters
+                          </CardTitle>
+                          <p className="text-xs text-[#737692]">
+                            Customize your search
+                          </p>
                         </div>
                       </div>
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
+                      <button
+                        onClick={() => setShowFilters(false)}
+                        className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                      >
+                        <X className="h-5 w-5 text-gray-400" />
+                      </button>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm text-[#737692] mb-1">Current Topic</p>
-                        <p className="font-medium text-[#000000]">{group.topic}</p>
+                  <CardContent className="pt-6 space-y-8">
+                    {/* Category Filter - Grid Style */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-6 w-1 bg-gradient-to-b from-[#D52B1E] to-orange-500 rounded-full"></div>
+                        <h4 className="font-bold text-[#000000] text-sm uppercase tracking-wider">
+                          Category
+                        </h4>
+                        <span className="text-xs font-semibold text-[#D52B1E] bg-red-50 px-2 py-1 rounded-full">
+                          {filters.category ? "1 Selected" : "All"}
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-sm text-[#737692] mb-1">Next Session</p>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-[#D52B1E]" />
-                          <p className="font-medium text-[#000000]">{group.nextSession}</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              category: undefined,
+                            }))
+                          }
+                          className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                            !filters.category
+                              ? "bg-gradient-to-r from-[#D52B1E] to-[#B8241B] text-white shadow-lg shadow-red-200"
+                              : "bg-gray-100 text-[#000000] hover:bg-gray-200"
+                          }`}
+                        >
+                          All
+                        </motion.button>
+                        {CATEGORIES.map((category) => (
+                          <motion.button
+                            key={category}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() =>
+                              setFilters((prev) => ({ ...prev, category }))
+                            }
+                            className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                              filters.category === category
+                                ? "bg-gradient-to-r from-[#D52B1E] to-[#B8241B] text-white shadow-lg shadow-red-200"
+                                : "bg-gray-100 text-[#000000] hover:bg-gray-200 border border-gray-200"
+                            }`}
+                          >
+                            {category}
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-gradient-to-r from-gray-200 via-[#D52B1E]/20 to-gray-200"></div>
+
+                    {/* Sort By Filter - Modern Radio Style */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-6 w-1 bg-gradient-to-b from-blue-500 to-blue-400 rounded-full"></div>
+                        <h4 className="font-bold text-[#000000] text-sm uppercase tracking-wider">
+                          Sort By
+                        </h4>
+                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-full capitalize">
+                          {filters.sortBy === "latest"
+                            ? "Latest"
+                            : filters.sortBy === "earliest"
+                              ? "Earliest"
+                              : filters.sortBy === "mostPopular"
+                                ? "Popular"
+                                : "Unanswered"}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {[
+                          {
+                            value: "latest",
+                            label: "Latest First",
+                            icon: "⏱️",
+                          },
+                          {
+                            value: "earliest",
+                            label: "Oldest First",
+                            icon: "📜",
+                          },
+                          {
+                            value: "mostPopular",
+                            label: "Most Popular",
+                            icon: "🔥",
+                          },
+                          {
+                            value: "unanswered",
+                            label: "Unanswered",
+                            icon: "❓",
+                          },
+                        ].map((option) => (
+                          <motion.button
+                            key={option.value}
+                            whileHover={{ x: 4 }}
+                            onClick={() =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                sortBy: option.value as any,
+                              }))
+                            }
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                              filters.sortBy === option.value
+                                ? "bg-blue-50 border-2 border-blue-400 text-[#000000]"
+                                : "bg-gray-50 border border-gray-200 text-[#737692] hover:bg-gray-100"
+                            }`}
+                          >
+                            <span className="text-lg">{option.icon}</span>
+                            <span>{option.label}</span>
+                            {filters.sortBy === option.value && (
+                              <div className="ml-auto h-5 w-5 rounded-full bg-blue-400 flex items-center justify-center">
+                                <span className="text-white text-xs">✓</span>
+                              </div>
+                            )}
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-gradient-to-r from-gray-200 via-[#D52B1E]/20 to-gray-200"></div>
+
+                    {/* Time Range Filter - Horizontal Pills */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-6 w-1 bg-gradient-to-b from-green-500 to-green-400 rounded-full"></div>
+                        <h4 className="font-bold text-[#000000] text-sm uppercase tracking-wider">
+                          Time Range
+                        </h4>
+                        <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full capitalize">
+                          {filters.timeRange === "day"
+                            ? "Day"
+                            : filters.timeRange === "week"
+                              ? "Week"
+                              : filters.timeRange === "month"
+                                ? "Month"
+                                : "All Time"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { value: "day", label: "📅 Last Day" },
+                          { value: "week", label: "📆 Last Week" },
+                          { value: "month", label: "📊 Last Month" },
+                          { value: "all", label: "🌍 All Time" },
+                        ].map((option) => (
+                          <motion.button
+                            key={option.value}
+                            whileHover={{ y: -2 }}
+                            whileTap={{ y: 0 }}
+                            onClick={() =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                timeRange: option.value as any,
+                              }))
+                            }
+                            className={`px-4 py-2 rounded-full font-medium text-sm transition-all ${
+                              filters.timeRange === option.value
+                                ? "bg-gradient-to-r from-green-400 to-green-500 text-white shadow-lg shadow-green-200"
+                                : "bg-gray-100 text-[#737692] hover:bg-gray-200 border border-gray-200"
+                            }`}
+                          >
+                            {option.label}
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-gradient-to-r from-gray-200 via-[#D52B1E]/20 to-gray-200"></div>
+
+                    {/* Saved Posts Filter - Toggle Switch Style */}
+                    <motion.div
+                      whileHover={{ x: 2 }}
+                      className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-transparent rounded-lg border border-purple-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-purple-400 to-purple-500 flex items-center justify-center text-white text-lg">
+                          💾
+                        </div>
+                        <div>
+                          <p className="font-semibold text-[#000000]">
+                            Saved Posts
+                          </p>
+                          <p className="text-xs text-[#737692]">
+                            Show only bookmarked
+                          </p>
                         </div>
                       </div>
-                      <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                        Join Group
-                      </Button>
-                    </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={filters.savedOnly || false}
+                          onChange={(e) =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              savedOnly: e.target.checked,
+                            }))
+                          }
+                          className="sr-only peer"
+                        />
+                        <div
+                          className={`w-11 h-6 rounded-full peer transition-all ${
+                            filters.savedOnly ? "bg-purple-500" : "bg-gray-300"
+                          } peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all`}
+                        ></div>
+                      </label>
+                    </motion.div>
+
+                    {/* Clear Filters Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() =>
+                        setFilters({ sortBy: "latest", timeRange: "all" })
+                      }
+                      className="w-full py-3 rounded-lg font-semibold text-sm border-2 border-gray-300 text-[#737692] hover:border-[#D52B1E] hover:text-[#D52B1E] transition-all bg-gray-50 hover:bg-red-50"
+                    >
+                      ↺ Reset Filters
+                    </motion.button>
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
-          </div>
-        </TabsContent>
+            )}
 
-        {/* Mentorship Tab */}
-        <TabsContent value="mentorship" className="mt-6">
-          <div className="grid gap-6 md:grid-cols-4">
-            {/* Filter Sidebar */}
-            <div className="md:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-[#000000] text-lg">Find a Mentor</CardTitle>
-                  <p className="text-sm text-[#737692]">Connect with a experienced professionals and instructors</p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Expertise Filter */}
-                  <div>
-                    <h4 className="font-semibold text-[#000000] mb-3">Expertise</h4>
-                    <div className="relative mb-3">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input placeholder="Filter by Name" className="pl-10 text-sm" />
-                    </div>
-                  </div>
+            {/* Results Count */}
+            <motion.div
+              variants={itemVariants}
+              className="text-sm text-[#737692]"
+            >
+              Showing {filteredDiscussions.length} of {discussionPosts.length}{" "}
+              discussions
+            </motion.div>
 
-                  {/* Availability Filter */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-[#000000]">Availability</h4>
-                      <span className="text-xs text-[#737692]">12 replies</span>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="rounded border-gray-300" />
-                        <span className="text-sm text-[#000000]">Takaful</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="rounded border-gray-300" />
-                        <span className="text-sm text-[#000000]">Sukuk</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked className="rounded border-gray-300" />
-                        <span className="text-sm text-[#000000]">Shari'ah Audit</span>
-                      </label>
-                    </div>
-                  </div>
+            {/* Discussions List */}
+            <div className="space-y-4">
+              {filteredDiscussions.length > 0 ? (
+                filteredDiscussions.map((post, index) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <Card
+                      onClick={() => handlePostClick(post)}
+                      className="hover:shadow-lg transition-all cursor-pointer border-l-4 border-l-transparent hover:border-l-[#D52B1E]"
+                    >
+                      <CardContent className="p-6">
+                        <div className="flex flex-col gap-3">
+                          {/* Header with Category and Status */}
+                          <div className="flex flex-wrap items-center gap-2 justify-between">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-lg font-semibold text-[#000000]">
+                                {post.title}
+                              </h3>
+                              <Badge
+                                className={`${categoryColors[post.category]} text-white hover:${categoryColors[post.category]}`}
+                              >
+                                {post.category}
+                              </Badge>
+                              {post.isAnswered && (
+                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                  Answered
+                                </Badge>
+                              )}
+                              {post.isPinned && (
+                                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                                  Pinned
+                                </Badge>
+                              )}
+                            </div>
+                            {isModerator && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePinPost(post.id);
+                                  }}
+                                  className="text-sm text-[#737692] hover:text-[#D52B1E]"
+                                >
+                                  {post.isPinned ? "Unpin" : "Pin"}
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePost(post.id);
+                                  }}
+                                  className="text-sm text-red-600 hover:text-red-700"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
-                  {/* Role Filter */}
-                  <div>
-                    <h4 className="font-semibold text-[#000000] mb-3">Role (Instructor, Professional)</h4>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="rounded border-gray-300" />
-                        <span className="text-sm text-[#000000]">Impact Guidance</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked className="rounded border-gray-300" />
-                        <span className="text-sm text-[#000000]">Career Advice</span>
-                      </label>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                          {/* Description */}
+                          <p className="text-sm text-[#737692]">
+                            {post.description}
+                          </p>
+
+                          {/* Poster Info and Metrics */}
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-3 border-t">
+                            {/* Poster Section */}
+                            <div
+                              className="flex items-center gap-3 relative"
+                              onMouseEnter={(e) => handleProfileHover(post, e)}
+                              onMouseLeave={clearProfileHover}
+                            >
+                              <button
+                                onClick={(e) =>
+                                  handlePosterProfileClick(post, e)
+                                }
+                                className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                              >
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-lg shadow-sm cursor-pointer">
+                                  {post.posterAvatar}
+                                </div>
+                              </button>
+
+                              <div className="min-w-0">
+                                <button
+                                  onClick={(e) =>
+                                    handlePosterProfileClick(post, e)
+                                  }
+                                  className="text-sm font-semibold text-[#000000] hover:text-[#D52B1E] transition-colors"
+                                >
+                                  {post.poster}
+                                </button>
+                                <p className="text-xs text-[#737692]">
+                                  {formatTime(post.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Metrics */}
+                            <div className="flex items-center gap-4 text-[#737692] flex-wrap justify-end sm:justify-start">
+                              <div className="flex items-center gap-1 text-sm">
+                                <Eye className="h-4 w-4" />
+                                <span>{post.views}</span>
+                              </div>
+                              <div
+                                className="flex items-center gap-1 text-sm cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleLikePost(post.id);
+                                }}
+                              >
+                                <Heart
+                                  className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-current text-red-500" : ""}`}
+                                />
+                                <span>
+                                  {post.likes +
+                                    (likedPosts.includes(post.id) ? 1 : 0)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm">
+                                <MessageSquare className="h-4 w-4" />
+                                <span>{post.replies}</span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShare(post);
+                                }}
+                                className="flex items-center gap-1 text-sm hover:text-[#D52B1E]"
+                              >
+                                <Share2 className="h-4 w-4" />
+                              </button>
+                              {post.shares > 0 && (
+                                <div className="flex items-center gap-1 text-sm">
+                                  <span>🔗</span>
+                                  <span>{post.shares}</span>
+                                </div>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReport(post.id);
+                                }}
+                                className={`p-1 rounded transition-colors ${reportedPosts.includes(post.id) ? "text-red-600" : "text-[#737692] hover:text-red-600"}`}
+                              >
+                                <Flag className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSavePost(post.id);
+                                }}
+                                className={`p-1 rounded transition-colors ${
+                                  savedPosts.includes(post.id)
+                                    ? "text-[#D52B1E]"
+                                    : "text-[#737692] hover:text-[#D52B1E]"
+                                }`}
+                              >
+                                <Bookmark
+                                  className={`h-4 w-4 ${savedPosts.includes(post.id) ? "fill-current" : ""}`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <p className="text-[#737692]">
+                      No discussions found matching your criteria.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
+          </TabsContent>
 
-            {/* Mentors Grid */}
-            <div className="md:col-span-3 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {mentors.map((mentor, index) => (
+          {/* Study Groups Tab */}
+          <TabsContent value="study-groups" className="mt-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              {[
+                {
+                  name: "CIFP Study Group",
+                  members: 45,
+                  topic: "Module 4 Discussion",
+                  nextSession: "Tomorrow, 3:00 PM",
+                },
+                {
+                  name: "Sukuk Investment Circle",
+                  members: 28,
+                  topic: "Market Analysis",
+                  nextSession: "Wednesday, 5:00 PM",
+                },
+                {
+                  name: "ESG Finance Enthusiasts",
+                  members: 32,
+                  topic: "Sustainable Finance",
+                  nextSession: "Friday, 2:00 PM",
+                },
+                {
+                  name: "Shariah Compliance Hub",
+                  members: 56,
+                  topic: "AAOIFI Standards",
+                  nextSession: "Thursday, 4:00 PM",
+                },
+              ].map((group, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
-                  <Card className="hover:shadow-lg transition-all h-full">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col items-center text-center space-y-3">
-                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-4xl">
-                          {mentor.image}
+                  <Card className="hover:shadow-lg transition-all">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-[#000000] mb-2">
+                            {group.name}
+                          </CardTitle>
+                          <div className="flex items-center gap-2 text-sm text-[#737692]">
+                            <Users className="h-4 w-4" />
+                            <span>{group.members} members</span>
+                          </div>
+                        </div>
+                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                          Active
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm text-[#737692] mb-1">
+                            Current Topic
+                          </p>
+                          <p className="font-medium text-[#000000]">
+                            {group.topic}
+                          </p>
                         </div>
                         <div>
-                          <h4 className="font-semibold text-[#000000]">{mentor.name}</h4>
-                          <p className="text-sm text-[#737692]">{mentor.role}</p>
-                          <p className="text-xs text-[#737692]">{mentor.organization}</p>
+                          <p className="text-sm text-[#737692] mb-1">
+                            Next Session
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-[#D52B1E]" />
+                            <p className="font-medium text-[#000000]">
+                              {group.nextSession}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                          <span className="text-xs text-[#737692]">Available for Mentorship</span>
-                        </div>
-                        <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white text-sm">
-                          Request Session
+                        <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
+                          Join Group
                         </Button>
                       </div>
                     </CardContent>
@@ -341,76 +1188,243 @@ export default function Community() {
                 </motion.div>
               ))}
             </div>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        {/* Events Tab */}
-        <TabsContent value="events" className="mt-6">
-          <div className="space-y-4">
-            {[
-              { 
-                title: 'Islamic Finance Summit 2026',
-                date: 'March 15, 2026',
-                time: '9:00 AM - 5:00 PM',
-                type: 'Conference',
-                location: 'Virtual',
-                attendees: 250
-              },
-              {
-                title: 'Sukuk Market Workshop',
-                date: 'February 20, 2026',
-                time: '2:00 PM - 4:00 PM',
-                type: 'Workshop',
-                location: 'Dubai',
-                attendees: 45
-              },
-              {
-                title: 'ESG Investment Webinar',
-                date: 'February 12, 2026',
-                time: '10:00 AM - 11:30 AM',
-                type: 'Webinar',
-                location: 'Online',
-                attendees: 180
-              }
-            ].map((event, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <Card className="hover:shadow-lg transition-all">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-[#000000]">{event.title}</h3>
-                          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                            {event.type}
-                          </Badge>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-[#737692]">
-                            <Calendar className="h-4 w-4" />
-                            <span>{event.date} • {event.time}</span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-[#737692]">
-                            <span>📍 {event.location}</span>
-                            <span>• {event.attendees} registered</span>
-                          </div>
-                        </div>
+          {/* Mentorship Tab */}
+          <TabsContent value="mentorship" className="mt-6">
+            <div className="grid gap-6 md:grid-cols-4">
+              {/* Filter Sidebar */}
+              <div className="md:col-span-1">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-[#000000] text-lg">
+                      Find a Mentor
+                    </CardTitle>
+                    <p className="text-sm text-[#737692]">
+                      Connect with a experienced professionals and instructors
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Expertise Filter */}
+                    <div>
+                      <h4 className="font-semibold text-[#000000] mb-3">
+                        Expertise
+                      </h4>
+                      <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Filter by Name"
+                          className="pl-10 text-sm"
+                        />
                       </div>
-                      <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                        Register
-                      </Button>
+                    </div>
+
+                    {/* Availability Filter */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-[#000000]">
+                          Availability
+                        </h4>
+                        <span className="text-xs text-[#737692]">
+                          12 replies
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm text-[#000000]">
+                            Takaful
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm text-[#000000]">Sukuk</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm text-[#000000]">
+                            Shari'ah Audit
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Role Filter */}
+                    <div>
+                      <h4 className="font-semibold text-[#000000] mb-3">
+                        Role (Instructor, Professional)
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm text-[#000000]">
+                            Impact Guidance
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm text-[#000000]">
+                            Career Advice
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-    </motion.div>
-  )
+              </div>
+
+              {/* Mentors Grid */}
+              <div className="md:col-span-3 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {mentors.map((mentor, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <Card className="hover:shadow-lg transition-all h-full">
+                      <CardContent className="p-6">
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <div className="h-20 w-20 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-4xl">
+                            {mentor.image}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-[#000000]">
+                              {mentor.name}
+                            </h4>
+                            <p className="text-sm text-[#737692]">
+                              {mentor.role}
+                            </p>
+                            <p className="text-xs text-[#737692]">
+                              {mentor.organization}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                            <span className="text-xs text-[#737692]">
+                              Available for Mentorship
+                            </span>
+                          </div>
+                          <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white text-sm">
+                            Request Session
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Events Tab */}
+          <TabsContent value="events" className="mt-6">
+            <div className="space-y-4">
+              {[
+                {
+                  title: "Islamic Finance Summit 2026",
+                  date: "March 15, 2026",
+                  time: "9:00 AM - 5:00 PM",
+                  type: "Conference",
+                  location: "Virtual",
+                  attendees: 250,
+                },
+                {
+                  title: "Sukuk Market Workshop",
+                  date: "February 20, 2026",
+                  time: "2:00 PM - 4:00 PM",
+                  type: "Workshop",
+                  location: "Dubai",
+                  attendees: 45,
+                },
+                {
+                  title: "ESG Investment Webinar",
+                  date: "February 12, 2026",
+                  time: "10:00 AM - 11:30 AM",
+                  type: "Webinar",
+                  location: "Online",
+                  attendees: 180,
+                },
+              ].map((event, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <Card className="hover:shadow-lg transition-all">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-semibold text-[#000000]">
+                              {event.title}
+                            </h3>
+                            <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                              {event.type}
+                            </Badge>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-[#737692]">
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                {event.date} • {event.time}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-[#737692]">
+                              <span>📍 {event.location}</span>
+                              <span>• {event.attendees} registered</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
+                          Register
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Start Discussion Modal */}
+        <StartDiscussionModal
+          isOpen={showStartDiscussionModal}
+          onClose={() => setShowStartDiscussionModal(false)}
+          onSubmit={handleCreateDiscussion}
+        />
+
+        {/* Poster Profile Popup */}
+        {selectedPoster && (
+          <PosterProfilePopup
+            user={selectedPoster}
+            isOpen={showPosterProfile}
+            onClose={() => {
+              setShowPosterProfile(false);
+              setSelectedPoster(null);
+            }}
+          />
+        )}
+      </motion.div>
+    </>
+  );
 }

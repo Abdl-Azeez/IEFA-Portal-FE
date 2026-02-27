@@ -218,53 +218,61 @@ function NewsCard({ news }: NewsCardProps) {
 }
 
 export function Dashboard() {
-  const navigate = useNavigate()
-  const [currentNewsIndex, setCurrentNewsIndex] = useState(0)
-  const [isTransitioning, setIsTransitioning] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
+  const navigate = useNavigate();
+  const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Scroll to top on page load
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   // Check if mobile on mount and resize
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Duplicate news for infinite loop
-  const infiniteNews = [...newsData, ...newsData]
+  const infiniteNews = [...newsData, ...newsData];
 
   // Auto-slide news every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentNewsIndex((prev) => prev + 1)
-    }, 5000)
+      setCurrentNewsIndex((prev) => prev + 1);
+    }, 5000);
 
-    return () => clearInterval(interval)
-  }, [])
+    return () => clearInterval(interval);
+  }, []);
 
   // Reset to beginning when reaching the end of the duplicated section
   useEffect(() => {
     if (currentNewsIndex >= newsData.length) {
       // Wait for transition to complete
       setTimeout(() => {
-        setIsTransitioning(false)
-        setCurrentNewsIndex(0)
+        setIsTransitioning(false);
+        setCurrentNewsIndex(0);
         // Re-enable transition after reset
-        setTimeout(() => setIsTransitioning(true), 50)
-      }, 600) // Match transition duration
+        setTimeout(() => setIsTransitioning(true), 50);
+      }, 600); // Match transition duration
     }
-  }, [currentNewsIndex])
+  }, [currentNewsIndex]);
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
     >
       {/* Welcome Section */}
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-4">
+      <motion.div
+        variants={itemVariants}
+        className="flex flex-col sm:flex-row justify-between items-start gap-4"
+      >
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#000000]">
             Hello, <span className="text-primary">Ibrahim Shenshen!</span>
@@ -285,19 +293,19 @@ export function Dashboard() {
               <CardContent className="p-0">
                 <Tabs defaultValue="topGainers" className="w-full">
                   <TabsList className="bg-transparent h-auto p-0 mb-6 gap-0 flex-wrap">
-                    <TabsTrigger 
+                    <TabsTrigger
                       value="topGainers"
                       className="bg-transparent px-0 mr-4 sm:mr-8 pb-2 text-xs sm:text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent"
                     >
                       Top Gainers
                     </TabsTrigger>
-                    <TabsTrigger 
+                    <TabsTrigger
                       value="topLosers"
                       className="bg-transparent px-0 mr-4 sm:mr-8 pb-2 text-xs sm:text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent"
                     >
                       Top Losers
                     </TabsTrigger>
-                    <TabsTrigger 
+                    <TabsTrigger
                       value="mostActive"
                       className="bg-transparent px-0 pb-2 text-xs sm:text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent"
                     >
@@ -339,17 +347,24 @@ export function Dashboard() {
 
         {/* Right Column - News Slider */}
         <motion.div variants={itemVariants} className="overflow-hidden">
-          <motion.div 
+          <motion.div
             className="flex gap-4 sm:gap-6"
-            animate={{ 
-              x: isMobile 
-                ? `calc(-${currentNewsIndex * 100}% - ${currentNewsIndex * 16}px)` 
-                : `calc(-${currentNewsIndex * 50}% - ${currentNewsIndex * 24}px)` 
+            animate={{
+              x: isMobile
+                ? `calc(-${currentNewsIndex * 100}% - ${currentNewsIndex * 16}px)`
+                : `calc(-${currentNewsIndex * 50}% - ${currentNewsIndex * 24}px)`,
             }}
-            transition={isTransitioning ? { duration: 0.6, ease: "easeInOut" } : { duration: 0 }}
+            transition={
+              isTransitioning
+                ? { duration: 0.6, ease: "easeInOut" }
+                : { duration: 0 }
+            }
           >
             {infiniteNews.map((news, index) => (
-              <div key={`${news.id}-${index}`} className="w-full sm:w-[calc(50%-12px)] flex-shrink-0">
+              <div
+                key={`${news.id}-${index}`}
+                className="w-full sm:w-[calc(50%-12px)] flex-shrink-0"
+              >
                 <NewsCard news={news} />
               </div>
             ))}
@@ -364,8 +379,10 @@ export function Dashboard() {
           <Card className="overflow-hidden bg-white shadow-sm border-0">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold text-[#000000]">Course Suggestions</CardTitle>
-                <motion.button 
+                <CardTitle className="text-lg font-semibold text-[#000000]">
+                  Course Suggestions
+                </CardTitle>
+                <motion.button
                   className="text-sm text-[#D52B1E] font-medium flex items-center gap-1 hover:underline"
                   whileHover={{ x: 3 }}
                 >
@@ -379,26 +396,34 @@ export function Dashboard() {
                 <div className="bg-gradient-to-r from-[#D52B1E]/10 to-[#6F1610]/10 rounded-xl p-6 border border-[#D52B1E]/20">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-[#000000] mb-2">Help me choose</h3>
+                      <h3 className="text-lg font-semibold text-[#000000] mb-2">
+                        Help me choose
+                      </h3>
                       <p className="text-sm text-[#737692] mb-3 leading-relaxed">
-                        Answer a few questions about your experience, goals, and interests to find your next step
+                        Answer a few questions about your experience, goals, and
+                        interests to find your next step
                       </p>
                       <div className="flex items-center gap-2 text-xs text-[#737692] mb-4">
                         <Clock className="h-3 w-3" />
                         <span>Takes 2 minutes</span>
                       </div>
-                      <motion.button 
+                      <motion.button
                         className="px-4 py-2 bg-[#D52B1E] text-white text-sm font-medium rounded-lg hover:bg-[#B8241B] transition-colors"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => navigate('/questionnaire')}
+                        onClick={() => navigate("/questionnaire")}
                       >
                         Start now
                       </motion.button>
                     </div>
                     <div className="ml-4 text-[#D52B1E]/30">
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                      <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                       </svg>
                     </div>
                   </div>
@@ -406,7 +431,9 @@ export function Dashboard() {
 
                 {/* Best selling courses */}
                 <div>
-                  <h3 className="text-base font-semibold text-[#000000] mb-4">Best Selling Courses</h3>
+                  <h3 className="text-base font-semibold text-[#000000] mb-4">
+                    Best Selling Courses
+                  </h3>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {courseSuggestions.map((course, index) => (
                       <motion.div
@@ -442,7 +469,9 @@ export function Dashboard() {
                             </div>
                           )}
                         </div>
-                        <h3 className="text-sm font-medium text-[#000000] line-clamp-2 mb-2">{course.title}</h3>
+                        <h3 className="text-sm font-medium text-[#000000] line-clamp-2 mb-2">
+                          {course.title}
+                        </h3>
                         <div className="flex items-center gap-3 text-xs text-[#737692]">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -493,5 +522,5 @@ export function Dashboard() {
         </motion.div>
       </div>
     </motion.div>
-  )
+  );
 }

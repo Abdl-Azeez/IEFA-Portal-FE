@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useEffect } from "react";
 import { Play, Pause, Clock, Headphones } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -55,8 +56,15 @@ const archiveEpisodes = [
 ]
 
 export default function Podcast() {
-  const [activeId, setActiveId] = useState<number | null>(episodes[0]?.id ?? null)
-  const activeEpisode = episodes.find((e) => e.id === activeId) ?? episodes[0]
+  const [activeId, setActiveId] = useState<number | null>(
+    episodes[0]?.id ?? null,
+  );
+  const activeEpisode = episodes.find((e) => e.id === activeId) ?? episodes[0];
+
+  // Scroll to top on page load
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   return (
     <motion.div
@@ -66,10 +74,13 @@ export default function Podcast() {
       variants={containerVariants}
     >
       <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">Podcast</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
+          Podcast
+        </h1>
         <p className="mt-2 text-[#737692]">
-          Conversations with investors, operators, and policymakers across the IEFA community.
-          Listen to career journeys, market debriefs, and behind-the-scenes stories.
+          Conversations with investors, operators, and policymakers across the
+          IEFA community. Listen to career journeys, market debriefs, and
+          behind-the-scenes stories.
         </p>
       </motion.div>
 
@@ -91,11 +102,19 @@ export default function Podcast() {
                 size="lg"
                 className="h-14 w-14 rounded-full bg-[#D52B1E] hover:bg-[#B8241B] text-white shrink-0"
               >
-                {activeId ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 ml-0.5" />}
+                {activeId ? (
+                  <Pause className="h-6 w-6" />
+                ) : (
+                  <Play className="h-6 w-6 ml-0.5" />
+                )}
               </Button>
               <div className="flex-1">
-                <h3 className="font-semibold text-[#000000] text-lg">{activeEpisode.title}</h3>
-                <p className="text-sm text-[#737692]">Guest: {activeEpisode.guest}</p>
+                <h3 className="font-semibold text-[#000000] text-lg">
+                  {activeEpisode.title}
+                </h3>
+                <p className="text-sm text-[#737692]">
+                  Guest: {activeEpisode.guest}
+                </p>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-[#D52B1E]/20">
                     {activeEpisode.tag}
@@ -123,7 +142,7 @@ export default function Podcast() {
           <CardContent>
             <div className="space-y-3">
               {episodes.map((episode, index) => {
-                const isActive = activeEpisode.id === episode.id
+                const isActive = activeEpisode.id === episode.id;
                 return (
                   <motion.div
                     key={episode.id}
@@ -133,13 +152,15 @@ export default function Podcast() {
                     onClick={() => setActiveId(episode.id)}
                     className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all ${
                       isActive
-                        ? 'bg-[#D52B1E] text-white border-[#D52B1E]'
-                        : 'hover:bg-gray-50 border-gray-200'
+                        ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+                        : "hover:bg-gray-50 border-gray-200"
                     }`}
                   >
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      isActive ? 'bg-white/20' : 'bg-[#FFEFEF]'
-                    }`}>
+                    <div
+                      className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        isActive ? "bg-white/20" : "bg-[#FFEFEF]"
+                      }`}
+                    >
                       {isActive ? (
                         <Pause className="h-5 w-5" />
                       ) : (
@@ -147,20 +168,33 @@ export default function Podcast() {
                       )}
                     </div>
                     <div className="flex-1 space-y-1">
-                      <h4 className={`font-semibold ${isActive ? 'text-white' : 'text-[#000000]'}`}>{episode.title}</h4>
-                      <p className={`text-sm ${isActive ? 'text-white/90' : 'text-[#737692]'}`}>Guest: {episode.guest}</p>
+                      <h4
+                        className={`font-semibold ${isActive ? "text-white" : "text-[#000000]"}`}
+                      >
+                        {episode.title}
+                      </h4>
+                      <p
+                        className={`text-sm ${isActive ? "text-white/90" : "text-[#737692]"}`}
+                      >
+                        Guest: {episode.guest}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={isActive ? 'border-white/50 text-white' : ''}>
+                      <Badge
+                        variant="outline"
+                        className={isActive ? "border-white/50 text-white" : ""}
+                      >
                         {episode.tag}
                       </Badge>
-                      <span className={`text-sm flex items-center gap-1 ${isActive ? 'text-white/90' : 'text-[#737692]'}`}>
+                      <span
+                        className={`text-sm flex items-center gap-1 ${isActive ? "text-white/90" : "text-[#737692]"}`}
+                      >
                         <Clock className="h-3 w-3" />
                         {episode.duration}
                       </span>
                     </div>
                   </motion.div>
-                )
+                );
               })}
             </div>
           </CardContent>
@@ -192,7 +226,9 @@ export default function Podcast() {
                     </div>
                     <div>
                       <h4 className="font-medium text-[#000000]">{ep.title}</h4>
-                      <p className="text-sm text-[#737692]">Length: {ep.duration}</p>
+                      <p className="text-sm text-[#737692]">
+                        Length: {ep.duration}
+                      </p>
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" className="text-[#D52B1E]">
@@ -205,5 +241,5 @@ export default function Podcast() {
         </Card>
       </motion.div>
     </motion.div>
-  )
+  );
 }

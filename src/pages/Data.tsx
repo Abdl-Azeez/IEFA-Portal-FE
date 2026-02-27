@@ -1,54 +1,67 @@
-import { motion } from 'framer-motion'
-import { Database, BarChart3, Download, TrendingUp } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { useEffect } from "react";
+import { motion } from "framer-motion";
+import { Database, BarChart3, Download, TrendingUp } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-}
+    transition: { staggerChildren: 0.1 },
+  },
+};
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { duration: 0.5 }
-  }
-}
+    transition: { duration: 0.5 },
+  },
+};
 
 const dataCatalog = [
   {
-    name: 'Market dashboard snapshot',
-    horizon: 'Daily',
-    description: 'Headline indices, FX, and rates for quick morning checks.',
-    tags: ['Indices', 'FX', 'Rates'],
+    name: "Market dashboard snapshot",
+    horizon: "Daily",
+    description: "Headline indices, FX, and rates for quick morning checks.",
+    tags: ["Indices", "FX", "Rates"],
   },
   {
-    name: 'Nigeria listed equities',
-    horizon: 'End of day',
-    description: 'Prices, volumes, and basic valuation metrics for listed names.',
-    tags: ['Equities', 'EOD'],
+    name: "Nigeria listed equities",
+    horizon: "End of day",
+    description:
+      "Prices, volumes, and basic valuation metrics for listed names.",
+    tags: ["Equities", "EOD"],
   },
   {
-    name: 'Fixed income curve',
-    horizon: 'Weekly',
-    description: 'Indicative yield curves across government and corporate bonds.',
-    tags: ['Bonds', 'Curve'],
+    name: "Fixed income curve",
+    horizon: "Weekly",
+    description:
+      "Indicative yield curves across government and corporate bonds.",
+    tags: ["Bonds", "Curve"],
   },
   {
-    name: 'FX & macro reference series',
-    horizon: 'Monthly',
-    description: 'FX, inflation, policy rates, and key macro indicators.',
-    tags: ['FX', 'Macro'],
+    name: "FX & macro reference series",
+    horizon: "Monthly",
+    description: "FX, inflation, policy rates, and key macro indicators.",
+    tags: ["FX", "Macro"],
   },
-]
+];
 
 export default function Data() {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   return (
     <motion.div
       className="space-y-6"
@@ -57,10 +70,12 @@ export default function Data() {
       variants={containerVariants}
     >
       <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">Data</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
+          Data
+        </h1>
         <p className="mt-2 text-[#737692]">
-          A future home for IEFA&apos;s structured data views – prices, curves, volumes, and
-          cross-asset dashboards.
+          A future home for IEFA&apos;s structured data views – prices, curves,
+          volumes, and cross-asset dashboards.
         </p>
       </motion.div>
 
@@ -68,10 +83,12 @@ export default function Data() {
       <motion.div variants={itemVariants}>
         <Card className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border-primary/20">
           <CardHeader>
-            <CardTitle className="text-[#000000]">Data Command Centre</CardTitle>
+            <CardTitle className="text-[#000000]">
+              Data Command Centre
+            </CardTitle>
             <CardDescription className="text-[#737692]">
-              Live dashboards, curves, and reference data will converge here. For now, explore
-              the datasets available for download.
+              Live dashboards, curves, and reference data will converge here.
+              For now, explore the datasets available for download.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -82,7 +99,9 @@ export default function Data() {
                 </div>
                 <div>
                   <p className="font-semibold text-[#000000]">Market Pulse</p>
-                  <p className="text-sm text-[#737692]">Headline indices, FX and yields</p>
+                  <p className="text-sm text-[#737692]">
+                    Headline indices, FX and yields
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-4 p-4 bg-white rounded-lg border hover:shadow-md transition-all">
@@ -91,7 +110,9 @@ export default function Data() {
                 </div>
                 <div>
                   <p className="font-semibold text-[#000000]">Liquidity Map</p>
-                  <p className="text-sm text-[#737692]">Volume concentration across assets</p>
+                  <p className="text-sm text-[#737692]">
+                    Volume concentration across assets
+                  </p>
                 </div>
               </div>
             </div>
@@ -105,7 +126,9 @@ export default function Data() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-2xl text-[#000000]">Data Catalog</CardTitle>
+                <CardTitle className="text-2xl text-[#000000]">
+                  Data Catalog
+                </CardTitle>
                 <CardDescription className="text-[#737692]">
                   Datasets available for preview and download
                 </CardDescription>
@@ -131,14 +154,22 @@ export default function Data() {
                       <Database className="h-5 w-5 text-[#D52B1E]" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-[#000000]">{item.name}</h3>
-                      <p className="text-sm text-[#737692] mb-2">{item.description}</p>
+                      <h3 className="font-semibold text-[#000000]">
+                        {item.name}
+                      </h3>
+                      <p className="text-sm text-[#737692] mb-2">
+                        {item.description}
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline" className="text-xs">
                           {item.horizon}
                         </Badge>
                         {item.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
+                          <Badge
+                            key={tag}
+                            variant="outline"
+                            className="text-xs"
+                          >
                             {tag}
                           </Badge>
                         ))}
@@ -159,5 +190,5 @@ export default function Data() {
         </Card>
       </motion.div>
     </motion.div>
-  )
+  );
 }

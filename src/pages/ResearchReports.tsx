@@ -1,67 +1,78 @@
-import { motion } from 'framer-motion'
-import { Search, Calendar, Download } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useEffect } from "react";
+import { motion } from "framer-motion";
+import { Search, Calendar, Download } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-}
+    transition: { staggerChildren: 0.1 },
+  },
+};
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { duration: 0.5 }
-  }
-}
+    transition: { duration: 0.5 },
+  },
+};
 
 const researchCategories = [
-  'Macroeconomic outlook',
-  'Equity strategy',
-  'Fixed income',
-  'Commodities',
-  'Sustainable investing',
-  'Private markets',
-]
+  "Macroeconomic outlook",
+  "Equity strategy",
+  "Fixed income",
+  "Commodities",
+  "Sustainable investing",
+  "Private markets",
+];
 
 const sampleReports = [
   {
     id: 1,
-    title: 'Nigeria Macro & Markets Outlook 2025',
-    type: 'Macroeconomic outlook',
-    date: 'Feb 10, 2026',
-    author: 'IEFA Research',
+    title: "Nigeria Macro & Markets Outlook 2025",
+    type: "Macroeconomic outlook",
+    date: "Feb 10, 2026",
+    author: "IEFA Research",
     summary:
-      'A forward-looking view on growth, inflation, FX, and policy with implications for local and foreign investors.',
+      "A forward-looking view on growth, inflation, FX, and policy with implications for local and foreign investors.",
   },
   {
     id: 2,
-    title: 'Frontier Equities: Sector Playbook',
-    type: 'Equity strategy',
-    date: 'Jan 28, 2026',
-    author: 'IEFA Strategy Team',
+    title: "Frontier Equities: Sector Playbook",
+    type: "Equity strategy",
+    date: "Jan 28, 2026",
+    author: "IEFA Strategy Team",
     summary:
-      'Sector-by-sector view of opportunities across banks, consumer, industrials, and infrastructure plays.',
+      "Sector-by-sector view of opportunities across banks, consumer, industrials, and infrastructure plays.",
   },
   {
     id: 3,
-    title: 'Fixed Income & Liquidity Radar',
-    type: 'Fixed income',
-    date: 'Jan 16, 2026',
-    author: 'Markets Desk',
+    title: "Fixed Income & Liquidity Radar",
+    type: "Fixed income",
+    date: "Jan 16, 2026",
+    author: "Markets Desk",
     summary:
-      'Curve positioning, primary auction calendar, and liquidity considerations for institutional portfolios.',
+      "Curve positioning, primary auction calendar, and liquidity considerations for institutional portfolios.",
   },
-]
+];
 
 export default function ResearchReports() {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   return (
     <motion.div
       className="space-y-6"
@@ -70,10 +81,13 @@ export default function ResearchReports() {
       variants={containerVariants}
     >
       <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">Research & Reports</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
+          Research & Reports
+        </h1>
         <p className="mt-2 text-[#737692]">
-          Structured research to help investment and finance professionals make better decisions.
-          Browse macro, strategy, and product-level insights curated by IEFA.
+          Structured research to help investment and finance professionals make
+          better decisions. Browse macro, strategy, and product-level insights
+          curated by IEFA.
         </p>
       </motion.div>
 
@@ -119,12 +133,17 @@ export default function ResearchReports() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-2xl text-[#000000]">Latest Publications</CardTitle>
+                <CardTitle className="text-2xl text-[#000000]">
+                  Latest Publications
+                </CardTitle>
                 <CardDescription className="text-[#737692]">
                   Research & reports you can download today
                 </CardDescription>
               </div>
-              <Button variant="ghost" className="text-[#D52B1E] hover:bg-[#FFEFEF]">
+              <Button
+                variant="ghost"
+                className="text-[#D52B1E] hover:bg-[#FFEFEF]"
+              >
                 View archive
               </Button>
             </div>
@@ -141,7 +160,9 @@ export default function ResearchReports() {
                 >
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-[#000000]">{report.title}</h3>
+                      <h3 className="font-semibold text-[#000000]">
+                        {report.title}
+                      </h3>
                       <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-[#D52B1E]/20">
                         {report.type}
                       </Badge>
@@ -169,5 +190,5 @@ export default function ResearchReports() {
         </Card>
       </motion.div>
     </motion.div>
-  )
+  );
 }

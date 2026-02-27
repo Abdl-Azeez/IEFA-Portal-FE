@@ -1,7 +1,12 @@
-import { motion } from 'framer-motion'
-import { Construction } from 'lucide-react'
+import { useEffect } from "react";
+import { motion } from "framer-motion";
+import { Construction } from "lucide-react";
 
 export function NotAvailable() {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
       <motion.div
@@ -18,11 +23,12 @@ export function NotAvailable() {
         >
           <Construction className="w-12 h-12 text-primary" />
         </motion.div>
-        
+
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-gray-900">Coming Soon</h1>
           <p className="text-lg text-[#737692] max-w-md">
-            This page is not available at the moment. We're working hard to bring you this feature soon.
+            This page is not available at the moment. We're working hard to
+            bring you this feature soon.
           </p>
         </div>
 
@@ -32,7 +38,7 @@ export function NotAvailable() {
           transition={{ delay: 0.4 }}
           className="pt-4"
         >
-          <a 
+          <a
             href="/"
             className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors"
           >
@@ -41,5 +47,5 @@ export function NotAvailable() {
         </motion.div>
       </motion.div>
     </div>
-  )
+  );
 }

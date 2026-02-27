@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useEffect } from "react";
 import { Clock, TrendingUp, MessageCircle, Share2, Bookmark, Search } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -114,52 +115,63 @@ function NewsCard({ title, excerpt, category, time, image, trending, delay = 0 }
 }
 
 export function News() {
+  // Scroll to top on page load
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   const newsData = [
     {
-      title: 'Islamic Finance Market Reaches New Heights in Q4 2025',
-      excerpt: 'The global Islamic finance market has shown unprecedented growth, with assets reaching $3.5 trillion...',
-      category: 'Market Update',
-      time: '2 hours ago',
-      image: '📈',
-      trending: true
+      title: "Islamic Finance Market Reaches New Heights in Q4 2025",
+      excerpt:
+        "The global Islamic finance market has shown unprecedented growth, with assets reaching $3.5 trillion...",
+      category: "Market Update",
+      time: "2 hours ago",
+      image: "📈",
+      trending: true,
     },
     {
-      title: 'Sukuk Issuance Surges Amid Economic Recovery',
-      excerpt: 'Corporate and sovereign sukuk issuances have increased significantly as economies recover...',
-      category: 'Sukuk',
-      time: '4 hours ago',
-      image: '💰'
+      title: "Sukuk Issuance Surges Amid Economic Recovery",
+      excerpt:
+        "Corporate and sovereign sukuk issuances have increased significantly as economies recover...",
+      category: "Sukuk",
+      time: "4 hours ago",
+      image: "💰",
     },
     {
-      title: 'New Shariah-Compliant Investment Opportunities in Tech',
-      excerpt: 'Leading Islamic financial institutions announce new investment vehicles in technology sector...',
-      category: 'Technology',
-      time: '6 hours ago',
-      image: '💻'
+      title: "New Shariah-Compliant Investment Opportunities in Tech",
+      excerpt:
+        "Leading Islamic financial institutions announce new investment vehicles in technology sector...",
+      category: "Technology",
+      time: "6 hours ago",
+      image: "💻",
     },
     {
-      title: 'Regulatory Framework Updates for Islamic Banks',
-      excerpt: 'Central banks across the region introduce new guidelines for Islamic banking operations...',
-      category: 'Regulation',
-      time: '8 hours ago',
-      image: '⚖️'
+      title: "Regulatory Framework Updates for Islamic Banks",
+      excerpt:
+        "Central banks across the region introduce new guidelines for Islamic banking operations...",
+      category: "Regulation",
+      time: "8 hours ago",
+      image: "⚖️",
     },
     {
-      title: 'ESG Principles Align with Islamic Finance Values',
-      excerpt: 'Environmental, Social, and Governance principles show strong alignment with Islamic finance...',
-      category: 'ESG',
-      time: '10 hours ago',
-      image: '🌱',
-      trending: true
+      title: "ESG Principles Align with Islamic Finance Values",
+      excerpt:
+        "Environmental, Social, and Governance principles show strong alignment with Islamic finance...",
+      category: "ESG",
+      time: "10 hours ago",
+      image: "🌱",
+      trending: true,
     },
     {
-      title: 'Takaful Industry Shows Strong Growth Potential',
-      excerpt: 'The Islamic insurance sector demonstrates resilience and expansion opportunities...',
-      category: 'Takaful',
-      time: '12 hours ago',
-      image: '🛡️'
-    }
-  ]
+      title: "Takaful Industry Shows Strong Growth Potential",
+      excerpt:
+        "The Islamic insurance sector demonstrates resilience and expansion opportunities...",
+      category: "Takaful",
+      time: "12 hours ago",
+      image: "🛡️",
+    },
+  ];
 
   return (
     <motion.div
@@ -171,7 +183,9 @@ export function News() {
       <motion.div variants={itemVariants}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#000000]">Latest News</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
+              Latest News
+            </h1>
             <p className="mt-2 text-[#737692]">
               Stay updated with the latest in Islamic finance and economics
             </p>
@@ -194,12 +208,20 @@ export function News() {
       <motion.div variants={itemVariants}>
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="flex w-full max-w-full gap-2 overflow-x-auto scrollbar-hide px-2 pr-4 snap-x snap-mandatory scroll-px-4 justify-start md:px-0 md:pr-0 md:grid md:max-w-md md:grid-cols-4 md:gap-0 md:overflow-visible md:snap-none">
-            <TabsTrigger value="all" className="shrink-0 snap-start">All</TabsTrigger>
-            <TabsTrigger value="trending" className="shrink-0 snap-start">Trending</TabsTrigger>
-            <TabsTrigger value="market" className="shrink-0 snap-start">Market</TabsTrigger>
-            <TabsTrigger value="regulation" className="shrink-0 snap-start">Regulation</TabsTrigger>
+            <TabsTrigger value="all" className="shrink-0 snap-start">
+              All
+            </TabsTrigger>
+            <TabsTrigger value="trending" className="shrink-0 snap-start">
+              Trending
+            </TabsTrigger>
+            <TabsTrigger value="market" className="shrink-0 snap-start">
+              Market
+            </TabsTrigger>
+            <TabsTrigger value="regulation" className="shrink-0 snap-start">
+              Regulation
+            </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="all" className="mt-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {newsData.map((news, index) => (
@@ -210,25 +232,35 @@ export function News() {
 
           <TabsContent value="trending" className="mt-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {newsData.filter(news => news.trending).map((news, index) => (
-                <NewsCard key={index} {...news} delay={0.2 + index * 0.1} />
-              ))}
+              {newsData
+                .filter((news) => news.trending)
+                .map((news, index) => (
+                  <NewsCard key={index} {...news} delay={0.2 + index * 0.1} />
+                ))}
             </div>
           </TabsContent>
 
           <TabsContent value="market" className="mt-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {newsData.filter(news => news.category === 'Market Update' || news.category === 'Sukuk').map((news, index) => (
-                <NewsCard key={index} {...news} delay={0.2 + index * 0.1} />
-              ))}
+              {newsData
+                .filter(
+                  (news) =>
+                    news.category === "Market Update" ||
+                    news.category === "Sukuk",
+                )
+                .map((news, index) => (
+                  <NewsCard key={index} {...news} delay={0.2 + index * 0.1} />
+                ))}
             </div>
           </TabsContent>
 
           <TabsContent value="regulation" className="mt-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {newsData.filter(news => news.category === 'Regulation').map((news, index) => (
-                <NewsCard key={index} {...news} delay={0.2 + index * 0.1} />
-              ))}
+              {newsData
+                .filter((news) => news.category === "Regulation")
+                .map((news, index) => (
+                  <NewsCard key={index} {...news} delay={0.2 + index * 0.1} />
+                ))}
             </div>
           </TabsContent>
         </Tabs>
@@ -246,9 +278,18 @@ export function News() {
           <CardContent>
             <div className="space-y-4">
               {[
-                { title: 'Global Islamic Finance Summit 2026 Announced', reads: '2.4k' },
-                { title: 'Major Bank Launches Digital Islamic Banking Platform', reads: '1.8k' },
-                { title: 'Fintech Innovation in Islamic Banking', reads: '1.5k' }
+                {
+                  title: "Global Islamic Finance Summit 2026 Announced",
+                  reads: "2.4k",
+                },
+                {
+                  title: "Major Bank Launches Digital Islamic Banking Platform",
+                  reads: "1.8k",
+                },
+                {
+                  title: "Fintech Innovation in Islamic Banking",
+                  reads: "1.5k",
+                },
               ].map((item, index) => (
                 <motion.div
                   key={index}
@@ -260,9 +301,13 @@ export function News() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-2 w-2 rounded-full bg-primary" />
-                    <span className="font-medium text-[#000000]">{item.title}</span>
+                    <span className="font-medium text-[#000000]">
+                      {item.title}
+                    </span>
                   </div>
-                  <span className="text-sm text-[#737692]">{item.reads} reads</span>
+                  <span className="text-sm text-[#737692]">
+                    {item.reads} reads
+                  </span>
                 </motion.div>
               ))}
             </div>
@@ -270,5 +315,5 @@ export function News() {
         </Card>
       </motion.div>
     </motion.div>
-  )
+  );
 }

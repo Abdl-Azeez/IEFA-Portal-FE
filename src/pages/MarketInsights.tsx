@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+// import { useEffect } from "react";
 import { TrendingUp, TrendingDown, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Globe, Building2, Briefcase, ChevronUp } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
