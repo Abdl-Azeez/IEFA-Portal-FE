@@ -85,7 +85,7 @@ export default function Community() {
   const [selectedPoster, setSelectedPoster] = useState<UserProfile | null>(
     null,
   );
-  const [isModerator] = useState(false); // Set based on actual user role
+  const [isModerator] = useState(true); // Set based on actual user role
 
   // state to track hover card
   const [hoverProfile, setHoverProfile] = useState<{
@@ -639,7 +639,7 @@ export default function Community() {
               value="study-groups"
               className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0"
             >
-              Study Groups
+              Groups
             </TabsTrigger>
             <TabsTrigger
               value="mentorship"
