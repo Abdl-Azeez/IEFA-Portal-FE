@@ -15,34 +15,41 @@ import Podcast from '@/pages/Podcast'
 import IFProfessionals from '@/pages/IFProfessionals'
 import Settings from '@/pages/Settings'
 import Support from '@/pages/Support'
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 function App() {
   console.log('App component loaded - routing should work now!')
   
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="news" element={<News />} />
-          <Route path="market-insights" element={<MarketInsights />} />
-          <Route path="learning-zone" element={<LearningZone />} />
-          <Route path="community" element={<Community />} />
-          <Route path="directory" element={<Directory />} />
-          <Route path="questionnaire" element={<Questionnaire />} />
-          <Route path="course-results" element={<CourseResults />} />
-          <Route path="research-reports" element={<ResearchReports />} />
-          <Route path="data" element={<Data />} />
-          <Route path="podcast" element={<Podcast />} />
-          <Route path="if-professionals" element={<IFProfessionals />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="support" element={<Support />} />
-          {/* Catch-all route for any undefined paths */}
-          <Route path="*" element={<NotAvailable />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  )
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="news" element={<News />} />
+            <Route path="market-insights" element={<MarketInsights />} />
+            <Route path="learning-zone" element={<LearningZone />} />
+            <Route path="community" element={<Community />} />
+            <Route path="directory" element={<Directory />} />
+            <Route path="questionnaire" element={<Questionnaire />} />
+            <Route path="course-results" element={<CourseResults />} />
+            <Route path="research-reports" element={<ResearchReports />} />
+            <Route path="data" element={<Data />} />
+            <Route path="podcast" element={<Podcast />} />
+            <Route path="if-professionals" element={<IFProfessionals />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="support" element={<Support />} />
+            {/* Catch-all route for any undefined paths */}
+            <Route path="*" element={<NotAvailable />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
 
 export default App

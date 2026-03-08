@@ -1,14 +1,23 @@
 import { motion } from 'framer-motion'
-import { Bell, Search } from 'lucide-react'
+import { Bell, Search, LogOut } from "lucide-react";
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useState, useEffect, useRef } from 'react'
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 export function Header() {
   const [notifications] = useState(3)
   const [isVisible, setIsVisible] = useState(true)
   const lastScrollY = useRef(0)
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,15 +38,15 @@ export function Header() {
   }, [])
 
   return (
-    <motion.header 
+    <motion.header
       className="sticky top-0 z-30 flex h-16 items-center gap-4 px-6 transition-all duration-200 mt-8"
-      style={{ backgroundColor: 'transparent' }}
+      style={{ backgroundColor: "transparent" }}
       initial={{ y: -100 }}
       animate={{ y: isVisible ? 0 : -100 }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
     >
       <div className="flex flex-1 items-center gap-4">
-        <motion.div 
+        <motion.div
           className="relative flex-1 max-w-md"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -48,7 +57,7 @@ export function Header() {
             type="search"
             placeholder="Search..."
             className="w-full rounded-full border-0 bg-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200 shadow-sm"
-            style={{ color: '#000000' }}
+            style={{ color: "#000000" }}
           />
         </motion.div>
       </div>
@@ -59,7 +68,11 @@ export function Header() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
         >
-          <Button variant="ghost" size="icon" className="relative bg-white rounded-full shadow-sm hover:bg-white/80">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative bg-white rounded-full shadow-sm hover:bg-white/80"
+          >
             <motion.div
               whileHover={{ rotate: [0, -10, 10, -10, 0] }}
               transition={{ duration: 0.5 }}
@@ -72,9 +85,7 @@ export function Header() {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.5, type: "spring", stiffness: 500 }}
               >
-                <Badge 
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary text-white border-0"
-                >
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary text-white border-0">
                   {notifications}
                 </Badge>
               </motion.div>
@@ -82,26 +93,39 @@ export function Header() {
           </Button>
         </motion.div>
 
-        <motion.div 
+        <motion.div
           className="flex items-center gap-3 bg-white rounded-full px-3 py-1.5 shadow-sm"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4, duration: 0.5 }}
         >
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Avatar className="h-9 w-9 ring-2 ring-primary/20 transition-all duration-200 hover:ring-primary/40 cursor-pointer">
-              <AvatarImage src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face" alt="User" />
+              <AvatarImage
+                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
+                alt="User"
+              />
               <AvatarFallback>IB</AvatarFallback>
             </Avatar>
           </motion.div>
           <div className="hidden md:block pr-2">
-            <p className="text-sm font-medium" style={{ color: '#000000' }}>Ibrahim Shenshen</p>
+            <p className="text-sm font-medium" style={{ color: "#000000" }}>
+              {user?.email || "User"}
+            </p>
+            <p className="text-xs text-gray-500 capitalize">
+              {user?.role || "Guest"}
+            </p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </motion.div>
       </div>
     </motion.header>
-  )
+  );
 }
