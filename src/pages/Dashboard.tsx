@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { TrendingUp, ChevronUp, Play, Clock, BookOpen, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuth } from '@/contexts/AuthContext'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -219,6 +220,7 @@ function NewsCard({ news }: NewsCardProps) {
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -385,6 +387,7 @@ export function Dashboard() {
                 <motion.button
                   className="text-sm text-[#D52B1E] font-medium flex items-center gap-1 hover:underline"
                   whileHover={{ x: 3 }}
+                  onClick={() => isAuthenticated ? navigate('/learning-zone') : navigate('/login')}
                 >
                   See All <ChevronRight className="h-4 w-4" />
                 </motion.button>
@@ -411,7 +414,7 @@ export function Dashboard() {
                         className="px-4 py-2 bg-[#D52B1E] text-white text-sm font-medium rounded-lg hover:bg-[#B8241B] transition-colors"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => navigate("/questionnaire")}
+                        onClick={() => isAuthenticated ? navigate("/questionnaire") : navigate('/login')}
                       >
                         Start now
                       </motion.button>
@@ -443,6 +446,7 @@ export function Dashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 + index * 0.1 }}
                         whileHover={{ y: -5 }}
+                        onClick={() => isAuthenticated ? navigate('/learning-zone') : navigate('/login')}
                       >
                         <div className="relative rounded-xl overflow-hidden aspect-video mb-3">
                           <img

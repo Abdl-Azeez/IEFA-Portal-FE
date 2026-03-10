@@ -18,10 +18,11 @@ import Support from '@/pages/Support'
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 function App() {
-  console.log('App component loaded - routing should work now!')
-  
+  console.log("App component loaded - routing should work now!");
+
   return (
     <AuthProvider>
       <BrowserRouter>
@@ -30,19 +31,110 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="news" element={<News />} />
-            <Route path="market-insights" element={<MarketInsights />} />
-            <Route path="learning-zone" element={<LearningZone />} />
-            <Route path="community" element={<Community />} />
-            <Route path="directory" element={<Directory />} />
-            <Route path="questionnaire" element={<Questionnaire />} />
-            <Route path="course-results" element={<CourseResults />} />
-            <Route path="research-reports" element={<ResearchReports />} />
-            <Route path="data" element={<Data />} />
-            <Route path="podcast" element={<Podcast />} />
-            <Route path="if-professionals" element={<IFProfessionals />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="support" element={<Support />} />
+            <Route
+              path="news"
+              element={
+                <ProtectedRoute>
+                  <News />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="market-insights"
+              element={
+                <ProtectedRoute>
+                  <MarketInsights />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="learning-zone"
+              element={
+                <ProtectedRoute>
+                  <LearningZone />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="community"
+              element={
+                <ProtectedRoute>
+                  <Community />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="directory"
+              element={
+                <ProtectedRoute>
+                  <Directory />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="questionnaire"
+              element={
+                <ProtectedRoute>
+                  <Questionnaire />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="course-results"
+              element={
+                <ProtectedRoute>
+                  <CourseResults />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="research-reports"
+              element={
+                <ProtectedRoute>
+                  <ResearchReports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="data"
+              element={
+                <ProtectedRoute>
+                  <Data />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="podcast"
+              element={
+                <ProtectedRoute>
+                  <Podcast />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="if-professionals"
+              element={
+                <ProtectedRoute>
+                  <IFProfessionals />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="support"
+              element={
+                <ProtectedRoute>
+                  <Support />
+                </ProtectedRoute>
+              }
+            />
             {/* Catch-all route for any undefined paths */}
             <Route path="*" element={<NotAvailable />} />
           </Route>

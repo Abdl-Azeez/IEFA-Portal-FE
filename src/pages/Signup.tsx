@@ -6,60 +6,51 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Eye, EyeOff, UserPlus, Mail, Lock, Shield } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useAuth } from '@/contexts/AuthContext'
+import { useRegister } from "@/hooks/useAuth";
 
 const Signup = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [role, setRole] = useState<'user' | 'admin'>('user')
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
-  const { signup } = useAuth()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<"user" | "admin">("user");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const registerMutation = useRegister();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError('')
-    setIsLoading(true)
+    e.preventDefault();
+    setError("");
 
     if (!email || !password || !confirmPassword) {
-      setError('All fields are required')
-      setIsLoading(false)
-      return
+      setError("All fields are required");
+      return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      setIsLoading(false)
-      return
+      setError("Passwords do not match");
+      return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
-      setIsLoading(false)
-      return
+      setError("Password must be at least 6 characters");
+      return;
     }
 
     try {
-      const success = await signup(email, password, role)
-      if (success) {
-        navigate('/')
-      } else {
-        setError('User already exists')
-      }
+      await registerMutation.mutateAsync({ email, password });
+      navigate("/");
     } catch (err) {
-      console.error('Signup error:', err)
-      setError('An error occurred during signup')
-    } finally {
-      setIsLoading(false)
+      // Error handled by toast in hook
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ backgroundColor: '#FFEFEF' }}>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative"
+      style={{ backgroundColor: "#FFEFEF" }}
+    >
       {/* Subtle background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -70,7 +61,7 @@ const Signup = () => {
           transition={{
             duration: 8,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
         <motion.div
@@ -81,7 +72,7 @@ const Signup = () => {
           transition={{
             duration: 10,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
       </div>
@@ -98,7 +89,12 @@ const Signup = () => {
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, duration: 0.8, type: "spring", stiffness: 200 }}
+              transition={{
+                delay: 0.2,
+                duration: 0.8,
+                type: "spring",
+                stiffness: 200,
+              }}
               className="mx-auto w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 shadow-lg"
             >
               <UserPlus className="w-8 h-8 text-white" />
@@ -130,7 +126,10 @@ const Signup = () => {
               transition={{ delay: 0.5, duration: 0.6 }}
             >
               <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <Label
+                  htmlFor="email"
+                  className="flex items-center gap-2 text-gray-700 font-semibold text-sm"
+                >
                   <Mail className="w-4 h-4 text-red-600" />
                   Email Address
                 </Label>
@@ -150,7 +149,10 @@ const Signup = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <Label
+                  htmlFor="password"
+                  className="flex items-center gap-2 text-gray-700 font-semibold text-sm"
+                >
                   <Lock className="w-4 h-4 text-red-600" />
                   Password
                 </Label>
@@ -161,7 +163,7 @@ const Signup = () => {
                 >
                   <Input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     placeholder="Create a password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -171,16 +173,21 @@ const Signup = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-600 transition-colors duration-200"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </motion.button>
                 </motion.div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <Label
+                  htmlFor="confirmPassword"
+                  className="flex items-center gap-2 text-gray-700 font-semibold text-sm"
+                >
                   <Lock className="w-4 h-4 text-red-600" />
                   Confirm Password
                 </Label>
@@ -191,7 +198,7 @@ const Signup = () => {
                 >
                   <Input
                     id="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
+                    type={showConfirmPassword ? "text" : "password"}
                     placeholder="Confirm your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -201,16 +208,21 @@ const Signup = () => {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-600 transition-colors duration-200"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
                   >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </motion.button>
                 </motion.div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role" className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <Label
+                  htmlFor="role"
+                  className="flex items-center gap-2 text-gray-700 font-semibold text-sm"
+                >
                   <Shield className="w-4 h-4 text-red-600" />
                   Account Type
                 </Label>
@@ -221,7 +233,9 @@ const Signup = () => {
                   <select
                     id="role"
                     value={role}
-                    onChange={(e) => setRole(e.target.value as 'user' | 'admin')}
+                    onChange={(e) =>
+                      setRole(e.target.value as "user" | "admin")
+                    }
                     className="w-full h-11 px-4 border-2 border-gray-200 focus:border-red-500 rounded-lg transition-all duration-200 focus:ring-4 focus:ring-red-100 bg-white text-gray-700"
                   >
                     <option value="user">Regular User</option>
@@ -246,17 +260,21 @@ const Signup = () => {
               >
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={registerMutation.isPending}
                   className="w-full h-11 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
                 >
-                  {isLoading ? (
+                  {registerMutation.isPending ? (
                     <motion.div
                       animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
                       className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"
                     />
                   ) : (
-                    'Create Account'
+                    "Create Account"
                   )}
                 </Button>
               </motion.div>
@@ -269,9 +287,9 @@ const Signup = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.7, duration: 0.6 }}
               >
-                Already have an account?{' '}
+                Already have an account?{" "}
                 <motion.button
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate("/login")}
                   className="text-red-600 hover:text-red-700 font-semibold transition-colors duration-200"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -285,14 +303,15 @@ const Signup = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8, duration: 0.6 }}
               >
-                By creating an account, you agree to our Terms of Service and Privacy Policy
+                By creating an account, you agree to our Terms of Service and
+                Privacy Policy
               </motion.p>
             </div>
           </CardContent>
         </Card>
       </motion.div>
     </div>
-  )
-}
+  );
+};
 
 export default Signup

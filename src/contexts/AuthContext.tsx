@@ -1,17 +1,19 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react'
+import React, { createContext, useContext, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { useAuthStore } from '@/stores/auth'
+import { useMe } from '@/hooks/useAuth'
 
 interface User {
+  id: string
   email: string
-  password: string
-  role: 'user' | 'admin' | 'moderator' | 'educator'
+  role: string
 }
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string) => Promise<void>
   logout: () => void
-  signup: (email: string, password: string, role: 'user' | 'admin') => Promise<boolean>
+  signup: (email: string, password: string, role: string) => Promise<void>
   isAuthenticated: boolean
   isLoading: boolean
 }
@@ -31,72 +33,31 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, isAuthenticated, logout, setUser } = useAuthStore()
+  const { data: meData, isLoading } = useMe()
 
-  // Initialize dummy data
   useEffect(() => {
-    const users = JSON.parse(localStorage.getItem('users') || '[]')
-    if (users.length === 0) {
-      const initialUsers: User[] = [
-        { email: 'admin@example.com', password: 'admin123', role: 'admin' },
-        { email: 'user@example.com', password: 'user123', role: 'user' },
-        { email: 'mod@example.com', password: 'mod123', role: 'moderator' },
-        { email: 'edu@example.com', password: 'edu123', role: 'educator' }
-      ]
-      localStorage.setItem('users', JSON.stringify(initialUsers))
+    if (meData && !user) {
+      setUser(meData)
     }
+  }, [meData, user, setUser])
 
-    // Check if user is already logged in
-    const currentUser = localStorage.getItem('currentUser')
-    if (currentUser) {
-      setUser(JSON.parse(currentUser))
-    }
-    setIsLoading(false)
-  }, [])
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const users: User[] = JSON.parse(localStorage.getItem('users') || '[]')
-    const foundUser = users.find(u => u.email === email && u.password === password)
-
-    if (foundUser) {
-      setUser(foundUser)
-      localStorage.setItem('currentUser', JSON.stringify(foundUser))
-      return true
-    }
-    return false
+  const login = async (_email: string, _password: string) => {
+    // This will be handled by the hook
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('currentUser')
+  const signup = async (_email: string, _password: string, _role: string) => {
+    // This will be handled by the hook
   }
 
-  const signup = async (email: string, password: string, role: 'user' | 'admin'): Promise<boolean> => {
-    const users: User[] = JSON.parse(localStorage.getItem('users') || '[]')
-
-    // Check if user already exists
-    if (users.some(u => u.email === email)) {
-      return false
-    }
-
-    const newUser: User = { email, password, role }
-    users.push(newUser)
-    localStorage.setItem('users', JSON.stringify(users))
-
-    setUser(newUser)
-    localStorage.setItem('currentUser', JSON.stringify(newUser))
-    return true
-  }
-
-  const value: AuthContextType = useMemo(() => ({
+  const value: AuthContextType = {
     user,
     login,
     logout,
     signup,
-    isAuthenticated: !!user,
-    isLoading
-  }), [user, isLoading])
+    isAuthenticated,
+    isLoading,
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -6,45 +6,38 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useAuth } from '@/contexts/AuthContext'
+import { useLogin } from "@/hooks/useAuth";
 
 const Login = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
-  const { login } = useAuth()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const loginMutation = useLogin();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError('')
-    setIsLoading(true)
+    e.preventDefault();
+    setError("");
 
     if (!email || !password) {
-      setError('Email and password are required')
-      setIsLoading(false)
-      return
+      setError("Email and password are required");
+      return;
     }
 
     try {
-      const success = await login(email, password)
-      if (success) {
-        navigate('/')
-      } else {
-        setError('Invalid email or password')
-      }
+      await loginMutation.mutateAsync({ email, password });
+      navigate("/");
     } catch (err) {
-      console.error('Login error:', err)
-      setError('An error occurred during login')
-    } finally {
-      setIsLoading(false)
+      // Error handled by toast in hook
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ backgroundColor: '#FFEFEF' }}>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative"
+      style={{ backgroundColor: "#FFEFEF" }}
+    >
       {/* Subtle background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -55,7 +48,7 @@ const Login = () => {
           transition={{
             duration: 8,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
         <motion.div
@@ -66,7 +59,7 @@ const Login = () => {
           transition={{
             duration: 10,
             repeat: Infinity,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
       </div>
@@ -83,7 +76,12 @@ const Login = () => {
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, duration: 0.8, type: "spring", stiffness: 200 }}
+              transition={{
+                delay: 0.2,
+                duration: 0.8,
+                type: "spring",
+                stiffness: 200,
+              }}
               className="mx-auto w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 shadow-lg"
             >
               <LogIn className="w-8 h-8 text-white" />
@@ -115,7 +113,10 @@ const Login = () => {
               transition={{ delay: 0.5, duration: 0.6 }}
             >
               <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <Label
+                  htmlFor="email"
+                  className="flex items-center gap-2 text-gray-700 font-semibold text-sm"
+                >
                   <Mail className="w-4 h-4 text-red-600" />
                   Email Address
                 </Label>
@@ -135,7 +136,10 @@ const Login = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <Label
+                  htmlFor="password"
+                  className="flex items-center gap-2 text-gray-700 font-semibold text-sm"
+                >
                   <Lock className="w-4 h-4 text-red-600" />
                   Password
                 </Label>
@@ -146,7 +150,7 @@ const Login = () => {
                 >
                   <Input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -156,10 +160,12 @@ const Login = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-600 transition-colors duration-200"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </motion.button>
                 </motion.div>
               </div>
@@ -180,17 +186,21 @@ const Login = () => {
               >
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={loginMutation.isPending}
                   className="w-full h-11 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
                 >
-                  {isLoading ? (
+                  {loginMutation.isPending ? (
                     <motion.div
                       animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
                       className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"
                     />
                   ) : (
-                    'Sign In'
+                    "Sign In"
                   )}
                 </Button>
               </motion.div>
@@ -203,9 +213,9 @@ const Login = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.7, duration: 0.6 }}
               >
-                Don't have an account?{' '}
+                Don't have an account?{" "}
                 <motion.button
-                  onClick={() => navigate('/signup')}
+                  onClick={() => navigate("/signup")}
                   className="text-red-600 hover:text-red-700 font-semibold transition-colors duration-200"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -219,14 +229,15 @@ const Login = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8, duration: 0.6 }}
               >
-                By signing in, you agree to our Terms of Service and Privacy Policy
+                By signing in, you agree to our Terms of Service and Privacy
+                Policy
               </motion.p>
             </div>
           </CardContent>
         </Card>
       </motion.div>
     </div>
-  )
-}
+  );
+};
 
 export default Login
