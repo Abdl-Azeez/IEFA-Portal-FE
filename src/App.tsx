@@ -20,6 +20,20 @@ import Signup from "@/pages/Signup";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+/* ── Admin imports ─────────────────────────────────────────────────────── */
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { ProtectedAdminRoute } from "@/components/admin/ProtectedAdminRoute";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminNews from "@/pages/admin/AdminNews";
+import AdminPodcasts from "@/pages/admin/AdminPodcasts";
+import AdminLearning from "@/pages/admin/AdminLearning";
+import AdminResearch from "@/pages/admin/AdminResearch";
+import AdminData from "@/pages/admin/AdminData";
+import AdminCommunity from "@/pages/admin/AdminCommunity";
+import AdminDirectory from "@/pages/admin/AdminDirectory";
+import AdminSettings from "@/pages/admin/AdminSettings";
+
 function App() {
   console.log("App component loaded - routing should work now!");
 
@@ -137,6 +151,33 @@ function App() {
             />
             {/* Catch-all route for any undefined paths */}
             <Route path="*" element={<NotAvailable />} />
+          </Route>
+
+          {/* ── Admin routes ─────────────────────────────────────────────── */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedAdminRoute>
+                <AdminLayout />
+              </ProtectedAdminRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="news" element={<AdminNews />} />
+            <Route path="podcasts" element={<AdminPodcasts />} />
+            <Route path="learning" element={<AdminLearning />} />
+            <Route path="learning/courses" element={<AdminLearning />} />
+            <Route path="learning/educators" element={<AdminLearning />} />
+            <Route path="learning/videos" element={<AdminLearning />} />
+            <Route path="learning/programmes" element={<AdminLearning />} />
+            <Route path="learning/certificates" element={<AdminLearning />} />
+            <Route path="learning/payments" element={<AdminLearning />} />
+            <Route path="research" element={<AdminResearch />} />
+            <Route path="data" element={<AdminData />} />
+            <Route path="community" element={<AdminCommunity />} />
+            <Route path="directory" element={<AdminDirectory />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Routes>
       </BrowserRouter>

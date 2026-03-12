@@ -6,15 +6,20 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth()
-  const location = useLocation()
+  const { isAuthenticated, isAdmin, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
-    return <div>Loading...</div> // Or a proper loading component
+    return <div>Loading...</div>;
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Admins should not access the user portal
+  if (isAdmin) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <>{children}</>
