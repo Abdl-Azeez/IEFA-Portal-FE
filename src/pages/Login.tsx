@@ -7,16 +7,6 @@ import { Label } from '@/components/ui/label'
 import { Eye, EyeOff, LogIn, Mail, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useLogin } from "@/hooks/useAuth";
-import { useAuthStore } from "@/stores/auth";
-
-/* ── Static admin credentials (replace with API role when backend is ready) ── */
-const STATIC_ADMIN_EMAIL = "admin@iefa.org";
-const STATIC_ADMIN_KEY = "Admin@2026!";
-const STATIC_ADMIN_USER = {
-  id: "admin-001",
-  email: STATIC_ADMIN_EMAIL,
-  role: "admin",
-} as const;
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -25,7 +15,6 @@ const Login = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const loginMutation = useLogin();
-  const { setUser } = useAuthStore();
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -36,21 +25,11 @@ const Login = () => {
       return;
     }
 
-    // Check static admin credentials before hitting the API
-    if (
-      email.toLowerCase() === STATIC_ADMIN_EMAIL &&
-      password === STATIC_ADMIN_KEY
-    ) {
-      setUser(STATIC_ADMIN_USER);
-      navigate("/admin");
-      return;
-    }
-
     try {
       const result = await loginMutation.mutateAsync({ email, password });
-      // If backend returns role:admin in future, this redirect handles it
-      const role = (result as { user?: { role?: string } })?.user?.role;
-      navigate(role === "admin" ? "/admin" : "/");
+      // Role comes directly from the API response
+      const role = result?.user?.role;
+      navigate(role === "admin" || role === "staff" ? "/admin" : "/");
     } catch {
       // Error handled by toast in hook
     }

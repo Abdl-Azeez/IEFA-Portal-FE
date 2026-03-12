@@ -34,8 +34,10 @@ export const useLogin = () => {
     },
     onSuccess: (data) => {
       setUser(data.user)
-      setToken(data.token)
-      localStorage.setItem('authToken', data.token)
+      // API returns 'accessToken', not 'token'
+      const token: string = data.accessToken ?? data.token
+      setToken(token)
+      localStorage.setItem('authToken', token)
       toast({
         title: 'Success',
         description: 'Logged in successfully!',

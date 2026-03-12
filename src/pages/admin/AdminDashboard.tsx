@@ -8,13 +8,22 @@ import {
   TrendingDown,
   DollarSign,
   Eye,
-  Activity,
   ArrowRight,
   BookOpen,
   MessageSquare,
   Award,
   UserCheck,
+  Database,
+  FileText,
+  Loader2,
 } from 'lucide-react'
+import {
+  useAdminUsers,
+  useAdminNews,
+  useAdminShows,
+  useAdminResearchReports,
+  useAdminDatasets,
+} from '@/hooks/useAdmin'
 
 /* ── helpers ── */
 const container = {
@@ -30,6 +39,7 @@ function StatCard({
   icon: Icon,
   trend,
   color,
+  isLoading,
 }: Readonly<{
   label: string
   value: string
@@ -37,6 +47,7 @@ function StatCard({
   icon: React.ElementType
   trend: number
   color: string
+  isLoading?: boolean
 }>) {
   const up = trend >= 0
   return (
@@ -60,23 +71,18 @@ function StatCard({
           {Math.abs(trend)}%
         </span>
       </div>
-      <p className="text-2xl font-bold text-slate-800">{value}</p>
+      {isLoading ? (
+        <div className="flex items-center gap-2 mb-1">
+          <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+        </div>
+      ) : (
+        <p className="text-2xl font-bold text-slate-800">{value}</p>
+      )}
       <p className="text-sm font-medium text-slate-600 mt-0.5">{label}</p>
       <p className="text-xs text-slate-400 mt-1">{sub}</p>
     </motion.div>
   )
 }
-
-const STATS = [
-  { label: 'Total Users', value: '12,847', sub: 'vs last month', icon: Users, trend: 12.4, color: '#3b82f6' },
-  { label: 'Published Articles', value: '348', sub: 'News & Reports', icon: Newspaper, trend: 8.1, color: '#D52B1E' },
-  { label: 'Podcast Episodes', value: '214', sub: 'Across 18 shows', icon: Mic, trend: 5.3, color: '#8b5cf6' },
-  { label: 'Active Courses', value: '63', sub: '1,240 enrolled this month', icon: GraduationCap, trend: 19.7, color: '#10b981' },
-  { label: 'Total Revenue', value: '$184,320', sub: 'Course & subscription', icon: DollarSign, trend: 22.5, color: '#f59e0b' },
-  { label: 'Content Views', value: '2.1M', sub: 'Past 30 days', icon: Eye, trend: -3.2, color: '#06b6d4' },
-  { label: 'Active Learners', value: '5,612', sub: 'Avg. 3.4 hrs/week', icon: Activity, trend: 14.8, color: '#ec4899' },
-  { label: 'Certificates Issued', value: '892', sub: 'This quarter', icon: Award, trend: 31.2, color: '#f97316' },
-]
 
 /* ── Monthly bar chart (SVG) ─────────────────────────────────────────────── */
 const MONTHLY_DATA = [
@@ -138,6 +144,23 @@ const TOP_ARTICLES = [
 
 /* ── Main component ─────────────────────────────────────────────────────── */
 export default function AdminDashboard() {
+  const { data: usersData, isLoading: usersLoading } = useAdminUsers({ perPage: 1 })
+  const { data: newsData, isLoading: newsLoading } = useAdminNews({ perPage: 1 })
+  const { data: showsData, isLoading: showsLoading } = useAdminShows({ perPage: 1 })
+  const { data: researchData, isLoading: researchLoading } = useAdminResearchReports({ perPage: 1 })
+  const { data: datasetsData, isLoading: datasetsLoading } = useAdminDatasets({ perPage: 1 })
+
+  const stats = [
+    { label: 'Total Users', value: usersData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Registered accounts', icon: Users, trend: 12.4, color: '#3b82f6', isLoading: usersLoading },
+    { label: 'News Articles', value: newsData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Total articles in system', icon: Newspaper, trend: 8.1, color: '#D52B1E', isLoading: newsLoading },
+    { label: 'Podcast Shows', value: showsData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Video podcast shows', icon: Mic, trend: 5.3, color: '#8b5cf6', isLoading: showsLoading },
+    { label: 'Research Reports', value: researchData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Total reports', icon: FileText, trend: 11.2, color: '#10b981', isLoading: researchLoading },
+    { label: 'Datasets', value: datasetsData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Available datasets', icon: Database, trend: 7.8, color: '#06b6d4', isLoading: datasetsLoading },
+    { label: 'Active Courses', value: '63', sub: '1,240 enrolled this month', icon: GraduationCap, trend: 19.7, color: '#10b981' },
+    { label: 'Content Views', value: '2.1M', sub: 'Past 30 days', icon: Eye, trend: -3.2, color: '#06b6d4' },
+    { label: 'Certificates Issued', value: '892', sub: 'This quarter', icon: Award, trend: 31.2, color: '#f97316' },
+  ]
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       {/* Page title */}
@@ -150,7 +173,7 @@ export default function AdminDashboard() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {STATS.map((s) => (
+        {stats.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
       </div>

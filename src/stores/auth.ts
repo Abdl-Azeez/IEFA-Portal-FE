@@ -5,7 +5,15 @@ interface User {
   id: string
   email: string
   role: string
-  // Add other user fields as needed
+  firstName?: string
+  lastName?: string
+  phone?: string
+  country?: string
+  isVerified?: boolean
+  isActive?: boolean
+  profilePhotoUrl?: string
+  lastLoginAt?: string
+  createdAt?: string
 }
 
 interface AuthState {

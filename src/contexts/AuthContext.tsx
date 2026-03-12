@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       logout,
       signup,
       isAuthenticated,
-      isAdmin: user?.role === "admin",
+      isAdmin: user?.role === "admin" || user?.role === "staff",
       isLoading,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
