@@ -24,9 +24,37 @@ interface UpdatePodcastEpisodeDto {
   description?: string
 }
 
+// backend show response shape (with pagination wrapper)
+export interface PodcastShow {
+  id: string
+  title: string
+  slug: string
+  description: string
+  coverImageUrl: string
+  language: string
+  category: string
+  rssFeedUrl: string | null
+  spotifyUrl: string | null
+  appleUrl: string | null
+  isActive: boolean
+  createdAt: string
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: {
+    page: number
+    perPage: number
+    itemCount: number
+    pageCount: number
+    hasPreviousPage: boolean
+    hasNextPage: boolean
+  }
+}
+
 // Queries
 export const usePodcastShows = () => {
-  return useQuery({
+  return useQuery<PaginatedResponse<PodcastShow>>({
     queryKey: ['podcastShows'],
     queryFn: async () => {
       const response = await api.get('/podcasts/shows')
@@ -50,9 +78,13 @@ export const usePodcastEpisodes = (showId?: string) => {
   return useQuery({
     queryKey: ['podcastEpisodes', showId],
     queryFn: async () => {
-      const response = await api.get('/podcasts/episodes')
+      const endpoint = showId
+        ? `/podcasts/shows/${showId}/episodes`
+        : '/podcasts/episodes'
+      const response = await api.get(endpoint)
       return response.data
     },
+    enabled: !!showId, // only fetch when a show is selected
   })
 }
 
@@ -210,6 +242,155 @@ export const useDeletePodcastEpisode = () => {
       toast({
         title: 'Error',
         description: error.response?.data?.message || 'Failed to delete podcast episode',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+// ─── Podcast Episode type ─────────────────────────────────────────────────────
+export interface PodcastEpisode {
+  id: string
+  title: string
+  description?: string
+  videoUrl?: string
+  thumbnailUrl?: string
+  coverImageUrl?: string
+  thumbnail?: string
+  duration?: string
+  showId?: string
+  guest?: string
+  tag?: string
+  views?: number
+  likes?: number
+  createdAt?: string
+  uploadDate?: Date
+}
+
+// ─── Playlist types ───────────────────────────────────────────────────────────
+export interface Playlist {
+  id: string
+  name: string
+  episodes: PodcastEpisode[]
+  createdAt: string
+}
+
+interface CreatePlaylistDto {
+  name: string
+}
+
+interface UpdatePlaylistDto {
+  name?: string
+}
+
+// ─── Playlist queries / mutations ─────────────────────────────────────────────
+export const usePlaylists = () => {
+  return useQuery<Playlist[]>({
+    queryKey: ['playlists'],
+    queryFn: async () => {
+      const response = await api.get('/playlists')
+      return response.data
+    },
+  })
+}
+
+export const useCreatePlaylist = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: CreatePlaylistDto) => {
+      const response = await api.post('/playlists', data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playlists'] })
+      toast({ title: 'Playlist created!' })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to create playlist',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export const useDeletePlaylist = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/playlists/${id}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playlists'] })
+      toast({ title: 'Playlist deleted.' })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to delete playlist',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export const useUpdatePlaylist = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdatePlaylistDto }) => {
+      const response = await api.patch(`/playlists/${id}`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playlists'] })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to update playlist',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export const useAddEpisodeToPlaylist = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ playlistId, episodeId }: { playlistId: string; episodeId: string }) => {
+      const response = await api.post(`/playlists/${playlistId}/episodes/${episodeId}`)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playlists'] })
+      toast({ title: 'Added to playlist!' })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to add episode to playlist',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export const useRemoveEpisodeFromPlaylist = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ playlistId, episodeId }: { playlistId: string; episodeId: string }) => {
+      const response = await api.delete(`/playlists/${playlistId}/episodes/${episodeId}`)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playlists'] })
+      toast({ title: 'Removed from playlist.' })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to remove episode from playlist',
         variant: 'destructive',
       })
     },

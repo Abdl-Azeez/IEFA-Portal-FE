@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion'
-import { useEffect, useRef, useState } from "react";
+﻿import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from 'react'
 import {
   Play,
   Pause,
@@ -10,832 +11,1250 @@ import {
   SkipBack,
   SkipForward,
   Volume2,
-  Maximize,
+  VolumeX,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+  X,
+  Trash2,
+  Mic2,
+  Loader2,
+  Globe,
+  Rss,
+  Headphones,
+  Check,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from "@/components/ui/button";import { Input } from '@/components/ui/input'
-const containerVariants = {
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  usePodcastShows,
+  usePodcastEpisodes,
+  usePlaylists,
+  useCreatePlaylist,
+  useDeletePlaylist,
+  useAddEpisodeToPlaylist,
+  useRemoveEpisodeFromPlaylist,
+} from '@/hooks/usePodcasts'
+import type { PodcastShow, PodcastEpisode, Playlist } from '@/hooks/usePodcasts'
+
+/* --- Animation variants -------------------------------------------------- */
+const fade = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+  visible: { opacity: 1, transition: { duration: 0.4 } },
+}
+const slideUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45 } },
+}
+const stagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07 } },
+}
+const cardIn = {
+  hidden: { opacity: 0, scale: 0.94 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.3 } },
 }
 
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { duration: 0.5 }
-  }
+/* --- Helpers --------------------------------------------------------------- */
+function getThumb(ep: PodcastEpisode): string {
+  return (
+    ep.thumbnailUrl ??
+    ep.coverImageUrl ??
+    (ep as any).thumbnail ??
+    `https://picsum.photos/seed/${ep.id}/640/360`
+  )
 }
 
-const episodes = [
-  {
-    id: 1,
-    title: "Building a career in frontier investment markets",
-    duration: "32:18",
-    guest: "Investment strategist, Lagos",
-    tag: "Career",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=1",
-    likes: 45,
-    views: 1200,
-    uploadDate: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-  },
-  {
-    id: 2,
-    title: "Macro volatility: How professionals stay anchored",
-    duration: "27:05",
-    guest: "Portfolio manager, Abuja",
-    tag: "Macro",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=2",
-    likes: 32,
-    views: 890,
-    uploadDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-  },
-  {
-    id: 3,
-    title: "Practical steps for better investment committees",
-    duration: "24:11",
-    guest: "IF professional, London",
-    tag: "Governance",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=3",
-    likes: 28,
-    views: 650,
-    uploadDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-  },
-];
+function formatTime(t: number): string {
+  if (!isFinite(t)) return '0:00'
+  const m = Math.floor(t / 60)
+  const s = Math.floor(t % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
-const archiveEpisodes = [
-  {
-    id: 101,
-    title: "Season 1 wrap: Lessons from frontier markets",
-    duration: "29:04",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=4",
-    likes: 67,
-    views: 1500,
-    guest: "Panel Discussion",
-    tag: "Summary",
-    uploadDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: 102,
-    title: "Investor stories from Lagos, Abuja and beyond",
-    duration: "34:18",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=5",
-    likes: 89,
-    views: 2100,
-    guest: "Multiple Speakers",
-    tag: "Stories",
-    uploadDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: 103,
-    title: "From analyst to CIO: A 15‑year journey",
-    duration: "41:52",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=6",
-    likes: 124,
-    views: 3200,
-    guest: "John Smith",
-    tag: "Career",
-    uploadDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: 104,
-    title: "Sukuk market deep dive",
-    duration: "38:22",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=7",
-    likes: 56,
-    views: 1100,
-    guest: "Dr. Ahmed",
-    tag: "Finance",
-    uploadDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: 105,
-    title: "ESG and Islamic finance alignment",
-    duration: "31:15",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-    thumbnail: "https://picsum.photos/640/360?random=8",
-    likes: 78,
-    views: 1800,
-    guest: "Prof. Fatima",
-    tag: "Sustainability",
-    uploadDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
-  },
-];
+/* --- ShowCard -------------------------------------------------------------- */
+function ShowCard({
+  show,
+  active,
+  onClick,
+}: {
+  show: PodcastShow
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.04, y: -2 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`relative flex-shrink-0 w-44 rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 shadow-md ${
+        active
+          ? 'ring-[3px] ring-[#D52B1E] ring-offset-2 shadow-[#D52B1E]/30 shadow-lg'
+          : 'hover:shadow-lg'
+      }`}
+    >
+      <div className="aspect-square bg-gray-200 relative">
+        <img
+          src={show.coverImageUrl ?? `https://picsum.photos/seed/${show.id}/300/300`}
+          alt={show.title}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            ;(e.target as HTMLImageElement).src = `https://picsum.photos/seed/${show.id}/300/300`
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+        {active && (
+          <div className="absolute top-2.5 right-2.5 bg-[#D52B1E] rounded-full p-1.5 shadow-lg">
+            <div className="flex gap-0.5 items-end h-3">
+              <div className="w-0.5 bg-white rounded-full animate-bounce" style={{ height: '40%', animationDelay: '0ms' }} />
+              <div className="w-0.5 bg-white rounded-full animate-bounce" style={{ height: '100%', animationDelay: '150ms' }} />
+              <div className="w-0.5 bg-white rounded-full animate-bounce" style={{ height: '60%', animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 p-3 text-left">
+        <p className="text-white font-semibold text-sm leading-tight line-clamp-2">{show.title}</p>
+        {show.category && (
+          <p className="text-white/65 text-xs mt-0.5 truncate">{show.category}</p>
+        )}
+      </div>
+    </motion.button>
+  )
+}
 
+/* --- EpisodeCard ----------------------------------------------------------- */
+function EpisodeCard({
+  episode,
+  active,
+  onPlay,
+  onLike,
+  liked,
+  onAddToPlaylist,
+}: {
+  episode: PodcastEpisode
+  active: boolean
+  onPlay: () => void
+  onLike: () => void
+  liked: boolean
+  onAddToPlaylist: () => void
+}) {
+  const thumb = getThumb(episode)
+  return (
+    <motion.div
+      variants={cardIn}
+      className={`rounded-2xl overflow-hidden border-2 transition-all duration-200 cursor-pointer group bg-white ${
+        active
+          ? 'border-[#D52B1E] shadow-lg shadow-[#D52B1E]/15'
+          : 'border-gray-100 hover:border-[#D52B1E]/35 hover:shadow-md'
+      }`}
+      onClick={onPlay}
+    >
+      {/* Thumbnail */}
+      <div className="aspect-video bg-gray-100 relative overflow-hidden">
+        <img
+          src={thumb}
+          alt={episode.title}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          onError={(e) => {
+            ;(e.target as HTMLImageElement).src = `https://picsum.photos/seed/${episode.id}/640/360`
+          }}
+        />
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="bg-white/20 backdrop-blur-sm rounded-full p-3.5 border border-white/40">
+            <Play className="h-6 w-6 text-white fill-white" />
+          </div>
+        </div>
+        {active && (
+          <div className="absolute top-2 left-2 bg-[#D52B1E] text-white text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 shadow-md">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+            </span>
+            Now Playing
+          </div>
+        )}
+        {(episode as any).duration && (
+          <div className="absolute bottom-2 right-2 bg-black/65 text-white text-xs px-2 py-0.5 rounded-md font-medium">
+            {(episode as any).duration}
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="p-3.5">
+        <h4 className="font-semibold text-[#000000] text-sm leading-snug line-clamp-2 mb-1.5">
+          {episode.title}
+        </h4>
+        {(episode as any).guest && (
+          <p className="text-xs text-[#737692] mb-2 flex items-center gap-1">
+            <Mic2 className="h-3 w-3 flex-shrink-0" />
+            {(episode as any).guest}
+          </p>
+        )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {(episode as any).tag && (
+              <Badge
+                variant="outline"
+                className="text-xs px-2 py-0 border-[#D52B1E]/30 text-[#D52B1E]"
+              >
+                {(episode as any).tag}
+              </Badge>
+            )}
+            {(episode as any).views && (
+              <span className="text-xs text-[#737692]">
+                {(episode as any).views.toLocaleString()} views
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onAddToPlaylist()
+              }}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-[#D52B1E] hover:bg-red-50 transition-colors"
+              title="Add to playlist"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onLike()
+              }}
+              className={`p-1.5 rounded-lg transition-colors ${
+                liked
+                  ? 'text-red-500 bg-red-50'
+                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+              }`}
+              title="Like"
+            >
+              <Heart className={`h-3.5 w-3.5 ${liked ? 'fill-current' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+/* --- Pager ---------------------------------------------------------------- */
+function Pager({
+  page,
+  total,
+  onChange,
+}: {
+  page: number
+  total: number
+  onChange: (p: number) => void
+}) {
+  if (total <= 1) return null
+  const pages: (number | '...')[] = []
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i)
+  } else {
+    pages.push(1)
+    if (page > 3) pages.push('...')
+    for (let i = Math.max(2, page - 1); i <= Math.min(total - 1, page + 1); i++) pages.push(i)
+    if (page < total - 2) pages.push('...')
+    pages.push(total)
+  }
+  return (
+    <div className="flex items-center justify-center gap-1 pt-5">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 px-2.5 rounded-lg"
+        onClick={() => onChange(page - 1)}
+        disabled={page === 1}
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </Button>
+      {pages.map((p, i) =>
+        p === '...' ? (
+          <span key={`e-${i}`} className="text-gray-400 text-sm px-0.5">
+            …
+          </span>
+        ) : (
+          <Button
+            key={p}
+            variant={p === page ? 'default' : 'outline'}
+            size="sm"
+            className={`h-8 w-8 rounded-lg text-xs font-medium ${
+              p === page ? 'bg-[#D52B1E] hover:bg-[#B8241B] border-[#D52B1E] text-white' : ''
+            }`}
+            onClick={() => onChange(p as number)}
+          >
+            {p}
+          </Button>
+        ),
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 px-2.5 rounded-lg"
+        onClick={() => onChange(page + 1)}
+        disabled={page === total}
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  )
+}
+
+/* --- Main Podcast Component ----------------------------------------------- */
 export default function Podcast() {
-  const [activeId, setActiveId] = useState<number | null>(
-    episodes[0]?.id ?? null,
-  );
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [likedVideos, setLikedVideos] = useState<number[]>([]);
-  const [playlists, setPlaylists] = useState<
-    { id: number; name: string; videos: number[] }[]
-  >([{ id: 1, name: "My Favorites", videos: [] }]);
+  /* Data */
+  const { data: showsResponse, isLoading: showsLoading } = usePodcastShows()
+  const shows: PodcastShow[] = (showsResponse as any)?.data ?? []
 
-  const [showAddToPlaylist, setShowAddToPlaylist] = useState<number | null>(
-    null,
-  );
-  const [currentPlaylist, setCurrentPlaylist] = useState<number | null>(null);
-  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState("");
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1);
-  const videosPerPage = 6;
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [activeShowId, setActiveShowId] = useState<string | null>(null)
 
-  const allEpisodes = [...episodes, ...archiveEpisodes];
-  const activeEpisode =
-    allEpisodes.find((e) => e.id === activeId) ?? allEpisodes[0];
+  const { data: episodesData, isLoading: epsLoading } = usePodcastEpisodes(
+    activeShowId ?? undefined,
+  )
+  const episodes: PodcastEpisode[] = Array.isArray(episodesData)
+    ? episodesData
+    : (episodesData as any)?.data ?? []
 
-  // Pagination
-  const totalPages = Math.ceil(allEpisodes.length / videosPerPage);
-  const startIndex = (currentPage - 1) * videosPerPage;
-  const paginatedEpisodes = allEpisodes.slice(
-    startIndex,
-    startIndex + videosPerPage,
-  );
+  /* Playlist API */
+  const { data: apiPlaylists = [], isLoading: playlistsLoading } = usePlaylists()
+  const playlists = apiPlaylists as Playlist[]
+  const createPlaylistMutation = useCreatePlaylist()
+  const deletePlaylistMutation = useDeletePlaylist()
+  const addEpisodeMutation = useAddEpisodeToPlaylist()
+  const removeEpisodeMutation = useRemoveEpisodeFromPlaylist()
 
-  // Scroll to top on page load
+  /* Player state */
+  const [activeEpisode, setActiveEpisode] = useState<PodcastEpisode | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [volume, setVolume] = useState(1)
+  const [muted, setMuted] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  /* UI state */
+  const [likedEpisodes, setLikedEpisodes] = useState<string[]>([])
+  const [addToPlaylistEpisode, setAddToPlaylistEpisode] = useState<PodcastEpisode | null>(null)
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false)
+  const [newPlaylistName, setNewPlaylistName] = useState('')
+  const [expandedPlaylist, setExpandedPlaylist] = useState<string | null>(null)
+  const showsScrollRef = useRef<HTMLDivElement>(null)
+  const playerRef = useRef<HTMLDivElement>(null)
+
+  const EPS_PER_PAGE = 6;
+  const PL_PER_PAGE = 5;
+  const [epPage, setEpPage] = useState(1);
+  const [playlistPage, setPlaylistPage] = useState(1);
+
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
 
-  // Video controls
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+  /* Reset episode when show changes */
+  useEffect(() => {
+    setActiveEpisode(null)
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+    setEpPage(1);
+  }, [activeShowId])
+
+  /* Auto-select first episode when episode list loads */
+  useEffect(() => {
+    if (episodes.length > 0 && !activeEpisode) {
+      setActiveEpisode(episodes[0])
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episodes.length, activeShowId])
+
+  /* Video controls */
+  const togglePlay = () => {
+    if (!videoRef.current) return
+    if (isPlaying) videoRef.current.pause()
+    else videoRef.current.play()
+    setIsPlaying(!isPlaying)
+  }
+
+  const skipBy = (secs: number) => {
+    if (!videoRef.current) return
+    videoRef.current.currentTime = Math.max(
+      0,
+      Math.min(videoRef.current.currentTime + secs, duration),
+    )
+  }
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-    }
-  };
-
+    if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
+  }
+  const handleLoaded = () => {
+    if (videoRef.current) setDuration(videoRef.current.duration)
+  }
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (videoRef.current) {
-      const time = parseFloat(e.target.value);
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
-  };
+    const t = Number(e.target.value)
+    if (videoRef.current) videoRef.current.currentTime = t
+    setCurrentTime(t)
+  }
+  const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value)
+    setVolume(v)
+    setMuted(v === 0)
+    if (videoRef.current) videoRef.current.volume = v
+  }
+  const toggleMute = () => {
+    const next = !muted
+    setMuted(next)
+    if (videoRef.current) videoRef.current.volume = next ? 0 : volume
+  }
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const vol = parseFloat(e.target.value);
-    setVolume(vol);
-    if (videoRef.current) {
-      videoRef.current.volume = vol;
-    }
-  };
+  /* Likes */
+  const toggleLike = (id: string) => {
+    setLikedEpisodes((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+  }
 
-  const toggleLike = (videoId: number) => {
-    setLikedVideos((prev) =>
-      prev.includes(videoId)
-        ? prev.filter((id) => id !== videoId)
-        : [...prev, videoId],
-    );
-  };
+  /* Playlists */
+  const handleCreatePlaylist = () => {
+    if (!newPlaylistName.trim()) return
+    createPlaylistMutation.mutate(
+      { name: newPlaylistName.trim() },
+      {
+        onSuccess: () => {
+          setNewPlaylistName('')
+          setShowCreatePlaylist(false)
+        },
+      },
+    )
+  }
 
-  const createPlaylist = () => {
-    if (newPlaylistName.trim()) {
-      const newPlaylist = {
-        id: Date.now(),
-        name: newPlaylistName.trim(),
-        videos: [],
-      };
-      setPlaylists((prev) => [...prev, newPlaylist]);
-      setNewPlaylistName("");
-      setShowPlaylistModal(false);
-    }
-  };
+  const scrollShows = (dir: 'left' | 'right') => {
+    showsScrollRef.current?.scrollBy({
+      left: dir === 'right' ? 220 : -220,
+      behavior: 'smooth',
+    })
+  }
 
-  const addToPlaylist = (playlistId: number, videoId: number) => {
-    setPlaylists((prev) =>
-      prev.map((p) =>
-        p.id === playlistId
-          ? {
-              ...p,
-              videos: p.videos.includes(videoId)
-                ? p.videos
-                : [...p.videos, videoId],
-            }
-          : p,
-      ),
-    );
-  };
-
-  const skipForward = () => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = Math.min(
-        videoRef.current.currentTime + 10,
-        duration,
-      );
-    }
-  };
-
-  const skipBackward = () => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = Math.max(
-        videoRef.current.currentTime - 10,
-        0,
-      );
-    }
-  };
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
-
-  const formatUploadDate = (date: Date) => {
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    const diffInMonths = Math.floor(diffInDays / 30);
-    const diffInYears = Math.floor(diffInDays / 365);
-
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60)
-      return `${diffInMinutes} minute${diffInMinutes > 1 ? "s" : ""} ago`;
-    if (diffInHours < 24)
-      return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
-    if (diffInDays < 30)
-      return `${diffInDays} day${diffInDays > 1 ? "s" : ""} ago`;
-    if (diffInMonths < 12)
-      return `${diffInMonths} month${diffInMonths > 1 ? "s" : ""} ago`;
-    return `${diffInYears} year${diffInYears > 1 ? "s" : ""} ago`;
-  };
+  const activeShow = shows.find((s) => s.id === activeShowId) ?? null
 
   return (
     <motion.div
-      className="space-y-6"
+      className="space-y-8 pb-10"
       initial="hidden"
       animate="visible"
-      variants={containerVariants}
+      variants={fade}
     >
-      <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
-          Podcast
-        </h1>
-        <p className="mt-2 text-[#737692]">
-          Conversations with investors, operators, and policymakers across the
-          IEFA community. Listen to career journeys, market debriefs, and
-          behind-the-scenes stories.
-        </p>
+      {/* HERO */}
+      <motion.div
+        variants={slideUp}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-[#1c0505] to-gray-900 p-8 md:p-12 min-h-[220px] flex items-center"
+      >
+        <div className="pointer-events-none absolute -top-16 -right-16 h-72 w-72 rounded-full bg-[#D52B1E]/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-12 h-56 w-56 rounded-full bg-[#D52B1E]/10 blur-3xl" />
+
+        <div className="relative z-10 max-w-2xl">
+          <span className="inline-flex items-center gap-1.5 bg-[#D52B1E]/20 text-[#D52B1E] text-xs font-bold px-3 py-1.5 rounded-full border border-[#D52B1E]/30 mb-4 tracking-widest uppercase">
+            <Mic2 className="h-3 w-3" /> IEFA Podcast Studio
+          </span>
+          <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight mb-3">
+            Stories that move <span className="text-[#D52B1E]">portfolios</span>
+          </h1>
+          <p className="text-gray-400 text-sm md:text-base leading-relaxed mb-6">
+            Conversations with investors, operators, and policymakers across the
+            IEFA community — career journeys, market debriefs, and
+            behind-the-scenes stories.
+          </p>
+          <div className="flex flex-wrap items-center gap-5 text-sm text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <Headphones className="h-4 w-4 text-gray-600" />
+              {shows.length} Shows
+            </span>
+            <span className="h-1 w-1 bg-gray-700 rounded-full" />
+            <span className="flex items-center gap-1.5">
+              <Mic2 className="h-4 w-4 text-gray-600" />
+              New episodes weekly
+            </span>
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute right-8 bottom-4 opacity-5 text-white select-none hidden md:block">
+          <Headphones className="h-52 w-52" />
+        </div>
       </motion.div>
 
-      {/* Video Player */}
-      <motion.div variants={itemVariants}>
-        <Card className="bg-gradient-to-br from-[#D52B1E]/5 via-[#D52B1E]/10 to-[#D52B1E]/5 border-[#D52B1E]/20 overflow-hidden">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Play className="h-5 w-5 text-[#D52B1E]" />
-              <CardTitle className="text-[#000000]">Now Playing</CardTitle>
+      {/* SHOWS SHELF */}
+      <motion.div variants={slideUp}>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-xl font-bold text-[#000000]">Shows</h2>
+            <p className="text-sm text-[#737692] mt-0.5">
+              Pick a show to browse its episodes
+            </p>
+          </div>
+          {shows.length > 3 && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => scrollShows("left")}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => scrollShows("right")}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            <CardDescription className="text-[#737692]">
-              IEFA Studio · Video conversations that move portfolios
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Video Element */}
-              <div className="relative bg-black rounded-lg overflow-hidden max-h-96">
-                <video
-                  ref={videoRef}
-                  src={activeEpisode.videoUrl}
-                  poster={activeEpisode.thumbnail}
-                  className="w-full h-full object-cover max-h-96"
-                  onTimeUpdate={handleTimeUpdate}
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                />
+          )}
+        </div>
 
-                {/* Video Controls Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                  <div className="flex items-center gap-4">
-                    <Button
-                      size="sm"
-                      onClick={skipBackward}
-                      className="bg-white/20 hover:bg-white/30 text-white border-0"
-                    >
-                      <SkipBack className="h-4 w-4" />
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      onClick={togglePlay}
-                      className="bg-white/20 hover:bg-white/30 text-white border-0"
-                    >
-                      {isPlaying ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      onClick={skipForward}
-                      className="bg-white/20 hover:bg-white/30 text-white border-0"
-                    >
-                      <SkipForward className="h-4 w-4" />
-                    </Button>
-
-                    <div className="flex-1">
-                      <input
-                        type="range"
-                        min="0"
-                        max={duration}
-                        value={currentTime}
-                        onChange={handleSeek}
-                        className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex justify-between text-xs text-white/80 mt-1">
-                        <span>{formatTime(currentTime)}</span>
-                        <span>{formatTime(duration)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Volume2 className="h-4 w-4 text-white" />
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={volume}
-                        onChange={handleVolumeChange}
-                        className="w-16 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
-                      />
-                    </div>
-
-                    <Button
-                      size="sm"
-                      className="bg-white/20 hover:bg-white/30 text-white border-0"
-                    >
-                      <Maximize className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Video Info */}
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-[#000000] text-lg">
-                    {activeEpisode.title}
-                  </h3>
-                  <p className="text-sm text-[#737692]">
-                    Guest: {activeEpisode.guest}
-                  </p>
-                  <div className="flex items-center gap-4 mt-2">
-                    <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-[#D52B1E]/20">
-                      {activeEpisode.tag}
-                    </Badge>
-                    <span className="text-sm text-[#737692] flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {activeEpisode.duration}
-                    </span>
-                    <span className="text-sm text-[#737692]">
-                      {activeEpisode.views} views
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleLike(activeEpisode.id)}
-                    className={`flex items-center gap-2 ${likedVideos.includes(activeEpisode.id) ? "text-red-500 border-red-500" : ""}`}
-                  >
-                    <Heart
-                      className={`h-4 w-4 ${likedVideos.includes(activeEpisode.id) ? "fill-current" : ""}`}
-                    />
-                    {activeEpisode.likes +
-                      (likedVideos.includes(activeEpisode.id) ? 1 : 0)}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAddToPlaylist(activeEpisode.id)}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add to Playlist
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {showsLoading ? (
+          <div className="flex items-center justify-center h-44">
+            <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E] mr-2" />
+            <span className="text-[#737692]">Loading shows…</span>
+          </div>
+        ) : shows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-44 bg-gray-50 rounded-2xl text-[#737692]">
+            <Mic2 className="h-10 w-10 mb-2 opacity-25" />
+            <p className="font-medium">No shows available yet</p>
+          </div>
+        ) : (
+          <div
+            ref={showsScrollRef}
+            className="flex gap-4 overflow-x-auto pb-2"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {shows.map((show) => (
+              <ShowCard
+                key={show.id}
+                show={show}
+                active={activeShowId === show.id}
+                onClick={() =>
+                  setActiveShowId(activeShowId === show.id ? null : show.id)
+                }
+              />
+            ))}
+          </div>
+        )}
       </motion.div>
 
-      {/* Video Library */}
-      <motion.div variants={itemVariants}>
-        <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-[#000000]">Video Library</CardTitle>
-            <CardDescription className="text-[#737692]">
-              Browse all IEFA Studio videos. Click to play.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {paginatedEpisodes.map((episode, index) => {
-                const isActive = activeEpisode.id === episode.id;
-                return (
-                  <motion.div
-                    key={episode.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 + index * 0.1 }}
-                    onClick={() => setActiveId(episode.id)}
-                    className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
-                      isActive
-                        ? "border-[#D52B1E] shadow-lg"
-                        : "border-gray-200 hover:border-[#D52B1E]/50"
-                    }`}
-                  >
-                    <div className="aspect-video bg-gray-200 relative">
-                      <img
-                        src={episode.thumbnail}
-                        alt={episode.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src =
-                            "https://via.placeholder.com/640x360/cccccc/666666?text=Video+Thumbnail";
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                        <Play className="h-12 w-12 text-white" />
-                      </div>
-                      {isActive && (
-                        <div className="absolute top-2 right-2 bg-[#D52B1E] text-white px-2 py-1 rounded text-xs">
-                          Playing
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h4 className="font-semibold text-[#000000] mb-1 line-clamp-2">
-                        {episode.title}
-                      </h4>
-                      <p className="text-sm text-[#737692] mb-2">
-                        {episode.guest}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {episode.tag}
-                          </Badge>
-                          <span className="text-xs text-[#737692] flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {episode.duration}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowAddToPlaylist(episode.id);
-                            }}
-                            className="p-1 text-gray-400 hover:text-[#D52B1E]"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleLike(episode.id);
-                            }}
-                            className={`p-1 ${likedVideos.includes(episode.id) ? "text-red-500" : "text-gray-400"}`}
-                          >
-                            <Heart
-                              className={`h-4 w-4 ${likedVideos.includes(episode.id) ? "fill-current" : ""}`}
-                            />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-2 text-xs text-[#737692]">
-                        <span>{formatUploadDate(episode.uploadDate)}</span>
-                        <div className="flex items-center gap-2">
-                          <span>
-                            {episode.likes +
-                              (likedVideos.includes(episode.id) ? 1 : 0)}{" "}
-                            likes
-                          </span>
-                          <span>{episode.views} views</span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
+      {/* EMPTY STATE */}
+      <AnimatePresence>
+        {!activeShow && !showsLoading && shows.length > 0 && (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center justify-center py-16 text-[#737692]"
+          >
+            <div className="bg-gray-50 border border-gray-100 rounded-full p-7 mb-4 shadow-inner">
+              <Headphones className="h-12 w-12 opacity-30" />
             </div>
+            <p className="font-semibold text-base">Select a show above</p>
+            <p className="text-sm mt-1">
+              Choose a show to start exploring its episodes
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+      {/* ACTIVE SHOW DETAIL */}
+      <AnimatePresence>
+        {activeShow && (
+          <motion.div
+            key={activeShow.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.4 }}
+            className="space-y-6"
+          >
+            {/* Show banner */}
+            <div className="relative rounded-2xl overflow-hidden shadow-xl">
+              <div className="absolute inset-0">
+                <img
+                  src={
+                    activeShow.coverImageUrl ??
+                    `https://picsum.photos/seed/${activeShow.id}/800/400`
                   }
-                  disabled={currentPage === 1}
+                  alt=""
+                  className="w-full h-full object-cover scale-110"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      `https://picsum.photos/seed/${activeShow.id}/800/400`;
+                  }}
+                />
+                <div className="absolute inset-0 backdrop-blur-2xl bg-black/65" />
+              </div>
+
+              <div className="relative z-10 flex flex-col sm:flex-row gap-5 p-6 md:p-8">
+                <img
+                  src={
+                    activeShow.coverImageUrl ??
+                    `https://picsum.photos/seed/${activeShow.id}/200/200`
+                  }
+                  alt={activeShow.title}
+                  className="w-28 h-28 md:w-36 md:h-36 rounded-xl object-cover shadow-2xl flex-shrink-0 border-2 border-white/10"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      `https://picsum.photos/seed/${activeShow.id}/200/200`;
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap gap-2 mb-2.5">
+                    <Badge className="bg-[#D52B1E]/25 text-[#ff6b6b] border-[#D52B1E]/40 text-xs font-semibold">
+                      {activeShow.category}
+                    </Badge>
+                    <Badge className="bg-white/10 text-white/75 border-white/20 text-xs">
+                      {activeShow.language?.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-1.5">
+                    {activeShow.title}
+                  </h2>
+                  <p className="text-gray-300 text-sm leading-relaxed line-clamp-2 mb-4">
+                    {activeShow.description}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {activeShow.spotifyUrl && (
+                      <a
+                        href={activeShow.spotifyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-green-300 hover:text-green-200 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors"
+                      >
+                        <Headphones className="h-3 w-3" />
+                        Spotify
+                      </a>
+                    )}
+                    {activeShow.appleUrl && (
+                      <a
+                        href={activeShow.appleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors"
+                      >
+                        <Headphones className="h-3 w-3" />
+                        Apple Podcasts
+                      </a>
+                    )}
+                    {activeShow.rssFeedUrl && (
+                      <a
+                        href={activeShow.rssFeedUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-orange-300 hover:text-orange-200 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors"
+                      >
+                        <Rss className="h-3 w-3" />
+                        RSS Feed
+                      </a>
+                    )}
+                    {!activeShow.spotifyUrl &&
+                      !activeShow.appleUrl &&
+                      !activeShow.rssFeedUrl && (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 bg-white/10 px-3 py-1.5 rounded-full">
+                          <Globe className="h-3 w-3" />
+                          IEFA Exclusive
+                        </span>
+                      )}
+                    <button
+                      onClick={() => setActiveShowId(null)}
+                      className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors ml-auto"
+                    >
+                      <X className="h-3 w-3" />
+                      Close show
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Video player */}
+            <AnimatePresence>
+              {activeEpisode && (
+                <motion.div
+                  ref={playerRef}
+                  key={activeEpisode.id + "-player"}
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.3 }}
+                  className="rounded-2xl overflow-hidden bg-gray-950 shadow-2xl border border-white/5"
                 >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                      className={
-                        currentPage === page
-                          ? "bg-[#D52B1E] hover:bg-[#B8241B]"
-                          : ""
+                  <div className="relative bg-black" style={{ maxHeight: 480 }}>
+                    <video
+                      ref={videoRef}
+                      src={(activeEpisode as any).videoUrl}
+                      poster={getThumb(activeEpisode)}
+                      className="w-full object-contain"
+                      style={{ maxHeight: 480 }}
+                      onTimeUpdate={handleTimeUpdate}
+                      onLoadedMetadata={handleLoaded}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onEnded={() => setIsPlaying(false)}
+                    />
+
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pt-16 pb-4 px-4">
+                      <div className="mb-2.5">
+                        <input
+                          type="range"
+                          min={0}
+                          max={duration || 0}
+                          value={currentTime}
+                          onChange={handleSeek}
+                          className="w-full h-1 appearance-none bg-white/25 rounded-full cursor-pointer accent-[#D52B1E]"
+                        />
+                        <div className="flex justify-between text-[11px] text-white/55 mt-1">
+                          <span>{formatTime(currentTime)}</span>
+                          <span>{formatTime(duration)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => skipBy(-10)}
+                          className="text-white/65 hover:text-white transition-colors"
+                          title="Rewind 10s"
+                        >
+                          <SkipBack className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={togglePlay}
+                          className="bg-[#D52B1E] hover:bg-[#c0241a] text-white rounded-full p-2.5 transition-colors shadow-lg"
+                        >
+                          {isPlaying ? (
+                            <Pause className="h-5 w-5" />
+                          ) : (
+                            <Play className="h-5 w-5 fill-white" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => skipBy(10)}
+                          className="text-white/65 hover:text-white transition-colors"
+                          title="Forward 10s"
+                        >
+                          <SkipForward className="h-5 w-5" />
+                        </button>
+                        <div className="flex-1" />
+                        <button
+                          onClick={toggleMute}
+                          className="text-white/65 hover:text-white transition-colors"
+                        >
+                          {muted ? (
+                            <VolumeX className="h-4 w-4" />
+                          ) : (
+                            <Volume2 className="h-4 w-4" />
+                          )}
+                        </button>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={muted ? 0 : volume}
+                          onChange={handleVolume}
+                          className="w-20 h-1 appearance-none bg-white/25 rounded-full cursor-pointer accent-[#D52B1E]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 px-5 py-4">
+                    <div className="min-w-0">
+                      <h3 className="text-white font-semibold text-base leading-snug">
+                        {activeEpisode.title}
+                      </h3>
+                      {(activeEpisode as any).guest && (
+                        <p className="text-gray-400 text-sm mt-0.5 flex items-center gap-1">
+                          <Mic2 className="h-3.5 w-3.5 flex-shrink-0" />
+                          {(activeEpisode as any).guest}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 mt-2">
+                        {(activeEpisode as any).tag && (
+                          <Badge className="bg-[#D52B1E]/20 text-[#ff7070] border-[#D52B1E]/30 text-xs">
+                            {(activeEpisode as any).tag}
+                          </Badge>
+                        )}
+                        {(activeEpisode as any).duration && (
+                          <span className="flex items-center gap-1 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            {(activeEpisode as any).duration}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
+                      <button
+                        onClick={() => toggleLike(activeEpisode.id)}
+                        className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border transition-all ${
+                          likedEpisodes.includes(activeEpisode.id)
+                            ? "border-red-500 text-red-400 bg-red-500/10"
+                            : "border-white/20 text-white/55 hover:border-red-500/50 hover:text-red-400"
+                        }`}
+                      >
+                        <Heart
+                          className={`h-3.5 w-3.5 ${likedEpisodes.includes(activeEpisode.id) ? "fill-current" : ""}`}
+                        />
+                        {(activeEpisode as any).likes !== undefined
+                          ? (activeEpisode as any).likes +
+                            (likedEpisodes.includes(activeEpisode.id) ? 1 : 0)
+                          : "Like"}
+                      </button>
+                      <button
+                        onClick={() => setAddToPlaylistEpisode(activeEpisode)}
+                        className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-white/20 text-white/55 hover:border-[#D52B1E]/50 hover:text-[#D52B1E] transition-all"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Episodes grid */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#000000]">
+                  Episodes
+                  {episodes.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-[#737692]">
+                      ({episodes.length})
+                    </span>
+                  )}
+                </h3>
+              </div>
+
+              {epsLoading ? (
+                <div className="flex items-center justify-center h-48">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E] mr-2" />
+                  <span className="text-[#737692]">Loading episodes…</span>
+                </div>
+              ) : episodes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 bg-gray-50 rounded-2xl text-[#737692]">
+                  <Mic2 className="h-10 w-10 mb-2 opacity-25" />
+                  <p className="font-medium">No episodes for this show yet</p>
+                </div>
+              ) : (
+                <>
+                  <motion.div
+                    variants={stagger}
+                    initial="hidden"
+                    animate="visible"
+                    className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                  >
+                    {episodes
+                      .slice((epPage - 1) * EPS_PER_PAGE, epPage * EPS_PER_PAGE)
+                      .map((ep) => (
+                        <EpisodeCard
+                          key={ep.id}
+                          episode={ep}
+                          active={activeEpisode?.id === ep.id}
+                          onPlay={() => {
+                            setActiveEpisode(ep);
+                            setTimeout(
+                              () =>
+                                playerRef.current?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "start",
+                                }),
+                              100,
+                            );
+                          }}
+                          onLike={() => toggleLike(ep.id)}
+                          liked={likedEpisodes.includes(ep.id)}
+                          onAddToPlaylist={() => setAddToPlaylistEpisode(ep)}
+                        />
+                      ))}
+                  </motion.div>
+                  <Pager
+                    page={epPage}
+                    total={Math.ceil(episodes.length / EPS_PER_PAGE)}
+                    onChange={setEpPage}
+                  />
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MY PLAYLISTS */}
+      <motion.div variants={slideUp}>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-xl font-bold text-[#000000]">My Playlists</h2>
+            <p className="text-sm text-[#737692] mt-0.5">
+              Build and manage your episode collections
+            </p>
+          </div>
+          <Button
+            onClick={() => setShowCreatePlaylist(true)}
+            className="bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl shadow-md"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Playlist
+          </Button>
+        </div>
+
+        {playlistsLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 className="h-5 w-5 animate-spin text-[#D52B1E] mr-2" />
+            <span className="text-[#737692]">Loading playlists…</span>
+          </div>
+        ) : playlists.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-14 bg-gray-50 rounded-2xl text-[#737692] border border-dashed border-gray-200">
+            <div className="bg-white rounded-full p-4 shadow-sm mb-3 border border-gray-100">
+              <List className="h-8 w-8 opacity-25" />
+            </div>
+            <p className="font-semibold">No playlists yet</p>
+            <p className="text-sm mt-1 text-center max-w-xs">
+              Create a playlist to organise and revisit your favourite episodes
+            </p>
+            <Button
+              onClick={() => setShowCreatePlaylist(true)}
+              variant="outline"
+              className="mt-4 rounded-xl border-[#D52B1E]/30 text-[#D52B1E] hover:bg-[#D52B1E]/5"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Create my first playlist
+            </Button>
+          </div>
+        ) : (
+          <>
+            <motion.div
+              variants={stagger}
+              initial="hidden"
+              animate="visible"
+              className="space-y-3"
+            >
+              {playlists
+                .slice(
+                  (playlistPage - 1) * PL_PER_PAGE,
+                  playlistPage * PL_PER_PAGE,
+                )
+                .map((playlist) => (
+                  <motion.div
+                    key={playlist.id}
+                    variants={cardIn}
+                    layout
+                    className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div
+                      className="flex items-center gap-4 p-4 cursor-pointer select-none"
+                      onClick={() =>
+                        setExpandedPlaylist(
+                          expandedPlaylist === playlist.id ? null : playlist.id,
+                        )
                       }
                     >
-                      {page}
-                    </Button>
-                  ),
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* My Playlists */}
-      <motion.div variants={itemVariants}>
-        <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-[#000000]">My Playlists</CardTitle>
-                <CardDescription className="text-[#737692]">
-                  Create and manage your video collections
-                </CardDescription>
-              </div>
-              <Button
-                onClick={() => setShowPlaylistModal(true)}
-                className="bg-[#D52B1E] hover:bg-[#B8241B] text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                New Playlist
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {playlists.map((playlist) => (
-                <motion.div
-                  key={playlist.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center">
-                      <List className="h-5 w-5 text-[#D52B1E]" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-[#000000]">
-                        {playlist.name}
-                      </h4>
-                      <p className="text-sm text-[#737692]">
-                        {playlist.videos.length} videos
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPlaylist(playlist.id)}
-                    className="text-[#D52B1E]"
-                  >
-                    View
-                  </Button>
-                </motion.div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Add to Playlist Modal */}
-      {showAddToPlaylist && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle className="text-[#000000]">Add to Playlist</CardTitle>
-              <CardDescription className="text-[#737692]">
-                Choose a playlist to add this video to
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {playlists.map((playlist) => (
-                <Button
-                  key={playlist.id}
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    addToPlaylist(playlist.id, showAddToPlaylist);
-                    setShowAddToPlaylist(null);
-                  }}
-                >
-                  <List className="h-4 w-4 mr-2" />
-                  {playlist.name}
-                </Button>
-              ))}
-              <div className="border-t pt-4">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setShowAddToPlaylist(null);
-                    setShowPlaylistModal(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Playlist
-                </Button>
-              </div>
-              <Button
-                variant="ghost"
-                className="w-full"
-                onClick={() => setShowAddToPlaylist(null)}
-              >
-                Cancel
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Playlist Creation Modal */}
-      {showPlaylistModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle className="text-[#000000]">Create New Playlist</CardTitle>
-              <CardDescription className="text-[#737692]">
-                Give your playlist a name
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                placeholder="Playlist name"
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && createPlaylist()}
-              />
-              <div className="flex gap-2">
-                <Button onClick={createPlaylist} className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                  Create
-                </Button>
-                <Button variant="outline" onClick={() => setShowPlaylistModal(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Current Playlist View */}
-      {currentPlaylist && (
-        <motion.div variants={itemVariants}>
-          <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-[#000000]">
-                  {playlists.find((p) => p.id === currentPlaylist)?.name}
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPlaylist(null)}
-                >
-                  Close
-                </Button>
-              </div>
-              <CardDescription className="text-[#737692]">
-                Videos in this playlist
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {playlists
-                  .find((p) => p.id === currentPlaylist)
-                  ?.videos.map((videoId) => {
-                    const video = allEpisodes.find((v) => v.id === videoId);
-                    if (!video) return null;
-                    return (
-                      <motion.div
-                        key={videoId}
-                        className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => setActiveId(videoId)}
-                      >
-                        <img
-                          src={video.thumbnail}
-                          alt={video.title}
-                          className="w-16 h-12 object-cover rounded"
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-medium text-[#000000]">
-                            {video.title}
-                          </h4>
-                          <p className="text-sm text-[#737692]">
-                            {video.duration}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                      <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[#D52B1E]/15 to-[#D52B1E]/5 flex items-center justify-center flex-shrink-0 border border-[#D52B1E]/10">
+                        <List className="h-5 w-5 text-[#D52B1E]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-[#000000] truncate">
+                          {playlist.name}
+                        </h4>
+                        <p className="text-sm text-[#737692]">
+                          {playlist.episodes?.length ?? 0}{" "}
+                          {(playlist.episodes?.length ?? 0) === 1
+                            ? "episode"
+                            : "episodes"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleLike(videoId);
+                            deletePlaylistMutation.mutate(playlist.id);
                           }}
-                          className={`p-1 ${likedVideos.includes(videoId) ? "text-red-500" : "text-gray-400"}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          title="Delete playlist"
                         >
-                          <Heart
-                            className={`h-4 w-4 ${likedVideos.includes(videoId) ? "fill-current" : ""}`}
-                          />
-                        </Button>
-                      </motion.div>
-                    );
-                  })}
-                {playlists.find((p) => p.id === currentPlaylist)?.videos
-                  .length === 0 && (
-                  <p className="text-[#737692] text-center py-8">
-                    No videos in this playlist yet. Add some from the library
-                    above!
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <ChevronRight
+                          className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
+                            expandedPlaylist === playlist.id ? "rotate-90" : ""
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <AnimatePresence initial={false}>
+                      {expandedPlaylist === playlist.id && (
+                        <motion.div
+                          key="content"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          className="overflow-hidden border-t border-gray-100"
+                        >
+                          <div className="p-4 space-y-1.5 max-h-72 overflow-y-auto">
+                            {(playlist.episodes ?? []).length === 0 ? (
+                              <p className="text-sm text-[#737692] text-center py-5">
+                                No episodes yet — add some from the shows above!
+                              </p>
+                            ) : (
+                              (playlist.episodes ?? []).map((ep) => (
+                                <motion.div
+                                  key={ep.id}
+                                  layout
+                                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition-colors group"
+                                >
+                                  <img
+                                    src={getThumb(ep)}
+                                    alt={ep.title}
+                                    className="w-14 h-10 object-cover rounded-lg flex-shrink-0"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src =
+                                        `https://picsum.photos/seed/${ep.id}/120/80`;
+                                    }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-[#000000] truncate">
+                                      {ep.title}
+                                    </p>
+                                    {(ep as any).duration && (
+                                      <p className="text-xs text-[#737692] flex items-center gap-1 mt-0.5">
+                                        <Clock className="h-3 w-3" />
+                                        {(ep as any).duration}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      removeEpisodeMutation.mutate({
+                                        playlistId: playlist.id,
+                                        episodeId: ep.id,
+                                      })
+                                    }
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    title="Remove from playlist"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </motion.div>
+                              ))
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                ))}
+            </motion.div>
+            <Pager
+              page={playlistPage}
+              total={Math.ceil(playlists.length / PL_PER_PAGE)}
+              onChange={(p) => {
+                setPlaylistPage(p);
+                setExpandedPlaylist(null);
+              }}
+            />
+          </>
+        )}
+      </motion.div>
+
+      {/* ADD TO PLAYLIST MODAL */}
+      {createPortal(
+        <AnimatePresence>
+          {addToPlaylistEpisode && (
+            <motion.div
+              key="add-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onClick={() => setAddToPlaylistEpisode(null)}
+            >
+              <motion.div
+                key="add-modal"
+                initial={{ scale: 0.88, opacity: 0, y: 16 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.88, opacity: 0, y: 16 }}
+                transition={{ duration: 0.22 }}
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-5 border-b border-gray-100">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-[#000000]">
+                        Add to Playlist
+                      </h3>
+                      <p className="text-xs text-[#737692] mt-0.5 line-clamp-1">
+                        {addToPlaylistEpisode.title}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setAddToPlaylistEpisode(null)}
+                      className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 space-y-1 max-h-56 overflow-y-auto">
+                  {playlists.length === 0 ? (
+                    <p className="text-sm text-[#737692] text-center py-5">
+                      No playlists yet
+                    </p>
+                  ) : (
+                    playlists.map((pl) => {
+                      const isIn = (pl.episodes ?? []).some(
+                        (e) => e.id === addToPlaylistEpisode.id,
+                      );
+                      return (
+                        <button
+                          key={pl.id}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+                          onClick={() => {
+                            if (!isIn)
+                              addEpisodeMutation.mutate({
+                                playlistId: pl.id,
+                                episodeId: addToPlaylistEpisode.id,
+                              });
+                            setAddToPlaylistEpisode(null);
+                          }}
+                        >
+                          <div
+                            className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              isIn ? "bg-[#D52B1E]/10" : "bg-gray-100"
+                            }`}
+                          >
+                            {isIn ? (
+                              <Check className="h-4 w-4 text-[#D52B1E]" />
+                            ) : (
+                              <List className="h-4 w-4 text-gray-500" />
+                            )}
+                          </div>
+                          <span className="flex-1 text-sm font-medium text-[#000000]">
+                            {pl.name}
+                          </span>
+                          {isIn && (
+                            <span className="text-xs text-[#D52B1E] font-medium">
+                              Added
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="p-3 border-t border-gray-100">
+                  <button
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[#D52B1E]/5 transition-colors text-left"
+                    onClick={() => {
+                      setAddToPlaylistEpisode(null);
+                      setShowCreatePlaylist(true);
+                    }}
+                  >
+                    <div className="h-8 w-8 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center flex-shrink-0">
+                      <Plus className="h-4 w-4 text-[#D52B1E]" />
+                    </div>
+                    <span className="text-sm font-semibold text-[#D52B1E]">
+                      Create new playlist
+                    </span>
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+
+      {/* CREATE PLAYLIST MODAL */}
+      {createPortal(
+        <AnimatePresence>
+          {showCreatePlaylist && (
+            <motion.div
+              key="create-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onClick={() => setShowCreatePlaylist(false)}
+            >
+              <motion.div
+                key="create-modal"
+                initial={{ scale: 0.88, opacity: 0, y: 16 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.88, opacity: 0, y: 16 }}
+                transition={{ duration: 0.22 }}
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-bold text-[#000000]">New Playlist</h3>
+                  <button
+                    onClick={() => {
+                      setShowCreatePlaylist(false);
+                      setNewPlaylistName("");
+                    }}
+                    className="text-gray-400 hover:text-gray-600 p-1"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <Input
+                    placeholder="e.g. Morning Finance Briefing"
+                    value={newPlaylistName}
+                    onChange={(e) => setNewPlaylistName(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleCreatePlaylist()
+                    }
+                    autoFocus
+                    className="rounded-xl"
+                  />
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleCreatePlaylist}
+                      disabled={
+                        !newPlaylistName.trim() ||
+                        createPlaylistMutation.isPending
+                      }
+                      className="flex-1 bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl"
+                    >
+                      {createPlaylistMutation.isPending && (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                      )}
+                      Create Playlist
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowCreatePlaylist(false);
+                        setNewPlaylistName("");
+                      }}
+                      className="rounded-xl"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
     </motion.div>
   );
