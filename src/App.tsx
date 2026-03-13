@@ -189,6 +189,7 @@ function App() {
             <Route path="directory" element={<AdminDirectory />} />
             <Route path="if-professionals" element={<AdminIFProfessionals />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -4,12 +4,19 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from '@/stores/auth';
 
 export function AdminHeader() {
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
   const { user, logout } = useAuth();
+  const storeUser = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+
+  const initials = [storeUser?.firstName, storeUser?.lastName]
+    .filter(Boolean)
+    .map((n) => n!.charAt(0).toUpperCase())
+    .join('') || storeUser?.email?.charAt(0).toUpperCase() || 'A';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -58,19 +65,30 @@ export function AdminHeader() {
         </Button>
 
         {/* Admin badge */}
-        <div className="flex items-center gap-2.5 bg-white rounded-full shadow-sm px-3 py-1.5">
-          <div className="h-7 w-7 rounded-full bg-[#D52B1E] flex items-center justify-center text-white text-xs font-bold">
-            SA
-          </div>
+        <button
+          onClick={() => navigate('/admin/profile')}
+          className="flex items-center gap-2.5 bg-white rounded-full shadow-sm px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          {storeUser?.profilePhotoUrl ? (
+            <img
+              src={storeUser.profilePhotoUrl}
+              alt="Profile"
+              className="h-7 w-7 rounded-full object-cover"
+            />
+          ) : (
+            <div className="h-7 w-7 rounded-full bg-[#D52B1E] flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {initials}
+            </div>
+          )}
           <div className="hidden sm:block">
             <p className="text-xs font-semibold text-slate-700 leading-none">
-              {user?.email ?? "Admin"}
+              {storeUser?.firstName ? `${storeUser.firstName} ${storeUser.lastName ?? ''}`.trim() : (user?.email ?? 'Admin')}
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5 capitalize">
               {user?.role}
             </p>
           </div>
-        </div>
+        </button>
 
         <Button
           variant="ghost"

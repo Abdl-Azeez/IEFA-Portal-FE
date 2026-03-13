@@ -6,13 +6,20 @@ import { Badge } from '@/components/ui/badge'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from '@/stores/auth';
 
 export function Header() {
   const [notifications] = useState(3)
   const [isVisible, setIsVisible] = useState(true)
   const lastScrollY = useRef(0)
   const { user, logout } = useAuth();
+  const storeUser = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+
+  const initials = [storeUser?.firstName, storeUser?.lastName]
+    .filter(Boolean)
+    .map((n) => n!.charAt(0).toUpperCase())
+    .join('') || storeUser?.email?.charAt(0).toUpperCase() || 'U';
 
   const handleLogout = () => {
     logout();
@@ -99,21 +106,21 @@ export function Header() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4, duration: 0.5 }}
         >
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => navigate('/profile')}>
             <Avatar className="h-9 w-9 ring-2 ring-primary/20 transition-all duration-200 hover:ring-primary/40 cursor-pointer">
               <AvatarImage
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
+                src={storeUser?.profilePhotoUrl ?? ''}
                 alt="User"
               />
-              <AvatarFallback>IB</AvatarFallback>
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
           </motion.div>
           <div className="hidden md:block pr-2">
             <p className="text-sm font-medium" style={{ color: "#000000" }}>
-              {user?.email || "User"}
+              {storeUser?.firstName ? `${storeUser.firstName} ${storeUser.lastName ?? ''}`.trim() : (user?.email || 'User')}
             </p>
             <p className="text-xs text-gray-500 capitalize">
-              {user?.role || "Guest"}
+              {user?.role || 'Guest'}
             </p>
           </div>
           <Button
