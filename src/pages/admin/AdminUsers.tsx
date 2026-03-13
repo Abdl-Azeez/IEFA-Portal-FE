@@ -19,6 +19,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
+import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { exportToCsv } from '@/lib/utils'
 import {
   useAdminUsers,
   useAdminVerifyUser,
@@ -111,8 +114,8 @@ export default function AdminUsers() {
           <p className="text-slate-500 text-sm">Manage all registered users and their roles</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg">
-            <Download className="h-3.5 w-3.5" /> Export
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg" onClick={() => exportToCsv('users', users.map((u) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, country: u.country ?? '', isVerified: u.isVerified, isActive: u.isActive, joined: u.createdAt })))}>
+            <Download className="h-3.5 w-3.5" /> Export CSV
           </Button>
           <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5">
             <Mail className="h-3.5 w-3.5" /> Invite User
@@ -121,6 +124,7 @@ export default function AdminUsers() {
       </motion.div>
 
       {/* Stat cards */}
+      {isLoading ? <CardGridSkeleton count={4} /> : (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Users', value: meta?.itemCount ?? '—', icon: Users, color: '#3b82f6' },
@@ -143,6 +147,7 @@ export default function AdminUsers() {
           </motion.div>
         ))}
       </div>
+      )}
 
       {/* Table */}
       <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -177,13 +182,9 @@ export default function AdminUsers() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          {isLoading && (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E]" />
-            </div>
-          )}
+          {isLoading && <TableSkeleton rows={8} cols={6} />}
           {!isLoading && users.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-16">No users found</p>
+            <EmptyState icon={Users} title="No users found" description="Try adjusting your search or role filter." />
           )}
           {!isLoading && users.length > 0 && (
             <table className="w-full text-sm">

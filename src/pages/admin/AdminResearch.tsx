@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
 import { ImageUpload } from '@/components/ui/image-upload'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
+import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { exportToCsv } from '@/lib/utils'
 import {
   useAdminResearchReports,
   useAdminReportCategories,
@@ -40,8 +44,9 @@ export default function AdminResearch() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editItem, setEditItem] = useState<ResearchReport | null>(null)
   const [form, setForm] = useState<CreateResearchDto>(EMPTY_FORM)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  function openCreate() { setEditItem(null); setForm(EMPTY_FORM); setModalOpen(true) }
+  function openCreate() { setEditItem(null); setForm(EMPTY_FORM); setFormErrors({}); setModalOpen(true) }
 
   function openEdit(r: ResearchReport) {
     setEditItem(r)
@@ -62,7 +67,15 @@ export default function AdminResearch() {
     setModalOpen(true)
   }
 
-  function closeModal() { setModalOpen(false); setEditItem(null); setForm(EMPTY_FORM) }
+  function closeModal() { setModalOpen(false); setEditItem(null); setForm(EMPTY_FORM); setFormErrors({}) }
+
+  function validate() {
+    const errs: Record<string, string> = {}
+    if (!form.title.trim()) errs.title = 'Title is required'
+    if (!form.categoryId) errs.categoryId = 'Category is required'
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const { data, isLoading } = useAdminResearchReports({
     search: search || undefined,
@@ -90,24 +103,31 @@ export default function AdminResearch() {
           <h1 className="text-2xl font-bold text-slate-800">Research &amp; Reports</h1>
           <p className="text-slate-500 text-sm">Manage research publications and reports</p>
         </div>
-        <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" onClick={openCreate}>
-          <Plus className="h-3.5 w-3.5" /> Upload Report
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-lg gap-1.5" onClick={() => exportToCsv('research-reports', reports.map((r) => ({ id: r.id, title: r.title, category: r.category?.name ?? '', type: r.reportType, status: r.status, downloads: r.downloadCount, views: r.viewCount, createdAt: r.createdAt })))}>
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </Button>
+          <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" /> Upload Report
+          </Button>
+        </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Reports', value: meta?.itemCount ?? '—', color: '#D52B1E' },
-          { label: 'Published', value: publishedCount, color: '#10b981' },
-          { label: 'Drafts', value: draftCount, color: '#6b7280' },
-          { label: 'Total Downloads', value: totalDownloads > 0 ? totalDownloads.toLocaleString() : '—', color: '#3b82f6' },
-        ].map((s) => (
-          <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-          </motion.div>
-        ))}
-      </div>
+      {isLoading ? <CardGridSkeleton count={4} /> : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Reports', value: meta?.itemCount ?? '—', color: '#D52B1E' },
+            { label: 'Published', value: publishedCount, color: '#10b981' },
+            { label: 'Drafts', value: draftCount, color: '#6b7280' },
+            { label: 'Total Downloads', value: totalDownloads > 0 ? totalDownloads.toLocaleString() : '—', color: '#3b82f6' },
+          ].map((s) => (
+            <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 p-4 border-b border-gray-100">
@@ -141,13 +161,9 @@ export default function AdminResearch() {
         </div>
 
         <div className="overflow-x-auto">
-          {isLoading && (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E]" />
-            </div>
-          )}
+          {isLoading && <TableSkeleton rows={8} cols={8} />}
           {!isLoading && reports.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-16">No reports found</p>
+            <EmptyState icon={FileText} title="No reports found" description="Upload your first research report to get started." />
           )}
           {!isLoading && reports.length > 0 && (
             <table className="w-full text-sm">
@@ -227,16 +243,15 @@ export default function AdminResearch() {
           <div>
             <label htmlFor="res-title" className="block text-xs font-medium text-slate-600 mb-1">Title <span className="text-red-500">*</span></label>
             <Input id="res-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Report title" className="h-9 text-sm" />
+            {formErrors.title && <p className="text-xs text-red-500 mt-0.5">{formErrors.title}</p>}
           </div>
           <div>
             <label htmlFor="res-abstract" className="block text-xs font-medium text-slate-600 mb-1">Abstract</label>
-            <textarea
-              id="res-abstract"
+            <RichTextEditor
               value={form.abstract ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, abstract: e.target.value }))}
+              onChange={(html) => setForm((f) => ({ ...f, abstract: html }))}
               placeholder="Brief description of the report…"
-              rows={3}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:border-[#D52B1E] resize-none"
+              minHeight="120px"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -251,6 +266,7 @@ export default function AdminResearch() {
                 <option value="">Select category</option>
                 {(categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {formErrors.categoryId && <p className="text-xs text-red-500 mt-0.5">{formErrors.categoryId}</p>}
             </div>
             <div>
               <label htmlFor="res-type" className="block text-xs font-medium text-slate-600 mb-1">Report Type</label>
@@ -327,6 +343,7 @@ export default function AdminResearch() {
               className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
               disabled={!form.title.trim() || !form.categoryId || createMutation.isPending || updateMutation.isPending}
               onClick={() => {
+                if (!validate()) return
                 if (editItem) {
                   updateMutation.mutate({ id: editItem.id, dto: form }, { onSuccess: closeModal })
                 } else {

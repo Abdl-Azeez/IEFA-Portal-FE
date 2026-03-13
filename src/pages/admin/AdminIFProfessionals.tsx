@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
 import { ImageUpload } from '@/components/ui/image-upload'
+import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   useAdminIFProfessionals,
   useAdminCreateIFProfessional,
@@ -70,10 +72,12 @@ export default function AdminIFProfessionals() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editItem, setEditItem] = useState<IFProfessional | null>(null)
   const [form, setForm] = useState<CreateIFProfessionalDto>(EMPTY_FORM)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   function openCreate() {
     setEditItem(null)
     setForm(EMPTY_FORM)
+    setFormErrors({})
     setModalOpen(true)
   }
 
@@ -99,6 +103,14 @@ export default function AdminIFProfessionals() {
     setModalOpen(false)
     setEditItem(null)
     setForm(EMPTY_FORM)
+    setFormErrors({})
+  }
+
+  function validate() {
+    const errs: Record<string, string> = {}
+    if (!form.name.trim()) errs.name = 'Name is required'
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
   }
 
   const { data, isLoading } = useAdminIFProfessionals({
@@ -140,24 +152,26 @@ export default function AdminIFProfessionals() {
         </Button>
       </motion.div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Profiles', value: meta?.itemCount ?? '—', icon: Briefcase, color: '#D52B1E' },
-          { label: 'Published', value: publishedCount, icon: Eye, color: '#10b981' },
-          { label: 'Drafts', value: draftCount, icon: EyeOff, color: '#6b7280' },
-          { label: 'Senior Level', value: seniorCount, icon: MapPin, color: '#f59e0b' },
-        ].map((s) => (
-          <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}18` }}>
-              <s.icon className="h-5 w-5" style={{ color: s.color }} />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-slate-800">{s.value}</p>
-              <p className="text-xs text-slate-500">{s.label}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {isLoading ? <CardGridSkeleton count={4} /> : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Profiles', value: meta?.itemCount ?? '—', icon: Briefcase, color: '#D52B1E' },
+            { label: 'Published', value: publishedCount, icon: Eye, color: '#10b981' },
+            { label: 'Drafts', value: draftCount, icon: EyeOff, color: '#6b7280' },
+            { label: 'Senior Level', value: seniorCount, icon: MapPin, color: '#f59e0b' },
+          ].map((s) => (
+            <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}18` }}>
+                <s.icon className="h-5 w-5" style={{ color: s.color }} />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-800">{s.value}</p>
+                <p className="text-xs text-slate-500">{s.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 p-4 border-b border-gray-100">
@@ -185,13 +199,9 @@ export default function AdminIFProfessionals() {
         </div>
 
         <div className="overflow-x-auto">
-          {isLoading && (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E]" />
-            </div>
-          )}
+          {isLoading && <TableSkeleton rows={8} cols={6} />}
           {!isLoading && professionals.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-16">No professionals found</p>
+            <EmptyState icon={Briefcase} title="No professionals found" description="Add your first IF professional profile to get started." />
           )}
           {!isLoading && professionals.length > 0 && (
             <table className="w-full text-sm">
@@ -321,6 +331,7 @@ export default function AdminIFProfessionals() {
             <div className="col-span-2">
               <label htmlFor="prof-name" className="block text-xs font-medium text-slate-600 mb-1">Name <span className="text-red-500">*</span></label>
               <Input id="prof-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Full name" className="h-9 text-sm" />
+              {formErrors.name && <p className="text-xs text-red-500 mt-0.5">{formErrors.name}</p>}
             </div>
             <div>
               <label htmlFor="prof-title" className="block text-xs font-medium text-slate-600 mb-1">Job Title</label>
@@ -403,8 +414,9 @@ export default function AdminIFProfessionals() {
             <Button
               size="sm"
               className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
-              disabled={!form.name.trim() || createMutation.isPending || updateMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending}
               onClick={() => {
+                if (!validate()) return
                 if (editItem) {
                   updateMutation.mutate({ id: editItem.id, dto: form }, { onSuccess: closeModal })
                 } else {

@@ -1,9 +1,12 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
-import { Database, Plus, Search, MoreVertical, Edit, Trash2, TrendingUp, BarChart2, RefreshCw, Loader2 } from 'lucide-react'
+import { Database, Plus, Search, MoreVertical, Edit, Trash2, TrendingUp, BarChart2, RefreshCw, Loader2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
+import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { exportToCsv } from '@/lib/utils'
 import {
   useAdminDatasets,
   useAdminDataCategories,
@@ -37,8 +40,9 @@ export default function AdminData() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editItem, setEditItem] = useState<Dataset | null>(null)
   const [form, setForm] = useState<CreateDatasetDto>(EMPTY_FORM)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  function openCreate() { setEditItem(null); setForm(EMPTY_FORM); setModalOpen(true) }
+  function openCreate() { setEditItem(null); setForm(EMPTY_FORM); setFormErrors({}); setModalOpen(true) }
 
   function openEdit(d: Dataset) {
     setEditItem(d)
@@ -59,7 +63,15 @@ export default function AdminData() {
     setModalOpen(true)
   }
 
-  function closeModal() { setModalOpen(false); setEditItem(null); setForm(EMPTY_FORM) }
+  function closeModal() { setModalOpen(false); setEditItem(null); setForm(EMPTY_FORM); setFormErrors({}) }
+
+  function validate() {
+    const errs: Record<string, string> = {}
+    if (!form.title.trim()) errs.title = 'Title is required'
+    if (!form.categoryId) errs.categoryId = 'Category is required'
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const { data, isLoading } = useAdminDatasets({
     search: search || undefined,
@@ -84,29 +96,36 @@ export default function AdminData() {
           <h1 className="text-2xl font-bold text-slate-800">Data Management</h1>
           <p className="text-slate-500 text-sm">Manage market data, datasets and feeds</p>
         </div>
-        <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" onClick={openCreate}>
-          <Plus className="h-3.5 w-3.5" /> Add Dataset
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-lg gap-1.5" onClick={() => exportToCsv('datasets', datasets.map((d) => ({ id: d.id, title: d.title, category: d.category?.name ?? '', source: d.source ?? '', format: d.format ?? '', status: d.status, downloads: d.downloadCount, updatedAt: d.updatedAt })))}>
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </Button>
+          <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" /> Add Dataset
+          </Button>
+        </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Datasets', value: meta?.itemCount ?? '—', color: '#10b981', icon: Database },
-          { label: 'Published', value: activeCount, color: '#3b82f6', icon: BarChart2 },
-          { label: 'Downloadable', value: datasets.filter((d) => d.isDownloadable).length, color: '#D52B1E', icon: TrendingUp },
-          { label: 'Premium', value: datasets.filter((d) => d.isPremium).length, color: '#f59e0b', icon: RefreshCw },
-        ].map((s) => (
-          <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}18` }}>
-              <s.icon className="h-5 w-5" style={{ color: s.color }} />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-slate-800">{s.value}</p>
-              <p className="text-xs text-slate-500">{s.label}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {isLoading ? <CardGridSkeleton count={4} /> : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Datasets', value: meta?.itemCount ?? '—', color: '#10b981', icon: Database },
+            { label: 'Published', value: activeCount, color: '#3b82f6', icon: BarChart2 },
+            { label: 'Downloadable', value: datasets.filter((d) => d.isDownloadable).length, color: '#D52B1E', icon: TrendingUp },
+            { label: 'Premium', value: datasets.filter((d) => d.isPremium).length, color: '#f59e0b', icon: RefreshCw },
+          ].map((s) => (
+            <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}18` }}>
+                <s.icon className="h-5 w-5" style={{ color: s.color }} />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-800">{s.value}</p>
+                <p className="text-xs text-slate-500">{s.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 p-4 border-b border-gray-100">
@@ -129,13 +148,9 @@ export default function AdminData() {
         </div>
 
         <div className="overflow-x-auto">
-          {isLoading && (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E]" />
-            </div>
-          )}
+          {isLoading && <TableSkeleton rows={8} cols={7} />}
           {!isLoading && datasets.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-16">No datasets found</p>
+            <EmptyState icon={Database} title="No datasets found" description="Add your first dataset to get started." />
           )}
           {!isLoading && datasets.length > 0 && (
             <table className="w-full text-sm">
@@ -201,6 +216,7 @@ export default function AdminData() {
           <div>
             <label htmlFor="ds-title" className="block text-xs font-medium text-slate-600 mb-1">Title <span className="text-red-500">*</span></label>
             <Input id="ds-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Dataset title" className="h-9 text-sm" />
+            {formErrors.title && <p className="text-xs text-red-500 mt-0.5">{formErrors.title}</p>}
           </div>
           <div>
             <label htmlFor="ds-desc" className="block text-xs font-medium text-slate-600 mb-1">Description</label>
@@ -225,6 +241,7 @@ export default function AdminData() {
                 <option value="">Select category</option>
                 {(categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {formErrors.categoryId && <p className="text-xs text-red-500 mt-0.5">{formErrors.categoryId}</p>}
             </div>
             <div>
               <label htmlFor="ds-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
@@ -293,8 +310,9 @@ export default function AdminData() {
             <Button
               size="sm"
               className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
-              disabled={!form.title.trim() || !form.categoryId || createMutation.isPending || updateMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending}
               onClick={() => {
+                if (!validate()) return
                 if (editItem) {
                   updateMutation.mutate({ id: editItem.id, dto: form }, { onSuccess: closeModal })
                 } else {

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminHeader } from './AdminHeader'
 import { AnimatedLayout } from '@/components/layout/AnimatedLayout'
+import { BackToTop } from '@/components/ui/back-to-top'
 
 export function AdminLayout() {
   const [isCollapsed, setIsCollapsed] = useState(() =>
@@ -36,6 +37,7 @@ export function AdminLayout() {
           </main>
         </div>
       </div>
+      <BackToTop />
     </div>
   )
 }

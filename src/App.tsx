@@ -15,6 +15,7 @@ import Podcast from '@/pages/Podcast'
 import IFProfessionals from '@/pages/IFProfessionals'
 import Settings from '@/pages/Settings'
 import Support from '@/pages/Support'
+import Profile from '@/pages/Profile'
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -45,7 +46,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/" element={<MainLayout />}>
-            <Route index element={<Dashboard />} />
+            <Route index element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route
               path="news"
               element={
@@ -147,6 +148,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Support />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               }
             />

@@ -18,6 +18,10 @@ import {
   Loader2,
 } from 'lucide-react'
 import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, CartesianGrid, Legend,
+} from 'recharts'
+import {
   useAdminUsers,
   useAdminNews,
   useAdminShows,
@@ -84,42 +88,16 @@ function StatCard({
   )
 }
 
-/* ── Monthly bar chart (SVG) ─────────────────────────────────────────────── */
+/* ── Charts data ─────────────────────────────────────────────────────────── */
 const MONTHLY_DATA = [
-  { month: 'Sep', users: 820, revenue: 9200 },
-  { month: 'Oct', users: 940, revenue: 11400 },
-  { month: 'Nov', users: 1080, revenue: 13200 },
-  { month: 'Dec', users: 920, revenue: 10800 },
-  { month: 'Jan', users: 1340, revenue: 15600 },
-  { month: 'Feb', users: 1580, revenue: 18200 },
-  { month: 'Mar', users: 1740, revenue: 20400 },
+  { month: 'Sep', users: 820, views: 92000, downloads: 1400 },
+  { month: 'Oct', users: 940, views: 114000, downloads: 1800 },
+  { month: 'Nov', users: 1080, views: 132000, downloads: 2100 },
+  { month: 'Dec', users: 920, views: 108000, downloads: 1600 },
+  { month: 'Jan', users: 1340, views: 156000, downloads: 2800 },
+  { month: 'Feb', users: 1580, views: 182000, downloads: 3200 },
+  { month: 'Mar', users: 1740, views: 204000, downloads: 3700 },
 ]
-const maxRevenue = Math.max(...MONTHLY_DATA.map((d) => d.revenue))
-
-function RevenueChart() {
-  return (
-    <div className="flex items-end gap-2 h-36 pt-4">
-      {MONTHLY_DATA.map((d) => {
-        const h = Math.round((d.revenue / maxRevenue) * 100)
-        return (
-          <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group">
-            <span className="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-              ${(d.revenue / 1000).toFixed(1)}k
-            </span>
-            <motion.div
-              className="w-full rounded-t-md bg-gradient-to-t from-[#D52B1E] to-[#ff6b6b] cursor-default"
-              style={{ height: `${h}%` }}
-              initial={{ scaleY: 0, originY: 1 }}
-              animate={{ scaleY: 1 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            />
-            <span className="text-[10px] text-slate-400">{d.month}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 /* ── Activity feed ─────────────────────────────────────────────────────────  */
 const ACTIVITY = [
@@ -180,17 +158,46 @@ export default function AdminDashboard() {
 
       {/* Charts + activity row */}
       <div className="grid md:grid-cols-3 gap-5">
-        {/* Revenue bar chart */}
+        {/* Charts row */}
         <motion.div
           variants={item}
           className="md:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-gray-100"
         >
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-bold text-slate-700">Monthly Revenue</h3>
+            <h3 className="font-bold text-slate-700">User Growth & Content Views</h3>
             <span className="text-xs text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full">Last 7 months</span>
           </div>
-          <p className="text-sm text-slate-400 mb-4">Total course & subscription earnings</p>
-          <RevenueChart />
+          <p className="text-sm text-slate-400 mb-4">Monthly new registrations and page views</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={MONTHLY_DATA} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="users" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="views" orientation="right" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line yAxisId="users" type="monotone" dataKey="users" name="New Users" stroke="#3b82f6" strokeWidth={2} dot={false} />
+              <Line yAxisId="views" type="monotone" dataKey="views" name="Views" stroke="#D52B1E" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Downloads bar chart */}
+        <motion.div
+          variants={item}
+          className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100"
+        >
+          <h3 className="font-bold text-slate-700 mb-1">Monthly Downloads</h3>
+          <p className="text-sm text-slate-400 mb-4">Research report &amp; dataset downloads</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={MONTHLY_DATA} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+              <Bar dataKey="downloads" name="Downloads" fill="#D52B1E" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </motion.div>
 
         {/* User breakdown */}

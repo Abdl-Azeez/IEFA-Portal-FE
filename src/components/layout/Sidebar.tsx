@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { LayoutDashboard, Newspaper, TrendingUp, BookOpen, Settings, HelpCircle, Users, ChevronLeft, ChevronRight, FolderOpen, FileText, Database, Mic, Briefcase } from 'lucide-react'
+import { LayoutDashboard, Newspaper, TrendingUp, BookOpen, Settings, HelpCircle, Users, ChevronLeft, ChevronRight, FolderOpen, FileText, Database, Mic, Briefcase, UserCircle } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,6 +20,7 @@ const menuNavigation = [
 
 // Help section items
 const helpNavigation = [
+  { name: 'Profile', href: '/profile', icon: UserCircle },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Support', href: '/support', icon: HelpCircle },
 ]

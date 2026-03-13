@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
 import { ImageUpload } from '@/components/ui/image-upload'
+import { CardGridSkeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   useAdminShows,
   useAdminShowEpisodes,
@@ -98,12 +100,14 @@ export default function AdminPodcasts() {
   const [showModalOpen, setShowModalOpen] = useState(false)
   const [showForm, setShowForm] = useState<CreateShowDto>(EMPTY_SHOW)
   const [editShowId, setEditShowId] = useState<string | null>(null)
+  const [showFormErrors, setShowFormErrors] = useState<Record<string, string>>({})
 
   // Episode modal
   const [epModalOpen, setEpModalOpen] = useState(false)
   const [epForm, setEpForm] = useState<CreateEpisodeDto>(EMPTY_EPISODE)
   const [editEpId, setEditEpId] = useState<string | null>(null)
   const [epShowId, setEpShowId] = useState<string>('')
+  const [epFormErrors, setEpFormErrors] = useState<Record<string, string>>({})
 
   const { data, isLoading } = useAdminShows({ search: search || undefined, perPage: 20 })
   const createShowMutation = useAdminCreateShow()
@@ -117,7 +121,7 @@ export default function AdminPodcasts() {
   const meta = data?.meta
 
   // Show modal handlers
-  function openCreateShow() { setEditShowId(null); setShowForm(EMPTY_SHOW); setShowModalOpen(true) }
+  function openCreateShow() { setEditShowId(null); setShowForm(EMPTY_SHOW); setShowFormErrors({}); setShowModalOpen(true) }
 
   function openEditShow(show: PodcastShow) {
     setEditShowId(show.id)
@@ -126,13 +130,22 @@ export default function AdminPodcasts() {
     setShowModalOpen(true)
   }
 
-  function closeShowModal() { setShowModalOpen(false); setEditShowId(null); setShowForm(EMPTY_SHOW) }
+  function closeShowModal() { setShowModalOpen(false); setEditShowId(null); setShowForm(EMPTY_SHOW); setShowFormErrors({}) }
+
+  function validateShow() {
+    const errs: Record<string, string> = {}
+    if (!showForm.title.trim()) errs.title = 'Title is required'
+    if (!showForm.slug.trim()) errs.slug = 'Slug is required'
+    setShowFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   // Episode modal handlers
   function openCreateEp(showId: string) {
     setEditEpId(null)
     setEpShowId(showId)
     setEpForm(EMPTY_EPISODE)
+    setEpFormErrors({})
     setOpenMenu(null)
     setEpModalOpen(true)
   }
@@ -144,7 +157,14 @@ export default function AdminPodcasts() {
     setEpModalOpen(true)
   }
 
-  function closeEpModal() { setEpModalOpen(false); setEditEpId(null); setEpForm(EMPTY_EPISODE) }
+  function closeEpModal() { setEpModalOpen(false); setEditEpId(null); setEpForm(EMPTY_EPISODE); setEpFormErrors({}) }
+
+  function validateEp() {
+    const errs: Record<string, string> = {}
+    if (!epForm.title.trim()) errs.title = 'Title is required'
+    setEpFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const showBtnLabel = editShowId ? 'Save Changes' : 'Create Show'
   const epBtnLabel = editEpId ? 'Save Changes' : 'Create Episode'
@@ -188,13 +208,9 @@ export default function AdminPodcasts() {
           </div>
         </div>
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E]" />
-          </div>
-        )}
+        {isLoading && <CardGridSkeleton count={4} />}
         {!isLoading && shows.length === 0 && (
-          <p className="text-center text-sm text-slate-400 py-16">No shows found</p>
+          <EmptyState icon={Mic} title="No shows found" description="Create your first podcast show to get started." />
         )}
         {!isLoading && shows.length > 0 && shows.map((show: PodcastShow) => (
             <motion.div key={show.id} variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -267,6 +283,7 @@ export default function AdminPodcasts() {
           <div>
             <label htmlFor="show-title" className="block text-xs font-medium text-slate-600 mb-1">Title <span className="text-red-500">*</span></label>
             <Input id="show-title" value={showForm.title} onChange={(e) => setShowForm((f) => ({ ...f, title: e.target.value }))} placeholder="Show title" className="h-9 text-sm" />
+            {showFormErrors.title && <p className="text-xs text-red-500 mt-0.5">{showFormErrors.title}</p>}
           </div>
           <div>
             <label htmlFor="show-slug" className="block text-xs font-medium text-slate-600 mb-1">Slug <span className="text-red-500">*</span></label>
@@ -306,8 +323,9 @@ export default function AdminPodcasts() {
             <Button
               size="sm"
               className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
-              disabled={!showForm.title.trim() || !showForm.slug.trim() || createShowMutation.isPending || updateShowMutation.isPending}
+              disabled={createShowMutation.isPending || updateShowMutation.isPending}
               onClick={() => {
+                if (!validateShow()) return
                 if (editShowId) {
                   updateShowMutation.mutate({ id: editShowId, dto: showForm }, { onSuccess: closeShowModal })
                 } else {
@@ -327,6 +345,7 @@ export default function AdminPodcasts() {
           <div>
             <label htmlFor="ep-title" className="block text-xs font-medium text-slate-600 mb-1">Title <span className="text-red-500">*</span></label>
             <Input id="ep-title" value={epForm.title} onChange={(e) => setEpForm((f) => ({ ...f, title: e.target.value }))} placeholder="Episode title" className="h-9 text-sm" />
+            {epFormErrors.title && <p className="text-xs text-red-500 mt-0.5">{epFormErrors.title}</p>}
           </div>
           <div>
             <label htmlFor="ep-video" className="block text-xs font-medium text-slate-600 mb-1">
@@ -406,8 +425,9 @@ export default function AdminPodcasts() {
             <Button
               size="sm"
               className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
-              disabled={!epForm.title.trim() || createEpMutation.isPending || updateEpMutation.isPending}
+              disabled={createEpMutation.isPending || updateEpMutation.isPending}
               onClick={() => {
+                if (!validateEp()) return
                 if (editEpId) {
                   updateEpMutation.mutate({ id: editEpId, dto: epForm }, { onSuccess: closeEpModal })
                 } else {

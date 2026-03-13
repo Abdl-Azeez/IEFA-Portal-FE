@@ -224,3 +224,47 @@ export const useAppHealth = () => {
     },
   })
 }
+
+interface UpdateProfileData {
+  firstName?: string
+  lastName?: string
+  phone?: string
+  country?: string
+  profilePhotoUrl?: string
+}
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient()
+  const { setUser } = useAuthStore()
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateProfileData }) => {
+      const response = await api.patch(`/users/${id}`, data)
+      return response.data
+    },
+    onSuccess: (data) => {
+      if (data?.user) setUser(data.user)
+      else if (data?.id) setUser(data)
+      queryClient.invalidateQueries({ queryKey: ['me'] })
+      toast({ title: 'Profile updated', description: 'Your profile has been saved.' })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to update profile', variant: 'destructive' })
+    },
+  })
+}
+
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const response = await api.post('/auth/change-password', data)
+      return response.data
+    },
+    onSuccess: () => {
+      toast({ title: 'Password changed', description: 'Your password has been updated successfully.' })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to change password', variant: 'destructive' })
+    },
+  })
+}

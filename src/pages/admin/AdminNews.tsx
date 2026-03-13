@@ -17,11 +17,16 @@ import {
   CheckCircle,
   Clock,
   Loader2,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
 import { ImageUpload } from '@/components/ui/image-upload'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
+import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { exportToCsv } from '@/lib/utils'
 import {
   useAdminNews,
   useAdminCreateNews,
@@ -54,10 +59,12 @@ export default function AdminNews() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editItem, setEditItem] = useState<AdminNewsItem | null>(null)
   const [form, setForm] = useState<CreateNewsDto>(EMPTY_FORM)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   function openCreate() {
     setEditItem(null)
     setForm(EMPTY_FORM)
+    setFormErrors({})
     setModalOpen(true)
   }
 
@@ -75,7 +82,14 @@ export default function AdminNews() {
     setModalOpen(true)
   }
 
-  function closeModal() { setModalOpen(false); setEditItem(null); setForm(EMPTY_FORM) }
+  function closeModal() { setModalOpen(false); setEditItem(null); setForm(EMPTY_FORM); setFormErrors({}) }
+
+  function validate() {
+    const errs: Record<string, string> = {}
+    if (!form.title.trim()) errs.title = 'Title is required'
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const { data, isLoading } = useAdminNews({
     search: search || undefined,
@@ -111,29 +125,36 @@ export default function AdminNews() {
           <h1 className="text-2xl font-bold text-slate-800">News Management</h1>
           <p className="text-slate-500 text-sm">Create, edit and publish news articles</p>
         </div>
-        <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" onClick={openCreate}>
-          <Plus className="h-3.5 w-3.5" /> New Article
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-lg gap-1.5" onClick={() => exportToCsv('news', articles.map((a) => ({ id: a.id, title: a.title, status: a.status, views: a.viewCount, author: a.author ? `${a.author.firstName} ${a.author.lastName}` : '', tags: (a.tagNames ?? []).join(';'), createdAt: a.createdAt })))}>
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </Button>
+          <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" /> New Article
+          </Button>
+        </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Articles', value: meta?.itemCount ?? '—', icon: Newspaper, color: '#D52B1E' },
-          { label: 'Published', value: publishedCount, icon: CheckCircle, color: '#10b981' },
-          { label: 'Drafts', value: draftCount, icon: FileText, color: '#6b7280' },
-          { label: 'Total Views', value: totalViews > 0 ? totalViews.toLocaleString() : '—', icon: Eye, color: '#3b82f6' },
-        ].map((s) => (
-          <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}18` }}>
-              <s.icon className="h-5 w-5" style={{ color: s.color }} />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-slate-800">{s.value}</p>
-              <p className="text-xs text-slate-500">{s.label}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {isLoading ? <CardGridSkeleton count={4} /> : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Articles', value: meta?.itemCount ?? '—', icon: Newspaper, color: '#D52B1E' },
+            { label: 'Published', value: publishedCount, icon: CheckCircle, color: '#10b981' },
+            { label: 'Drafts', value: draftCount, icon: FileText, color: '#6b7280' },
+            { label: 'Total Views', value: totalViews > 0 ? totalViews.toLocaleString() : '—', icon: Eye, color: '#3b82f6' },
+          ].map((s) => (
+            <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}18` }}>
+                <s.icon className="h-5 w-5" style={{ color: s.color }} />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-800">{s.value}</p>
+                <p className="text-xs text-slate-500">{s.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 p-4 border-b border-gray-100">
@@ -161,13 +182,9 @@ export default function AdminNews() {
         </div>
 
         <div className="overflow-x-auto">
-          {isLoading && (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E]" />
-            </div>
-          )}
+          {isLoading && <TableSkeleton rows={8} cols={7} />}
           {!isLoading && articles.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-16">No articles found</p>
+            <EmptyState icon={Newspaper} title="No articles found" description="Try adjusting your search or status filter, or create a new article." />
           )}
           {!isLoading && articles.length > 0 && (
             <table className="w-full text-sm">
@@ -287,6 +304,7 @@ export default function AdminNews() {
           <div>
             <label htmlFor="news-title" className="block text-xs font-medium text-slate-600 mb-1">Title <span className="text-red-500">*</span></label>
             <Input id="news-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Article title" className="h-9 text-sm" />
+            {formErrors.title && <p className="text-xs text-red-500 mt-0.5">{formErrors.title}</p>}
           </div>
           <div>
             <label htmlFor="news-excerpt" className="block text-xs font-medium text-slate-600 mb-1">Excerpt</label>
@@ -301,13 +319,10 @@ export default function AdminNews() {
           </div>
           <div>
             <label htmlFor="news-content" className="block text-xs font-medium text-slate-600 mb-1">Content</label>
-            <textarea
-              id="news-content"
+            <RichTextEditor
               value={form.content ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+              onChange={(html) => setForm((f) => ({ ...f, content: html }))}
               placeholder="Full article content…"
-              rows={6}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:border-[#D52B1E] resize-none"
             />
           </div>
           <div>
@@ -347,8 +362,9 @@ export default function AdminNews() {
             <Button
               size="sm"
               className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
-              disabled={!form.title.trim() || createMutation.isPending || updateMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending}
               onClick={() => {
+                if (!validate()) return
                 if (editItem) {
                   updateMutation.mutate({ id: editItem.id, dto: form }, { onSuccess: closeModal })
                 } else {

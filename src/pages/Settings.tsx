@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Bell, Globe2, Lock, Mail } from "lucide-react";
+import { Bell, Globe2, Lock, Mail, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -9,6 +9,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useChangePassword } from "@/hooks/useAuth";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,6 +31,27 @@ const itemVariants = {
 };
 
 export default function Settings() {
+  const changePassword = useChangePassword()
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [pwErrors, setPwErrors] = useState<Record<string, string>>({})
+
+  function validatePw() {
+    const errs: Record<string, string> = {}
+    if (!pwForm.currentPassword) errs.currentPassword = 'Current password is required'
+    if (!pwForm.newPassword || pwForm.newPassword.length < 8) errs.newPassword = 'New password must be at least 8 characters'
+    if (pwForm.newPassword !== pwForm.confirmPassword) errs.confirmPassword = 'Passwords do not match'
+    setPwErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  function handleChangePassword() {
+    if (!validatePw()) return
+    changePassword.mutate(
+      { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword },
+      { onSuccess: () => setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' }) },
+    )
+  }
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
@@ -187,24 +211,61 @@ export default function Settings() {
                 <div>
                   <CardTitle className="text-[#000000]">Security</CardTitle>
                   <CardDescription className="text-[#737692]">
-                    Authentication and SSO will live here once user accounts are
-                    wired up.
+                    Change your account password.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-[#737692]">
-                For now this is just a visual placeholder. When you add auth, we
-                can connect settings like password changes, device sessions, and
-                2FA.
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4 border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-              >
-                Manage Security
-              </Button>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={pwForm.currentPassword}
+                    onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+                    placeholder="Enter current password"
+                  />
+                  {pwErrors.currentPassword && (
+                    <p className="text-xs text-red-500">{pwErrors.currentPassword}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={pwForm.newPassword}
+                    onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+                    placeholder="At least 8 characters"
+                  />
+                  {pwErrors.newPassword && (
+                    <p className="text-xs text-red-500">{pwErrors.newPassword}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={pwForm.confirmPassword}
+                    onChange={(e) => setPwForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                    placeholder="Repeat new password"
+                  />
+                  {pwErrors.confirmPassword && (
+                    <p className="text-xs text-red-500">{pwErrors.confirmPassword}</p>
+                  )}
+                </div>
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={changePassword.isPending}
+                  className="bg-[#D52B1E] hover:bg-[#B8241B] gap-2"
+                >
+                  {changePassword.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Update Password
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

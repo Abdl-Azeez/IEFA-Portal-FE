@@ -1,30 +1,42 @@
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { Footer } from './Footer'
-import { Outlet } from 'react-router-dom'
+import { Outlet, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { AnimatedLayout } from './AnimatedLayout'
+import { useAuth } from '@/contexts/AuthContext'
+import { BackToTop } from '@/components/ui/back-to-top'
 
 export function MainLayout() {
-  // Initialize sidebar state based on screen size
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 768 // Collapsed by default on mobile (< md breakpoint)
-    }
-    return false
-  })
+  const { isAdmin, isLoading } = useAuth()
 
-  // Handle window resize to automatically collapse sidebar on mobile
+  // Initialize sidebar state based on screen size
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => globalThis.window.innerWidth < 768
+  )
+
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768 && !isSidebarCollapsed) {
+      if (globalThis.window.innerWidth < 768 && !isSidebarCollapsed) {
         setIsSidebarCollapsed(true)
       }
     }
 
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    globalThis.window.addEventListener('resize', handleResize)
+    return () => globalThis.window.removeEventListener('resize', handleResize)
   }, [isSidebarCollapsed])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#FFEFEF' }}>
+        <div className="h-8 w-8 rounded-full border-4 border-[#D52B1E] border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
+  if (isAdmin) {
+    return <Navigate to="/admin" replace />
+  }
 
   return (
     <div className="overflow-x-hidden" style={{ backgroundColor: '#FFEFEF' }}>
@@ -46,11 +58,11 @@ export function MainLayout() {
             <AnimatedLayout>
               <Outlet />
             </AnimatedLayout>
-          </main>
-        </div>
+          </main>        </div>
       </div>
       {/* Footer below sidebar area - spans full width */}
       <Footer />
+      <BackToTop />
     </div>
   )
 }
