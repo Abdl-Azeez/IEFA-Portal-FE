@@ -28,6 +28,7 @@ import type {
 import DiscussionDetailPage from "@/components/community/DiscussionDetailPage";
 import StartDiscussionModal from "@/components/community/StartDiscussionModal";
 import PosterProfilePopup from "@/components/community/PosterProfilePopup";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CATEGORIES: CommunityCategory[] = [
   "Markets & Investing",
@@ -85,7 +86,7 @@ export default function Community() {
   const [selectedPoster, setSelectedPoster] = useState<UserProfile | null>(
     null,
   );
-  const [isModerator] = useState(true); // Set based on actual user role
+  const { isModerator } = useAuth();
 
   // state to track hover card
   const [hoverProfile, setHoverProfile] = useState<{

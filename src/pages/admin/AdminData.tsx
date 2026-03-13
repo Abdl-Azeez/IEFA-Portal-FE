@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Database, Plus, Search, MoreVertical, Edit, Trash2, TrendingUp, BarChart2, RefreshCw, Loader2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
 import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -134,16 +135,16 @@ export default function AdminData() {
             <Input placeholder="Search datasets…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm rounded-lg" />
           </div>
           {categories && categories.length > 0 && (
-            <select
+            <Select
               value={categoryId ?? ''}
               onChange={(e) => setCategoryId(e.target.value || undefined)}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-slate-600 bg-white focus:outline-none focus:border-[#D52B1E]"
+              className="h-auto py-1.5 w-auto text-xs text-slate-600"
             >
               <option value="">All Categories</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </select>
+            </Select>
           )}
         </div>
 
@@ -232,27 +233,25 @@ export default function AdminData() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="ds-category" className="block text-xs font-medium text-slate-600 mb-1">Category <span className="text-red-500">*</span></label>
-              <select
+              <Select
                 id="ds-category"
                 value={form.categoryId}
                 onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white"
               >
                 <option value="">Select category</option>
                 {(categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </Select>
               {formErrors.categoryId && <p className="text-xs text-red-500 mt-0.5">{formErrors.categoryId}</p>}
             </div>
             <div>
               <label htmlFor="ds-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <select
+              <Select
                 id="ds-status"
                 value={form.status ?? 'draft'}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as CreateDatasetDto['status'] }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white"
               >
                 {['draft', 'published', 'archived'].map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -277,15 +276,14 @@ export default function AdminData() {
           </div>
           <div>
             <label htmlFor="ds-freq" className="block text-xs font-medium text-slate-600 mb-1">Update Frequency</label>
-            <select
+            <Select
               id="ds-freq"
               value={form.frequency ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as CreateDatasetDto['frequency'] || undefined }))}
-              className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white"
             >
               <option value="">None</option>
               {FREQUENCIES.map((fr) => <option key={fr} value={fr}>{fr.replaceAll('_', ' ')}</option>)}
-            </select>
+            </Select>
           </div>
           <div className="flex items-center gap-6">
             {(

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { User, Camera, Save, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ImageUpload } from '@/components/ui/image-upload'
@@ -173,17 +174,18 @@ export default function Profile() {
 
             <div className="space-y-1.5">
               <Label htmlFor="country">Country</Label>
-              <select
+              <Select
                 id="country"
+                variant="student"
                 value={form.country}
                 onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/20 focus:border-[#D52B1E]"
+                className="h-10"
               >
                 <option value="">Select country</option>
                 {COUNTRIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="flex justify-end pt-2">

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { FileText, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
@@ -146,16 +147,16 @@ export default function AdminResearch() {
               </button>
             ))}
             {categories && categories.length > 0 && (
-              <select
+              <Select
                 value={categoryId ?? ''}
                 onChange={(e) => setCategoryId(e.target.value || undefined)}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-slate-600 bg-white focus:outline-none focus:border-[#D52B1E]"
+                className="h-auto py-1.5 w-auto text-xs text-slate-600"
               >
                 <option value="">All Categories</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
-              </select>
+              </Select>
             )}
           </div>
         </div>
@@ -257,27 +258,26 @@ export default function AdminResearch() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="res-category" className="block text-xs font-medium text-slate-600 mb-1">Category <span className="text-red-500">*</span></label>
-              <select
+              <Select
                 id="res-category"
                 value={form.categoryId}
                 onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white"
               >
                 <option value="">Select category</option>
                 {(categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </Select>
               {formErrors.categoryId && <p className="text-xs text-red-500 mt-0.5">{formErrors.categoryId}</p>}
             </div>
             <div>
               <label htmlFor="res-type" className="block text-xs font-medium text-slate-600 mb-1">Report Type</label>
-              <select
+              <Select
                 id="res-type"
                 value={form.reportType ?? 'whitepaper'}
                 onChange={(e) => setForm((f) => ({ ...f, reportType: e.target.value as CreateResearchDto['reportType'] }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white capitalize"
+                className="capitalize"
               >
                 {REPORT_TYPES.map((t) => <option key={t} value={t}>{t.replaceAll('_', ' ')}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -297,14 +297,13 @@ export default function AdminResearch() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="res-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <select
+              <Select
                 id="res-status"
                 value={form.status ?? 'draft'}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as CreateResearchDto['status'] }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white"
               >
                 {['draft', 'review', 'published', 'archived'].map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label htmlFor="res-tags" className="block text-xs font-medium text-slate-600 mb-1">Tags (comma-separated)</label>

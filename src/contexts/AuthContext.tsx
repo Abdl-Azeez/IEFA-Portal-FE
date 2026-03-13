@@ -16,6 +16,7 @@ interface AuthContextType {
   signup: (email: string, password: string, role: string) => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isModerator: boolean;
   isLoading: boolean;
 }
 
@@ -59,6 +60,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       signup,
       isAuthenticated,
       isAdmin: user?.role === "admin" || user?.role === "staff",
+      isModerator: user?.role === "moderator",
       isLoading,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

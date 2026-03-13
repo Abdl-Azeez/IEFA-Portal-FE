@@ -6,17 +6,17 @@ import { useAuth } from '@/contexts/AuthContext'
 
 // Menu section items
 const menuNavigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'News', href: '/news', icon: Newspaper },
-  { name: 'Market Insights', href: '/market-insights', icon: TrendingUp },
-  { name: 'Learning Zone', href: '/learning-zone', icon: BookOpen },
-  { name: 'Community', href: '/community', icon: Users },
-  { name: 'Directory', href: '/directory', icon: FolderOpen },
-  { name: 'Research & Reports', href: '/research-reports', icon: FileText },
-  { name: 'Data', href: '/data', icon: Database },
-  { name: 'Podcast', href: '/podcast', icon: Mic },
-  { name: 'IF Professionals', href: '/if-professionals', icon: Briefcase },
-]
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "News", href: "/news", icon: Newspaper },
+  { name: "Market Insights", href: "/market-insights", icon: TrendingUp },
+  { name: "Learning Zone", href: "/learning-zone", icon: BookOpen },
+  { name: "Community", href: "/community", icon: Users },
+  { name: "Directory", href: "/directory", icon: FolderOpen },
+  { name: "Resources", href: "/resources", icon: FileText },
+  { name: "Data", href: "/data", icon: Database },
+  { name: "Podcast", href: "/podcast", icon: Mic },
+  { name: "IF Professionals", href: "/if-professionals", icon: Briefcase },
+];
 
 // Help section items
 const helpNavigation = [

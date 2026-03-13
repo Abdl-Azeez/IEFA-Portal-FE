@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
@@ -336,15 +337,14 @@ export default function AdminNews() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="news-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <select
+              <Select
                 id="news-status"
                 value={form.status ?? 'draft'}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as 'draft' | 'published' }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white"
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
-              </select>
+              </Select>
             </div>
             <div>
               <label htmlFor="news-tags" className="block text-xs font-medium text-slate-600 mb-1">Tags (comma-separated)</label>

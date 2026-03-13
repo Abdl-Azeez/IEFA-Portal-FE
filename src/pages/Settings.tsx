@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useChangePassword } from "@/hooks/useAuth";
 
@@ -189,12 +190,15 @@ export default function Settings() {
                   <span className="text-sm font-medium text-[#000000]">
                     Primary region
                   </span>
-                  <select className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#D52B1E] focus:ring-2 focus:ring-[#D52B1E]/10">
+                  <Select
+                    variant="student"
+                    className="mt-2"
+                  >
                     <option>Nigeria</option>
                     <option>West Africa</option>
                     <option>Pan-African</option>
                     <option>Global</option>
-                  </select>
+                  </Select>
                 </label>
               </div>
             </CardContent>

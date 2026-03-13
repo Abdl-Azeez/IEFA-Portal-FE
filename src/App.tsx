@@ -9,13 +9,13 @@ import Directory from '@/pages/Directory'
 import { NotAvailable } from '@/pages/NotAvailable'
 import Questionnaire from '@/pages/Questionnaire'
 import CourseResults from '@/pages/CourseResults'
-import ResearchReports from '@/pages/ResearchReports'
-import Data from '@/pages/Data'
-import Podcast from '@/pages/Podcast'
-import IFProfessionals from '@/pages/IFProfessionals'
-import Settings from '@/pages/Settings'
-import Support from '@/pages/Support'
-import Profile from '@/pages/Profile'
+import Resources from "@/pages/Resources";
+import Data from "@/pages/Data";
+import Podcast from "@/pages/Podcast";
+import IFProfessionals from "@/pages/IFProfessionals";
+import Settings from "@/pages/Settings";
+import Support from "@/pages/Support";
+import Profile from "@/pages/Profile";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -29,7 +29,7 @@ import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminNews from "@/pages/admin/AdminNews";
 import AdminPodcasts from "@/pages/admin/AdminPodcasts";
 import AdminLearning from "@/pages/admin/AdminLearning";
-import AdminResearch from "@/pages/admin/AdminResearch";
+import AdminResources from "@/pages/admin/AdminResources";
 import AdminData from "@/pages/admin/AdminData";
 import AdminCommunity from "@/pages/admin/AdminCommunity";
 import AdminDirectory from "@/pages/admin/AdminDirectory";
@@ -46,7 +46,14 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/" element={<MainLayout />}>
-            <Route index element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route
+              index
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="news"
               element={
@@ -104,10 +111,10 @@ function App() {
               }
             />
             <Route
-              path="research-reports"
+              path="resources"
               element={
                 <ProtectedRoute>
-                  <ResearchReports />
+                  <Resources />
                 </ProtectedRoute>
               }
             />
@@ -183,7 +190,7 @@ function App() {
             <Route path="learning/programmes" element={<AdminLearning />} />
             <Route path="learning/certificates" element={<AdminLearning />} />
             <Route path="learning/payments" element={<AdminLearning />} />
-            <Route path="research" element={<AdminResearch />} />
+            <Route path="research" element={<AdminResources />} />
             <Route path="data" element={<AdminData />} />
             <Route path="community" element={<AdminCommunity />} />
             <Route path="directory" element={<AdminDirectory />} />

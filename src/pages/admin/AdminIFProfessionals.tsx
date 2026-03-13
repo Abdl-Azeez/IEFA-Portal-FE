@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
@@ -373,28 +374,26 @@ export default function AdminIFProfessionals() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="prof-level" className="block text-xs font-medium text-slate-600 mb-1">Career Level</label>
-              <select
+              <Select
                 id="prof-level"
                 value={form.level ?? 'early_career'}
                 onChange={(e) => setForm((f) => ({ ...f, level: e.target.value as CareerLevel }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white text-slate-800"
               >
                 {CAREER_LEVELS.map((l) => (
                   <option key={l} value={l}>{LEVEL_LABELS[l]}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label htmlFor="prof-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <select
+              <Select
                 id="prof-status"
                 value={form.isPublished ? 'published' : 'draft'}
                 onChange={(e) => setForm((f) => ({ ...f, isPublished: e.target.value === 'published' }))}
-                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white text-slate-800"
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
-              </select>
+              </Select>
             </div>
           </div>
 

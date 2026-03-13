@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
 import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -334,17 +335,16 @@ export default function AdminUsers() {
           </div>
           <div>
             <label htmlFor="user-role" className="block text-xs font-medium text-slate-600 mb-1">Role</label>
-            <select
+            <Select
               id="user-role"
               value={editForm.role}
               onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value as AdminUser['role'] }))}
-              className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white text-slate-800"
             >
               <option value="student">Student</option>
               <option value="educator">Educator</option>
               <option value="moderator">Moderator</option>
               <option value="admin">Admin</option>
-            </select>
+            </Select>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" size="sm" className="rounded-lg" onClick={closeEditModal}>Cancel</Button>

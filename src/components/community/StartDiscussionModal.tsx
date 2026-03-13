@@ -3,6 +3,7 @@ import { X, Paperclip, AtSign, Send } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { useState } from 'react'
 import type { CommunityCategory, Attachment } from '@/types/community'
 
@@ -185,15 +186,16 @@ export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: Star
                 <label className="block text-sm font-semibold text-[#000000] mb-2">
                   Category *
                 </label>
-                <select
+                <Select
+                  variant="student"
                   value={category}
                   onChange={(e) => setCategory(e.target.value as CommunityCategory)}
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D52B1E] text-[#000000] bg-white"
+                  className="p-3 h-auto"
                 >
                   {CATEGORIES.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               {/* Content Input */}
@@ -220,16 +222,17 @@ export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: Star
               <div className="flex gap-2 flex-wrap">
                 <div>
                   <label className="block text-sm font-semibold text-[#000000] mb-2">Font Style</label>
-                  <select
+                  <Select
+                    variant="student"
                     value={selectedFont}
                     onChange={(e) => setSelectedFont(e.target.value)}
-                    className="p-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D52B1E] text-sm bg-white text-[#000000]"
+                    className="p-2 h-auto"
                   >
                     <option value="normal">Normal</option>
                     <option value="bold">Bold</option>
                     <option value="italic">Italic</option>
                     <option value="monospace">Code</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

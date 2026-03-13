@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -84,12 +85,15 @@ export default function Support() {
                   <label className="text-sm font-medium text-[#000000]">
                     Topic
                   </label>
-                  <select className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#D52B1E] focus:ring-2 focus:ring-[#D52B1E]/10">
+                  <Select
+                    variant="student"
+                    className="mt-2"
+                  >
                     <option>Question about the platform</option>
                     <option>Bug or issue</option>
                     <option>Content / research request</option>
                     <option>Partnership / collaboration</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-[#000000]">

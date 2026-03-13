@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Eye, EyeOff, UserPlus, Mail, Lock, Shield } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -230,17 +231,18 @@ const Signup = () => {
                   whileFocus={{ scale: 1.01 }}
                   transition={{ type: "spring", stiffness: 300 }}
                 >
-                  <select
+                  <Select
                     id="role"
+                    variant="student"
                     value={role}
                     onChange={(e) =>
                       setRole(e.target.value as "user" | "admin")
                     }
-                    className="w-full h-11 px-4 border-2 border-gray-200 focus:border-red-500 rounded-lg transition-all duration-200 focus:ring-4 focus:ring-red-100 bg-white text-gray-700"
+                    className="h-11 border-2 border-gray-200 focus:border-red-500 transition-all duration-200 focus:ring-4 focus:ring-red-100 text-gray-700"
                   >
                     <option value="user">Regular User</option>
                     <option value="admin">Administrator</option>
-                  </select>
+                  </Select>
                 </motion.div>
               </div>
 
