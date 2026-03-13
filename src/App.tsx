@@ -33,6 +33,7 @@ import AdminData from "@/pages/admin/AdminData";
 import AdminCommunity from "@/pages/admin/AdminCommunity";
 import AdminDirectory from "@/pages/admin/AdminDirectory";
 import AdminSettings from "@/pages/admin/AdminSettings";
+import AdminIFProfessionals from "@/pages/admin/AdminIFProfessionals";
 
 function App() {
   console.log("App component loaded - routing should work now!");
@@ -177,6 +178,7 @@ function App() {
             <Route path="data" element={<AdminData />} />
             <Route path="community" element={<AdminCommunity />} />
             <Route path="directory" element={<AdminDirectory />} />
+            <Route path="if-professionals" element={<AdminIFProfessionals />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Routes>

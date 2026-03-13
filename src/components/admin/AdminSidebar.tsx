@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
+  Briefcase,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -54,6 +55,7 @@ const adminNav: NavItem[] = [
   },
   { name: 'Research & Reports', href: '/admin/research', icon: FileText },
   { name: 'Data Management', href: '/admin/data', icon: Database },
+  { name: 'IF Professionals', href: '/admin/if-professionals', icon: Briefcase },
   { name: 'Community', href: '/admin/community', icon: MessageSquare },
   { name: 'Directory', href: '/admin/directory', icon: FolderOpen },
 ]

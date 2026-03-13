@@ -39,12 +39,15 @@ const STATUS_COLORS: Record<string, string> = {
 
 const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-[#D52B1E]/10 text-[#D52B1E]',
+  moderator: 'bg-purple-50 text-purple-700',
+  educator: 'bg-blue-50 text-blue-700',
+  student: 'bg-gray-100 text-gray-600',
+  // legacy fallbacks
   staff: 'bg-purple-50 text-purple-700',
   instructor: 'bg-blue-50 text-blue-700',
-  student: 'bg-gray-100 text-gray-600',
 }
 
-const ROLE_FILTERS = ['All', 'student', 'instructor', 'admin', 'staff'] as const
+const ROLE_FILTERS = ['All', 'student', 'educator', 'moderator', 'admin'] as const
 type RoleFilter = (typeof ROLE_FILTERS)[number]
 
 function userStatus(u: AdminUser) {
@@ -62,16 +65,16 @@ export default function AdminUsers() {
   // Edit modal
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editUser, setEditUser] = useState<AdminUser | null>(null)
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', phone: '', country: '' })
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', phone: '', country: '', role: 'student' as AdminUser['role'] })
 
   function openEditUser(u: AdminUser) {
     setEditUser(u)
-    setEditForm({ firstName: u.firstName, lastName: u.lastName, phone: u.phone ?? '', country: u.country ?? '' })
+    setEditForm({ firstName: u.firstName, lastName: u.lastName, phone: u.phone ?? '', country: u.country ?? '', role: u.role })
     setOpenMenu(null)
     setEditModalOpen(true)
   }
 
-  function closeEditModal() { setEditModalOpen(false); setEditUser(null); setEditForm({ firstName: '', lastName: '', phone: '', country: '' }) }
+  function closeEditModal() { setEditModalOpen(false); setEditUser(null); setEditForm({ firstName: '', lastName: '', phone: '', country: '', role: 'student' }) }
 
   const { data, isLoading } = useAdminUsers({
     search: search || undefined,
@@ -327,6 +330,20 @@ export default function AdminUsers() {
           <div>
             <label htmlFor="user-country" className="block text-xs font-medium text-slate-600 mb-1">Country</label>
             <Input id="user-country" value={editForm.country} onChange={(e) => setEditForm((f) => ({ ...f, country: e.target.value }))} placeholder="Nigeria" className="h-9 text-sm" />
+          </div>
+          <div>
+            <label htmlFor="user-role" className="block text-xs font-medium text-slate-600 mb-1">Role</label>
+            <select
+              id="user-role"
+              value={editForm.role}
+              onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value as AdminUser['role'] }))}
+              className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:border-[#D52B1E] bg-white text-slate-800"
+            >
+              <option value="student">Student</option>
+              <option value="educator">Educator</option>
+              <option value="moderator">Moderator</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" size="sm" className="rounded-lg" onClick={closeEditModal}>Cancel</Button>

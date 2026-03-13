@@ -42,7 +42,7 @@ export interface AdminUser {
   email: string
   firstName: string
   lastName: string
-  role: 'student' | 'instructor' | 'admin' | 'staff'
+  role: 'student' | 'instructor' | 'educator' | 'moderator' | 'admin' | 'staff'
   phone?: string
   country?: string
   profilePhotoUrl?: string
@@ -54,7 +54,7 @@ export interface AdminUser {
 }
 
 export interface UsersListParams extends ListParams {
-  role?: 'student' | 'instructor' | 'admin' | 'staff'
+  role?: 'student' | 'instructor' | 'educator' | 'moderator' | 'admin' | 'staff'
   name?: string
 }
 
@@ -85,7 +85,7 @@ export const useAdminUpdateUser = () => {
       dto,
     }: {
       id: string
-      dto: { firstName?: string; lastName?: string; phone?: string; country?: string; profilePhotoUrl?: string }
+      dto: { firstName?: string; lastName?: string; phone?: string; country?: string; profilePhotoUrl?: string; role?: AdminUser['role'] }
     }) => {
       const { data } = await api.patch<AdminUser>(`/users/${id}`, dto)
       return data
@@ -705,6 +705,97 @@ export const useAdminDeleteDataCategory = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'datasets', 'categories'] })
       toast({ title: 'Category deleted' })
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message ?? 'Delete failed', variant: 'destructive' }),
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IF Professionals
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type CareerLevel = 'early_career' | 'mid_career' | 'senior'
+
+export interface IFProfessional {
+  id: string
+  name: string
+  title?: string
+  location?: string
+  focus?: string
+  bio?: string
+  level?: CareerLevel
+  profileImageUrl?: string
+  linkedInUrl?: string
+  email?: string
+  isPublished: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface IFProfessionalsListParams extends ListParams {
+  level?: CareerLevel
+  isPublished?: boolean
+}
+
+export interface CreateIFProfessionalDto {
+  name: string
+  title?: string
+  location?: string
+  focus?: string
+  bio?: string
+  level?: CareerLevel
+  profileImageUrl?: string
+  linkedInUrl?: string
+  email?: string
+  isPublished?: boolean
+}
+
+export const useAdminIFProfessionals = (params: IFProfessionalsListParams = {}) =>
+  useQuery({
+    queryKey: ['admin', 'if-professionals', params],
+    queryFn: async () => {
+      const { data } = await api.get<Page<IFProfessional>>('/if-professionals', { params })
+      return data
+    },
+  })
+
+export const useAdminCreateIFProfessional = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (dto: CreateIFProfessionalDto) => {
+      const { data } = await api.post<IFProfessional>('/if-professionals', dto)
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'if-professionals'] })
+      toast({ title: 'Professional created' })
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message ?? 'Create failed', variant: 'destructive' }),
+  })
+}
+
+export const useAdminUpdateIFProfessional = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, dto }: { id: string; dto: Partial<CreateIFProfessionalDto> }) => {
+      const { data } = await api.patch<IFProfessional>(`/if-professionals/${id}`, dto)
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'if-professionals'] })
+      toast({ title: 'Professional updated' })
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message ?? 'Update failed', variant: 'destructive' }),
+  })
+}
+
+export const useAdminDeleteIFProfessional = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => api.delete(`/if-professionals/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'if-professionals'] })
+      toast({ title: 'Professional deleted' })
     },
     onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message ?? 'Delete failed', variant: 'destructive' }),
   })
