@@ -190,6 +190,9 @@ function App() {
             <Route path="learning/programmes" element={<AdminLearning />} />
             <Route path="learning/certificates" element={<AdminLearning />} />
             <Route path="learning/payments" element={<AdminLearning />} />
+            <Route path="learning/paths" element={<AdminLearning />} />
+            <Route path="learning/assessments" element={<AdminLearning />} />
+            <Route path="learning/results" element={<AdminLearning />} />
             <Route path="research" element={<AdminResources />} />
             <Route path="data" element={<AdminData />} />
             <Route path="community" element={<AdminCommunity />} />

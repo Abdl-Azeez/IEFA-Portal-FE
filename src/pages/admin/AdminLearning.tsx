@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BookOpen, UserCheck, Video, Award, CreditCard, Plus, Search,
-  Edit, Trash2, Eye, CheckCircle,
+  Edit, Trash2, Eye, CheckCircle, TrendingUp, FileText, BarChart3, Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input'
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { y: 16, opacity: 0 }, show: { y: 0, opacity: 1 } }
 
-type Tab = 'courses' | 'educators' | 'videos' | 'programmes' | 'certificates' | 'payments'
+type Tab = 'courses' | 'educators' | 'videos' | 'programmes' | 'certificates' | 'payments' | 'paths' | 'assessments' | 'results'
 
 /* ── Static data ─────────────────────────────────────────────────────────── */
 const COURSES = [
@@ -59,6 +60,29 @@ const PAYMENTS = [
   { id: 'TXN005', user: 'Omar Al-Sayed', item: 'Sukuk Structuring (Course)', amount: '$199', date: 'Mar 3, 2026', status: 'pending' },
 ]
 
+const LEARNING_PATHS = [
+  { id: '1', title: 'Islamic Banking Fundamentals', courses: 5, enrolled: 210, duration: '20 hours', level: 'Beginner', status: 'active' },
+  { id: '2', title: 'Investment & Portfolio Management', courses: 4, enrolled: 145, duration: '16 hours', level: 'Intermediate', status: 'active' },
+  { id: '3', title: 'Professional Certification Track (CIFP)', courses: 8, enrolled: 340, duration: '40 hours', level: 'Advanced', status: 'active' },
+  { id: '4', title: 'ESG & Ethical Finance', courses: 6, enrolled: 178, duration: '24 hours', level: 'Intermediate', status: 'active' },
+]
+
+const ASSESSMENTS = [
+  { id: '1', title: 'CIFP Module 4 Final Exam', course: 'CIFP Programme', type: 'Final Exam', duration: '2 hours', attempts: 42, avgScore: 78, status: 'active' },
+  { id: '2', title: 'Sukuk Investment Quiz', course: 'Sukuk Structuring', type: 'Quiz', duration: '45 mins', attempts: 28, avgScore: 82, status: 'active' },
+  { id: '3', title: 'Islamic Banking Principles — Final Exam', course: 'IF Fundamentals', type: 'Final Exam', duration: '1.5 hours', attempts: 156, avgScore: 85, status: 'published' },
+  { id: '4', title: 'Shariah Compliance Fundamentals Quiz', course: 'IF Fundamentals', type: 'Quiz', duration: '30 mins', attempts: 210, avgScore: 80, status: 'published' },
+  { id: '5', title: 'Halal Investment Strategies Assessment', course: 'Investment Strategies', type: 'Assessment', duration: '1 hour', attempts: 95, avgScore: 74, status: 'draft' },
+]
+
+const RESULTS = [
+  { id: '1', user: 'Fatima Al-Hassan', assessment: 'Islamic Banking Principles Final', score: 92, grade: 'A', passed: true, date: 'Dec 15, 2025', certificate: true },
+  { id: '2', user: 'Yusuf Okonkwo', assessment: 'Shariah Compliance Fundamentals', score: 88, grade: 'B+', passed: true, date: 'Nov 28, 2025', certificate: true },
+  { id: '3', user: 'Aisha Bello', assessment: 'Halal Investment Strategies', score: 72, grade: 'C+', passed: true, date: 'Nov 20, 2025', certificate: false },
+  { id: '4', user: 'Mohammed Idris', assessment: 'CIFP Module 4 Final Exam', score: 58, grade: 'F', passed: false, date: 'Mar 5, 2026', certificate: false },
+  { id: '5', user: 'Sara Khalid', assessment: 'Sukuk Investment Quiz', score: 95, grade: 'A+', passed: true, date: 'Mar 8, 2026', certificate: true },
+]
+
 /* ── Status helpers ─────────────────────────────── */
 const statusCls: Record<string, string> = {
   active: 'bg-green-50 text-green-700',
@@ -70,9 +94,26 @@ const statusCls: Record<string, string> = {
   issued: 'bg-green-50 text-green-700',
   completed: 'bg-green-50 text-green-700',
   refunded: 'bg-red-50 text-red-700',
+  passed: 'bg-green-50 text-green-700',
+  failed: 'bg-red-50 text-red-700',
 }
 
-/* ── Tab icon map ─────────────────────────────────── */
+/* ── Helpers ────────────────────────────────────────────────────────────── */
+function scoreColor(score: number) {
+  if (score >= 75) return 'text-green-600'
+  if (score >= 60) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
+function passedBadgeCls(passed: boolean) {
+  return passed ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+}
+
+function passedLabel(passed: boolean) {
+  return passed ? 'Passed' : 'Failed'
+}
+
+
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'courses', label: 'Courses', icon: BookOpen },
   { id: 'educators', label: 'Educators', icon: UserCheck },
@@ -80,11 +121,26 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'programmes', label: 'Programmes', icon: Award },
   { id: 'certificates', label: 'Certificates', icon: Award },
   { id: 'payments', label: 'Payments', icon: CreditCard },
+  { id: 'paths', label: 'Learning Paths', icon: TrendingUp },
+  { id: 'assessments', label: 'Assessments', icon: FileText },
+  { id: 'results', label: 'Results', icon: BarChart3 },
 ]
 
+const VALID_TABS: Tab[] = ['courses', 'educators', 'videos', 'programmes', 'certificates', 'payments', 'paths', 'assessments', 'results']
+
 export default function AdminLearning() {
-  const [tab, setTab] = useState<Tab>('courses')
+  const location = useLocation()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
+
+  const pathSegment = location.pathname.split('/').pop() as Tab
+  const activeTab: Tab = VALID_TABS.includes(pathSegment) ? pathSegment : 'courses'
+
+  useEffect(() => { setSearch('') }, [activeTab])
+
+  function handleSetTab(t: Tab) {
+    navigate(`/admin/learning/${t}`)
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -99,7 +155,7 @@ export default function AdminLearning() {
       </motion.div>
 
       {/* LMS Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         {[
           { label: 'Courses', value: '63', color: '#10b981' },
           { label: 'Educators', value: '14', color: '#3b82f6' },
@@ -107,6 +163,8 @@ export default function AdminLearning() {
           { label: 'Programmes', value: '8', color: '#f59e0b' },
           { label: 'Certificates', value: '892', color: '#ec4899' },
           { label: 'Revenue', value: '$184K', color: '#D52B1E' },
+          { label: 'Paths', value: '4', color: '#14b8a6' },
+          { label: 'Assessments', value: '5', color: '#f97316' },
         ].map((s) => (
           <motion.div key={s.label} variants={item} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
@@ -121,9 +179,9 @@ export default function AdminLearning() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => { setTab(t.id); setSearch('') }}
+              onClick={() => handleSetTab(t.id)}
               className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                tab === t.id
+                activeTab === t.id
                   ? 'border-[#D52B1E] text-[#D52B1E] bg-[#D52B1E]/4'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
               }`}
@@ -138,13 +196,13 @@ export default function AdminLearning() {
         <div className="p-4 border-b border-gray-100">
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input placeholder={`Search ${tab}…`} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm rounded-lg" />
+            <Input placeholder={`Search ${activeTab}…`} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm rounded-lg" />
           </div>
         </div>
 
         {/* Tab content */}
         <div className="overflow-x-auto">
-          {tab === 'courses' && (
+          {activeTab === 'courses' && (
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -173,7 +231,7 @@ export default function AdminLearning() {
             </table>
           )}
 
-          {tab === 'educators' && (
+          {activeTab === 'educators' && (
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -200,7 +258,7 @@ export default function AdminLearning() {
             </table>
           )}
 
-          {tab === 'videos' && (
+          {activeTab === 'videos' && (
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -227,7 +285,7 @@ export default function AdminLearning() {
             </table>
           )}
 
-          {tab === 'programmes' && (
+          {activeTab === 'programmes' && (
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -254,7 +312,7 @@ export default function AdminLearning() {
             </table>
           )}
 
-          {tab === 'certificates' && (
+          {activeTab === 'certificates' && (
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -279,7 +337,7 @@ export default function AdminLearning() {
             </table>
           )}
 
-          {tab === 'payments' && (
+          {activeTab === 'payments' && (
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -302,6 +360,105 @@ export default function AdminLearning() {
                     <td className="px-4 py-3 text-slate-400 text-xs hidden md:table-cell">{p.date}</td>
                     <td className="px-4 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${statusCls[p.status] ?? ''}`}>{p.status}</span></td>
                     <td className="px-4 py-3 text-right"><button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600"><Eye className="h-3.5 w-3.5" /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === 'paths' && (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Path</th>
+                  <th className="px-4 py-3 text-left hidden md:table-cell">Courses</th>
+                  <th className="px-4 py-3 text-left hidden sm:table-cell">Enrolled</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Duration</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Level</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {LEARNING_PATHS.filter((p) => p.title.toLowerCase().includes(search.toLowerCase())).map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3 font-medium text-slate-800 max-w-xs"><p className="line-clamp-1">{p.title}</p></td>
+                    <td className="px-4 py-3 text-slate-600 text-xs hidden md:table-cell">{p.courses} courses</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs hidden sm:table-cell">{p.enrolled.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{p.duration}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{p.level}</td>
+                    <td className="px-4 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${statusCls[p.status] ?? ''}`}>{p.status}</span></td>
+                    <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1"><button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600"><Edit className="h-3.5 w-3.5" /></button><button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === 'assessments' && (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Assessment</th>
+                  <th className="px-4 py-3 text-left hidden md:table-cell">Course</th>
+                  <th className="px-4 py-3 text-left hidden sm:table-cell">Type</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Duration</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Attempts</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Avg Score</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {ASSESSMENTS.filter((a) => a.title.toLowerCase().includes(search.toLowerCase())).map((a) => (
+                  <tr key={a.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3 font-medium text-slate-800 max-w-xs"><p className="line-clamp-1">{a.title}</p></td>
+                    <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{a.course}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">
+                      <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">{a.type}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{a.duration}</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs hidden lg:table-cell">{a.attempts}</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs hidden lg:table-cell font-semibold">{a.avgScore}%</td>
+                    <td className="px-4 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${statusCls[a.status] ?? ''}`}>{a.status}</span></td>
+                    <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1"><button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600"><Edit className="h-3.5 w-3.5" /></button><button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === 'results' && (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">User</th>
+                  <th className="px-4 py-3 text-left hidden md:table-cell">Assessment</th>
+                  <th className="px-4 py-3 text-left hidden sm:table-cell">Score</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Grade</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Date</th>
+                  <th className="px-4 py-3 text-left">Result</th>
+                  <th className="px-4 py-3 text-right">Certificate</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {RESULTS.filter((r) => r.user.toLowerCase().includes(search.toLowerCase()) || r.assessment.toLowerCase().includes(search.toLowerCase())).map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="h-7 w-7 rounded-full bg-indigo-50 flex items-center justify-center text-xs font-bold text-indigo-600">{r.user.charAt(0)}</div><p className="font-medium text-slate-800 text-xs">{r.user}</p></div></td>
+                    <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell max-w-[180px]"><p className="line-clamp-1">{r.assessment}</p></td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span className={`text-xs font-bold ${scoreColor(r.score)}`}>{r.score}%</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 text-xs hidden lg:table-cell font-semibold">{r.grade}</td>
+                    <td className="px-4 py-3 text-slate-400 text-xs hidden lg:table-cell">{r.date}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${passedBadgeCls(r.passed)}`}>{passedLabel(r.passed)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {r.certificate
+                        ? <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-green-600" title="Download certificate"><Download className="h-3.5 w-3.5" /></button>
+                        : <span className="text-xs text-slate-300">—</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>

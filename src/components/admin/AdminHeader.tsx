@@ -84,7 +84,10 @@ const SEARCH_ITEMS: SearchItem[] = [
   { icon: Video,     label: "Course Videos",             description: "Upload and organise course video content",             path: "/admin/learning/videos",       parent: "Learning" },
   { icon: Award,     label: "Programmes",                description: "Learning programmes and structured pathways",          path: "/admin/learning/programmes",   parent: "Learning" },
   { icon: Award,     label: "Certificates",              description: "Issue and manage learner certificates",                path: "/admin/learning/certificates", parent: "Learning" },
-  { icon: CreditCard,label: "Payments",                  description: "Course payments and transaction history",              path: "/admin/learning/payments",     parent: "Learning" },
+  { icon: CreditCard,  label: "Payments",                 description: "Course payments and transaction history",              path: "/admin/learning/payments",     parent: "Learning" },
+  { icon: TrendingUp,  label: "Learning Paths",            description: "Curated multi-course learning paths and tracks",       path: "/admin/learning/paths",        parent: "Learning" },
+  { icon: FileText,    label: "Assessments",               description: "Exams, quizzes and learner assessments",               path: "/admin/learning/assessments",  parent: "Learning" },
+  { icon: BarChart2,   label: "Results",                   description: "Learner scores, grades and certificate downloads",      path: "/admin/learning/results",      parent: "Learning" },
 
   // ── Resources ──
   { icon: FileText,  label: "Resources",                 description: "Educational guides, publications and tools",           path: "/admin/research" },

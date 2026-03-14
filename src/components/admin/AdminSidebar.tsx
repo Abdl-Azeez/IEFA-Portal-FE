@@ -16,13 +16,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  BookOpen,
-  Video,
-  Award,
-  CreditCard,
-  UserCheck,
-  ChevronDown,
-  ChevronUp,
   ShieldCheck,
   Briefcase,
 } from 'lucide-react'
@@ -40,23 +33,7 @@ const adminNav: NavItem[] = [
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "News", href: "/admin/news", icon: Newspaper },
   { name: "Podcasts", href: "/admin/podcasts", icon: Mic },
-  {
-    name: "Learning Management",
-    href: "/admin/learning",
-    icon: GraduationCap,
-    children: [
-      { name: "Courses", href: "/admin/learning/courses", icon: BookOpen },
-      { name: "Educators", href: "/admin/learning/educators", icon: UserCheck },
-      { name: "Course Videos", href: "/admin/learning/videos", icon: Video },
-      { name: "Programmes", href: "/admin/learning/programmes", icon: Award },
-      {
-        name: "Certificates",
-        href: "/admin/learning/certificates",
-        icon: Award,
-      },
-      { name: "Payments", href: "/admin/learning/payments", icon: CreditCard },
-    ],
-  },
+  { name: "Learning Management", href: "/admin/learning", icon: GraduationCap },
   { name: "Resources", href: "/admin/research", icon: FileText },
   { name: "Data Management", href: "/admin/data", icon: Database },
   {
