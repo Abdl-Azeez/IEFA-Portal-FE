@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { User, Camera, Save, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
@@ -34,6 +35,7 @@ const itemVariants = {
 export default function Profile() {
   const { user } = useAuthStore()
   const updateProfile = useUpdateProfile()
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   const [form, setForm] = useState({
     firstName: user?.firstName ?? '',
@@ -58,7 +60,7 @@ export default function Profile() {
 
   function handleSave() {
     if (!user?.id) return
-    updateProfile.mutate({ id: user.id, data: form })
+    updateProfile.mutate(form);
   }
 
   const initials = [form.firstName, form.lastName]
@@ -94,17 +96,33 @@ export default function Profile() {
           </CardHeader>
           <CardContent className="flex items-center gap-6">
             {form.profilePhotoUrl ? (
-              <img
-                src={form.profilePhotoUrl}
-                alt="Profile"
-                className="h-20 w-20 rounded-full object-cover border-4 border-white shadow-md shrink-0"
-              />
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(true)}
+                className="shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-[#D52B1E] focus:ring-offset-2"
+                aria-label="Preview profile photo"
+              >
+                <img
+                  src={form.profilePhotoUrl}
+                  alt="Profile"
+                  className="h-20 w-20 rounded-full object-cover border-4 border-white shadow-md transition-transform duration-200 hover:scale-[1.03]"
+                />
+              </button>
             ) : (
               <div className="h-20 w-20 rounded-full bg-[#D52B1E]/10 flex items-center justify-center border-4 border-white shadow-md shrink-0">
                 <span className="text-2xl font-bold text-[#D52B1E]">{initials}</span>
               </div>
             )}
             <div className="flex-1">
+              {form.profilePhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewOpen(true)}
+                  className="mb-3 text-sm font-medium text-[#D52B1E] transition-colors hover:text-[#B8241B]"
+                >
+                  Preview current photo
+                </button>
+              )}
               <ImageUpload
                 id="profile-photo"
                 value={form.profilePhotoUrl}
@@ -114,6 +132,23 @@ export default function Profile() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Dialog
+        open={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        title="Profile Photo Preview"
+        maxWidth="max-w-2xl"
+      >
+        {form.profilePhotoUrl && (
+          <div className="flex items-center justify-center">
+            <img
+              src={form.profilePhotoUrl}
+              alt="Profile preview"
+              className="max-h-[70vh] w-full rounded-2xl object-contain"
+            />
+          </div>
+        )}
+      </Dialog>
 
       {/* Info card */}
       <motion.div variants={itemVariants}>

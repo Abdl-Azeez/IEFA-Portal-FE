@@ -16,11 +16,22 @@ import {
   Star,
   X,
   Calendar,
-} from 'lucide-react'
+  ExternalLink,
+  AlertTriangle,
+} from "lucide-react";
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useNews, useNewsTags, useNewsItem, type NewsItem } from '@/hooks/useNews'
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useNews,
+  useNewsTags,
+  useNewsItem,
+  useFeaturedNews,
+  useExternalNews,
+  type NewsItem,
+  type ExternalNewsArticle,
+} from "@/hooks/useNews";
 
 /* --- Animation variants -------------------------------------------------- */
 const containerVariants = {
@@ -32,127 +43,32 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { duration: 0.45 } },
 }
 
-/* --- Static featured stories (editorial API not ready) ------------------- */
-interface FeaturedStory {
-  id: string
-  title: string
-  excerpt: string
-  category: string
-  image: string
-  date: string
-  readTime: number
-  tag: string
+/* --- Helpers for external news ------------------------------------------- */
+function getExternalTitle(item: ExternalNewsArticle): string {
+  return item.title ?? 'Untitled'
+}
+function getExternalSource(item: ExternalNewsArticle): string {
+  if (!item.source) return 'External'
+  if (typeof item.source === 'string') return item.source
+  return item.source._ ?? 'External'
+}
+function getExternalKey(item: ExternalNewsArticle, idx: number): string {
+  const g = item.guid
+  if (typeof g === 'string') return g
+  if (g?._) return g._
+  return `ext-${idx}`
 }
 
-const FEATURED_STORIES: FeaturedStory[] = [
-  {
-    id: 'feat-1',
-    title: 'The $4 Trillion Shift: Islamic Finance Is Reshaping Global Capital Markets',
-    excerpt:
-      'As assets under management cross a historic milestone, global portfolio managers, sovereign wealth funds, and development banks are reassessing the role of Shariah-compliant finance in diversified portfolios.',
-    category: 'Deep Dive',
-    image: 'https://picsum.photos/seed/iefa-f1/800/450',
-    date: 'March 10, 2026',
-    readTime: 8,
-    tag: 'Cover Story',
-  },
-  {
-    id: 'feat-2',
-    title: "AAOIFI Releases Updated Shariah Standards for Tokenised Assets and Digital Sukuk",
-    excerpt:
-      'Landmark guidance on digital sukuk and asset tokenisation sets new benchmarks across jurisdictions and signals regulatory convergence.',
-    category: 'Regulation',
-    image: 'https://picsum.photos/seed/iefa-f2/400/300',
-    date: 'March 9, 2026',
-    readTime: 6,
-    tag: 'Policy',
-  },
-  {
-    id: 'feat-3',
-    title: 'ESG Sukuk: How Islamic Finance Is Leading the Green Bond Evolution',
-    excerpt:
-      'Record Q1 inflows reveal deep institutional appetite for Shariah-aligned sustainability instruments as ESG mandates go mainstream.',
-    category: 'Sustainability',
-    image: 'https://picsum.photos/seed/iefa-f3/400/300',
-    date: 'March 8, 2026',
-    readTime: 5,
-    tag: 'ESG',
-  },
-]
+const EXT_QUERY_KEY = "iefa_ext_news_query";
+const DEFAULT_EXT_QUERY = "Islamic finance";
 
-/* --- Static live / external RSS feed ------------------------------------- */
-interface ExternalNewsItem {
-  id: string
-  source: string
-  sourceColor: string
-  headline: string
-  summary: string
-  publishedAt: string
-  category: string
+function getStoredExtQuery(): string {
+  try {
+    return localStorage.getItem(EXT_QUERY_KEY) || DEFAULT_EXT_QUERY;
+  } catch {
+    return DEFAULT_EXT_QUERY;
+  }
 }
-
-const LIVE_FEED: ExternalNewsItem[] = [
-  {
-    id: 'ext-1',
-    source: 'Reuters',
-    sourceColor: '#e85a0e',
-    headline: 'Saudi Arabia targets record $15bn sukuk pipeline for 2026',
-    summary:
-      'The Kingdom capitalises on easing yields and sustained demand from GCC and Southeast Asian sovereign wealth funds.',
-    publishedAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-    category: 'Sukuk',
-  },
-  {
-    id: 'ext-2',
-    source: 'Bloomberg',
-    sourceColor: '#1a56db',
-    headline: "Malaysia's Bank Negara unveils revised Islamic liquidity framework for Q3",
-    summary:
-      'Updated HQLA definitions for Islamic banks align with Basel IV, effective Q3 2026 across all licensed institutions.',
-    publishedAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-    category: 'Regulation',
-  },
-  {
-    id: 'ext-3',
-    source: 'IFN',
-    sourceColor: '#059669',
-    headline: 'Green sukuk volumes surpass $12bn in Q1 2026, up 40% year-on-year',
-    summary:
-      'European institutional ESG mandates and SDG alignment fuel record sustainable Islamic bond issuance globally.',
-    publishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    category: 'ESG',
-  },
-  {
-    id: 'ext-4',
-    source: 'Zawya',
-    sourceColor: '#7c3aed',
-    headline: 'UAE opens dedicated Shariah-compliant fintech regulatory sandbox',
-    summary:
-      'CBUAE invites applications for its Islamic fintech accelerator through H1 2026, targeting digital takaful and murabaha platforms.',
-    publishedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    category: 'Fintech',
-  },
-  {
-    id: 'ext-5',
-    source: 'Arab News',
-    sourceColor: '#dc2626',
-    headline: 'Takaful gross contributions reach $36bn as GCC penetration climbs above 3%',
-    summary:
-      'Islamic insurance sector posts its strongest decade-high growth with Saudi Arabia and UAE leading new corporate adoption.',
-    publishedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    category: 'Takaful',
-  },
-  {
-    id: 'ext-6',
-    source: 'S&P Global',
-    sourceColor: '#0369a1',
-    headline: "Pakistan's Islamic banking assets cross 25% of total sector",
-    summary:
-      'With state-bank conversions underway, the sector sets its sights on a 50% share of total banking assets by 2030.',
-    publishedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    category: 'Banking',
-  },
-]
 
 /* --- Helpers --------------------------------------------------------------- */
 function relativeTime(iso: string): string {
@@ -237,8 +153,33 @@ function Pager({ page, pageCount, onPage }: Readonly<PagerProps>) {
 }
 
 /* --- Featured This Week ---------------------------------------------------- */
-function FeaturedSection() {
-  const [main, ...side] = FEATURED_STORIES
+function FeaturedSection({
+  onOpen,
+}: Readonly<{ onOpen: (id: string) => void }>) {
+  const { data: featured, isLoading } = useFeaturedNews();
+  const [main, ...side] = featured ?? [];
+
+  if (isLoading) {
+    return (
+      <motion.div variants={itemVariants} className="space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-1 rounded-full bg-[#D52B1E]" />
+          <h2 className="text-xl font-bold text-[#000000]">
+            Featured This Week
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4 animate-pulse">
+          <div className="md:col-span-2 rounded-2xl bg-gray-200 h-[420px]" />
+          <div className="flex flex-col gap-4">
+            <div className="rounded-2xl bg-gray-200 flex-1 min-h-[180px]" />
+            <div className="rounded-2xl bg-gray-200 flex-1 min-h-[180px]" />
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (!main) return null;
 
   return (
     <motion.div variants={itemVariants} className="space-y-4">
@@ -246,9 +187,13 @@ function FeaturedSection() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <div className="h-6 w-1 rounded-full bg-[#D52B1E]" />
-          <h2 className="text-xl font-bold text-[#000000]">Featured This Week</h2>
+          <h2 className="text-xl font-bold text-[#000000]">
+            Featured This Week
+          </h2>
         </div>
-        <span className="text-sm text-[#737692]">Most impactful stories of the week</span>
+        <span className="text-sm text-[#737692]">
+          Most impactful stories of the week
+        </span>
         <div className="hidden md:flex flex-1 h-px bg-gray-100" />
         <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-0 text-xs font-semibold">
           <Star className="h-3 w-3 mr-1" />
@@ -259,40 +204,54 @@ function FeaturedSection() {
       {/* Magazine layout */}
       <div className="grid md:grid-cols-3 gap-4">
         {/* Main story */}
-        <div className="md:col-span-2 relative group rounded-2xl overflow-hidden h-80 md:h-[420px] bg-gray-900">
-          <img
-            src={main.image}
-            alt={main.title}
-            className="absolute inset-0 w-full h-full object-cover opacity-55 transition-transform duration-700 group-hover:scale-105"
-          />
+        <div
+          className="md:col-span-2 relative group rounded-2xl overflow-hidden h-80 md:h-[420px] bg-gray-900 cursor-pointer"
+          onClick={() => onOpen(main.id)}
+        >
+          {main.coverImageUrl ? (
+            <img
+              src={main.coverImageUrl}
+              alt={main.title}
+              className="absolute inset-0 w-full h-full object-cover opacity-55 transition-transform duration-700 group-hover:scale-105"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#D52B1E]/40 to-slate-900">
+              <BookOpen className="h-20 w-20 text-white/20" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-6">
             <div className="flex items-center gap-2 mb-3">
-              <span className="bg-[#D52B1E] text-white text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
-                {main.tag}
-              </span>
-              <span className="text-white/55 text-xs">{main.category}</span>
+              {main.tags?.[0] && (
+                <span className="bg-[#D52B1E] text-white text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                  {main.tags[0].name}
+                </span>
+              )}
+              {main.tags?.[1] && (
+                <span className="text-white/55 text-xs">
+                  {main.tags[1].name}
+                </span>
+              )}
             </div>
             <h3 className="text-white font-bold text-xl md:text-2xl leading-snug mb-2">
               {main.title}
             </h3>
-            <p className="text-white/65 text-sm leading-relaxed line-clamp-2 mb-4">
-              {main.excerpt}
-            </p>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-white/45 text-xs">
+            {main.excerpt && (
+              <p className="text-white/65 text-sm leading-relaxed line-clamp-2 mb-4">
+                {main.excerpt}
+              </p>
+            )}
+            <div className="flex items-center gap-3 text-white/45 text-xs">
+              {main.publishedAt && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {main.date}
+                  {fmtDate(main.publishedAt)}
                 </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {main.readTime} min read
-                </span>
-              </div>
-              <span className="flex items-center gap-1.5 text-white/70 text-xs bg-white/10 rounded-full px-3 py-1">
-                Coming soon
+              )}
+              <span className="flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                {main.viewCount.toLocaleString()} views
               </span>
             </div>
           </div>
@@ -300,28 +259,39 @@ function FeaturedSection() {
 
         {/* Side stories */}
         <div className="flex flex-col gap-4">
-          {side.map((story) => (
+          {side.slice(0, 2).map((story) => (
             <div
               key={story.id}
-              className="relative group rounded-2xl overflow-hidden flex-1 bg-gray-900 min-h-[180px]"
+              className="relative group rounded-2xl overflow-hidden flex-1 bg-gray-900 min-h-[180px] cursor-pointer"
+              onClick={() => onOpen(story.id)}
             >
-              <img
-                src={story.image}
-                alt={story.title}
-                className="absolute inset-0 w-full h-full object-cover opacity-45 transition-transform duration-700 group-hover:scale-105"
-              />
+              {story.coverImageUrl ? (
+                <img
+                  src={story.coverImageUrl}
+                  alt={story.title}
+                  className="absolute inset-0 w-full h-full object-cover opacity-45 transition-transform duration-700 group-hover:scale-105"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-[#D52B1E]/30 to-slate-900" />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-4">
-                <span className="inline-block mb-2 text-xs font-semibold text-[#ff8080] bg-[#D52B1E]/15 px-2 py-0.5 rounded-full">
-                  {story.tag}
-                </span>
+                {story.tags?.[0] && (
+                  <span className="inline-block mb-2 text-xs font-semibold text-[#ff8080] bg-[#D52B1E]/15 px-2 py-0.5 rounded-full">
+                    {story.tags[0].name}
+                  </span>
+                )}
                 <h4 className="text-white font-bold text-sm leading-snug line-clamp-2 mb-1">
                   {story.title}
                 </h4>
                 <div className="flex items-center gap-2 text-white/40 text-xs">
-                  <span>{story.date}</span>
-                  <span>·</span>
-                  <span>{story.readTime} min</span>
+                  {story.publishedAt && (
+                    <span>{fmtDate(story.publishedAt)}</span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    {story.viewCount.toLocaleString()}
+                  </span>
                 </div>
               </div>
             </div>
@@ -329,12 +299,16 @@ function FeaturedSection() {
         </div>
       </div>
     </motion.div>
-  )
+  );
 }
 
 /* --- Live Feed Strip ------------------------------------------------------- */
-function LiveFeedStrip() {
-  const scrollRef = useRef<HTMLDivElement>(null)
+function LiveFeedStrip({
+  onOpen,
+}: Readonly<{ onOpen: (item: ExternalNewsArticle) => void }>) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [query] = useState(() => getStoredExtQuery());
+  const { data: externalNews, isLoading } = useExternalNews(query);
 
   return (
     <motion.div variants={itemVariants} className="space-y-4">
@@ -345,7 +319,9 @@ function LiveFeedStrip() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
           </span>
-          <h2 className="text-xl font-bold text-[#000000]">Live Market Intelligence</h2>
+          <h2 className="text-xl font-bold text-[#000000]">
+            Live Market Intelligence
+          </h2>
         </div>
         <Badge className="bg-green-50 text-green-700 border-green-200 text-xs font-semibold">
           External Sources
@@ -353,7 +329,7 @@ function LiveFeedStrip() {
         <div className="hidden md:flex flex-1 h-px bg-gray-100" />
         <div className="flex items-center gap-1.5 text-xs text-[#737692]">
           <Rss className="h-3 w-3" />
-          Reuters · Bloomberg · IFN · Zawya · Arab News · S&P
+          Google News · RSS Feed
         </div>
       </div>
 
@@ -365,30 +341,65 @@ function LiveFeedStrip() {
         </div>
         <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5">
           <Shield className="h-3 w-3 text-[#D52B1E]" />
-          <span>IEFA Official — verified & curated below</span>
+          <span>IEFA Official — verified &amp; curated below</span>
         </div>
       </div>
 
       {/* Horizontal scroll strip */}
-      <div
-        ref={scrollRef}
-        className="flex gap-4 overflow-x-auto pb-2"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        {LIVE_FEED.map((item) => (
-          <LiveFeedCard key={item.id} item={item} />
-        ))}
-      </div>
+      {isLoading && (
+        <div className="flex gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 w-72 h-48 rounded-2xl bg-gray-900 animate-pulse opacity-40"
+            />
+          ))}
+        </div>
+      )}
+
+      {!isLoading && (!externalNews || externalNews.length === 0) && (
+        <div className="flex items-center gap-2 text-sm text-[#737692] py-4">
+          <Rss className="h-4 w-4" />
+          <span>No live feeds available right now. Check back soon.</span>
+        </div>
+      )}
+
+      {!isLoading && externalNews && externalNews.length > 0 && (
+        <div
+          ref={scrollRef}
+          className="flex gap-4 overflow-x-auto pb-2"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {externalNews.map((item, idx) => (
+            <LiveFeedCard
+              key={getExternalKey(item, idx)}
+              item={item}
+              onOpen={onOpen}
+            />
+          ))}
+        </div>
+      )}
     </motion.div>
-  )
+  );
 }
 
-function LiveFeedCard({ item }: Readonly<{ item: ExternalNewsItem }>) {
+function LiveFeedCard({
+  item,
+  onOpen,
+}: Readonly<{
+  item: ExternalNewsArticle;
+  onOpen: (item: ExternalNewsArticle) => void;
+}>) {
+  const title = getExternalTitle(item);
+  const source = getExternalSource(item);
+  const link = item.link;
+
   return (
     <motion.div
       whileHover={{ y: -4, scale: 1.02 }}
       transition={{ duration: 0.2 }}
-      className="flex-shrink-0 w-72 bg-gradient-to-br from-gray-900 to-slate-900 rounded-2xl p-4 border border-white/6 shadow-xl cursor-default group select-text"
+      className="flex-shrink-0 w-72 bg-gradient-to-br from-gray-900 to-slate-900 rounded-2xl p-4 border border-white/6 shadow-xl group select-text cursor-pointer"
+      onClick={() => onOpen(item)}
     >
       {/* Top bar */}
       <div className="flex items-center justify-between mb-3">
@@ -397,13 +408,12 @@ function LiveFeedCard({ item }: Readonly<{ item: ExternalNewsItem }>) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
           </span>
-          <span className="text-xs font-bold text-green-400 uppercase tracking-widest">Live</span>
+          <span className="text-xs font-bold text-green-400 uppercase tracking-widest">
+            Live
+          </span>
         </div>
-        <span
-          className="text-xs font-bold px-2.5 py-0.5 rounded-md text-white"
-          style={{ backgroundColor: item.sourceColor }}
-        >
-          {item.source}
+        <span className="text-xs font-bold px-2.5 py-0.5 rounded-md text-white bg-white/15 truncate max-w-[120px]">
+          {source}
         </span>
       </div>
 
@@ -411,29 +421,225 @@ function LiveFeedCard({ item }: Readonly<{ item: ExternalNewsItem }>) {
 
       {/* Headline */}
       <h4 className="text-white font-semibold text-sm leading-snug line-clamp-3 mb-2 group-hover:text-green-300 transition-colors">
-        {item.headline}
+        {title}
       </h4>
 
       {/* Summary */}
-      <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mb-3">
-        {item.summary}
-      </p>
+      {item.description && (
+        <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mb-3">
+          {item.description}
+        </p>
+      )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between">
-        <span
-          className="text-xs px-2 py-0.5 rounded-full font-medium text-white/80"
-          style={{ backgroundColor: `${item.sourceColor}28` }}
-        >
-          {item.category}
-        </span>
-        <span className="text-[11px] text-gray-500 flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          {relativeTime(item.publishedAt)}
-        </span>
+      <div className="flex items-center justify-between mt-auto">
+        {item.pubDate ? (
+          <span className="text-[11px] text-gray-500 flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {relativeTime(item.pubDate)}
+          </span>
+        ) : (
+          <span />
+        )}
+        {link && (
+          <span className="text-[11px] text-green-500 flex items-center gap-1">
+            Read <ArrowRight className="h-3 w-3" />
+          </span>
+        )}
       </div>
     </motion.div>
-  )
+  );
+}
+
+/* --- External Article Overlay ---------------------------------------------- */
+function ExternalArticleOverlay({
+  item,
+  onClose,
+}: Readonly<{ item: ExternalNewsArticle; onClose: () => void }>) {
+  const title = getExternalTitle(item);
+  const source = getExternalSource(item);
+  const link = item.link;
+
+  // Known domains that block iframe embedding (Google News redirects, major publishers, etc.)
+  const NON_EMBEDDABLE = [
+    "news.google.com",
+    "reuters.com",
+    "bloomberg.com",
+    "wsj.com",
+    "ft.com",
+  ];
+  const isNonEmbeddable = !link || NON_EMBEDDABLE.some((d) => link.includes(d));
+
+  const [iframeBlocked, setIframeBlocked] = useState(isNonEmbeddable);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  // Detect if iframe was blocked after load (best-effort; true cross-origin errors are silent)
+  useEffect(() => {
+    if (isNonEmbeddable) return;
+    const timer = setTimeout(() => {
+      try {
+        const iw = iframeRef.current?.contentWindow;
+        if (!iw) setIframeBlocked(true);
+      } catch {
+        setIframeBlocked(true);
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [link, isNonEmbeddable]);
+
+  return createPortal(
+    <motion.div
+      key="ext-backdrop"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm overflow-y-auto"
+      onClick={onClose}
+    >
+      <motion.div
+        key="ext-panel"
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        className="min-h-screen bg-white mx-auto max-w-4xl my-0 md:my-8 md:rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        style={{ maxHeight: "calc(100vh - 4rem)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sticky header */}
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-5 py-3 gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-sm text-[#737692] hover:text-[#000000] transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to News
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-green-600 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+              {source}
+            </span>
+            {link && (
+              <a
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-[#737692] hover:text-[#000000] bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink className="h-3 w-3" />
+                Open original
+              </a>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Article metadata */}
+        <div className="px-6 md:px-8 py-5 border-b border-gray-100 shrink-0">
+          <h1 className="text-xl md:text-2xl font-bold text-[#000000] leading-snug mb-3">
+            {title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-4 text-xs text-[#737692]">
+            {item.pubDate && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                {fmtDate(item.pubDate, true)}
+              </span>
+            )}
+            <span className="flex items-center gap-1 font-semibold text-green-700">
+              <Rss className="h-3.5 w-3.5" />
+              External Source — unverified by IEFA
+            </span>
+          </div>
+          {item.description && (
+            <p className="mt-3 text-sm text-[#444] leading-relaxed border-l-4 border-green-400 pl-4 bg-green-50/50 py-2 rounded-r-xl">
+              {item.description}
+            </p>
+          )}
+        </div>
+
+        {/* Iframe content area */}
+        <div
+          className="flex-1 relative overflow-hidden"
+          style={{ minHeight: "400px" }}
+        >
+          {iframeBlocked ? (
+            <div className="flex flex-col items-center justify-center h-full gap-5 p-8 text-center">
+              <div className="h-14 w-14 rounded-full bg-amber-50 flex items-center justify-center">
+                <AlertTriangle className="h-7 w-7 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-[#000000] mb-1">
+                  Article blocked by publisher
+                </p>
+                <p className="text-sm text-[#737692]">
+                  This publisher does not allow their content to be embedded.
+                </p>
+              </div>
+              {link && (
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 bg-[#D52B1E] hover:bg-[#B8241B] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Read full article
+                </a>
+              )}
+            </div>
+          ) : link ? (
+            <>
+              <iframe
+                ref={iframeRef}
+                src={link}
+                title={title}
+                className="w-full h-full border-0"
+                style={{ minHeight: "500px" }}
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                onError={() => setIframeBlocked(true)}
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-amber-50/95 border-t border-amber-200 px-4 py-2 flex items-center justify-between gap-3">
+                <span className="text-xs text-amber-700 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Content not displaying?
+                </span>
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-amber-800 font-semibold flex items-center gap-1 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="h-3 w-3" /> Open in new tab
+                </a>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-[#737692]">
+              <Rss className="h-10 w-10 opacity-30" />
+              <p>No link available for this article</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
 }
 
 /* --- IEFA Official Card ---------------------------------------------------- */
@@ -718,6 +924,14 @@ export function News() {
   const [selectedTag, setSelectedTag] = useState('')
   const [page, setPage] = useState(1)
   const [openArticleId, setOpenArticleId] = useState<string | null>(null)
+  const [openExtArticle, setOpenExtArticle] =
+    useState<ExternalNewsArticle | null>(null);
+  const queryClient = useQueryClient();
+
+  const closeArticle = () => {
+    setOpenArticleId(null);
+    queryClient.invalidateQueries({ queryKey: ["news"] });
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -770,7 +984,8 @@ export function News() {
               News &amp; Insights
             </h1>
             <p className="mt-1.5 text-[#737692]">
-              IEFA official intelligence plus live global market feeds — all in one place
+              IEFA official intelligence plus live global market feeds — all in
+              one place
             </p>
           </div>
           <div className="relative w-full md:w-64">
@@ -786,10 +1001,10 @@ export function News() {
       </motion.div>
 
       {/* Featured This Week */}
-      <FeaturedSection />
+      <FeaturedSection onOpen={setOpenArticleId} />
 
       {/* Live Market Intelligence */}
-      <LiveFeedStrip />
+      <LiveFeedStrip onOpen={setOpenExtArticle} />
 
       {/* IEFA Official News */}
       <motion.div variants={itemVariants} className="space-y-5">
@@ -797,7 +1012,9 @@ export function News() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="h-6 w-1 rounded-full bg-[#D52B1E]" />
-            <h2 className="text-xl font-bold text-[#000000]">IEFA Official News</h2>
+            <h2 className="text-xl font-bold text-[#000000]">
+              IEFA Official News
+            </h2>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[#D52B1E] bg-[#D52B1E]/8 px-2.5 py-1 rounded-full font-semibold">
             <Shield className="h-3 w-3" />
@@ -816,13 +1033,13 @@ export function News() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => {
-                setSelectedTag('')
-                setPage(1)
+                setSelectedTag("");
+                setPage(1);
               }}
               className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                 selectedTag
-                  ? 'bg-white text-[#737692] border-gray-200 hover:border-[#D52B1E] hover:text-[#D52B1E]'
-                  : 'bg-[#D52B1E] text-white border-[#D52B1E]'
+                  ? "bg-white text-[#737692] border-gray-200 hover:border-[#D52B1E] hover:text-[#D52B1E]"
+                  : "bg-[#D52B1E] text-white border-[#D52B1E]"
               }`}
             >
               All
@@ -833,8 +1050,8 @@ export function News() {
                 onClick={() => handleTagClick(tag.name)}
                 className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                   selectedTag === tag.name
-                    ? 'bg-[#D52B1E] text-white border-[#D52B1E]'
-                    : 'bg-white text-[#737692] border-gray-200 hover:border-[#D52B1E] hover:text-[#D52B1E]'
+                    ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+                    : "bg-white text-[#737692] border-gray-200 hover:border-[#D52B1E] hover:text-[#D52B1E]"
                 }`}
               >
                 {tag.name}
@@ -852,16 +1069,18 @@ export function News() {
                   <NewsCardSkeleton key={id} />
                 ))}
               </div>
-            )
+            );
           }
           if (items.length === 0) {
             return (
               <div className="flex flex-col items-center justify-center py-24 text-[#737692]">
                 <BookOpen className="h-12 w-12 mb-4 opacity-30" />
                 <p className="text-lg font-medium">No news articles found</p>
-                <p className="text-sm mt-1">Try adjusting your search or filters</p>
+                <p className="text-sm mt-1">
+                  Try adjusting your search or filters
+                </p>
               </div>
-            )
+            );
           }
           return (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -873,7 +1092,7 @@ export function News() {
                 />
               ))}
             </div>
-          )
+          );
         })()}
 
         {/* Pagination */}
@@ -888,10 +1107,17 @@ export function News() {
           <ArticleDetail
             key={openArticleId}
             id={openArticleId}
-            onClose={() => setOpenArticleId(null)}
+            onClose={closeArticle}
+          />
+        )}
+        {openExtArticle && (
+          <ExternalArticleOverlay
+            key={getExternalKey(openExtArticle, 0)}
+            item={openExtArticle}
+            onClose={() => setOpenExtArticle(null)}
           />
         )}
       </AnimatePresence>
     </motion.div>
-  )
+  );
 }

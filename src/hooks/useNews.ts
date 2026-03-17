@@ -87,3 +87,34 @@ export const useNewsItem = (id: string) => {
     enabled: !!id,
   })
 }
+
+export interface ExternalNewsArticle {
+  title?: string;
+  link?: string;
+  pubDate?: string;
+  description?: string;
+  source?: string | { _?: string; $?: { url?: string } };
+  guid?: string | { _?: string };
+  category?: string;
+}
+
+export const useExternalNews = (search: string) => {
+  return useQuery<ExternalNewsArticle[]>({
+    queryKey: ["externalNews", search],
+    queryFn: async () => {
+      const response = await api.get("/news/external", { params: { search } });
+      return response.data;
+    },
+    enabled: !!search,
+  });
+};
+
+export const useFeaturedNews = () => {
+  return useQuery<NewsItem[]>({
+    queryKey: ["featuredNews"],
+    queryFn: async () => {
+      const response = await api.get("/news/featured");
+      return response.data;
+    },
+  });
+};

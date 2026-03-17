@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth";
 import { useMe } from "@/hooks/useAuth";
+import api from "@/lib/api";
 
 interface User {
   id: string;
@@ -35,14 +37,28 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const { user, isAuthenticated, logout, setUser } = useAuthStore();
+  const {
+    user,
+    token,
+    isAuthenticated,
+    logout: storeLogout,
+    setUser,
+  } = useAuthStore();
   const { data: meData, isLoading } = useMe();
+  const queryClient = useQueryClient();
+
+  const logout = () => {
+    // Invalidate server-side refresh token (best-effort, don't block UI)
+    api.post("/auth/logout").catch(() => {});
+    storeLogout();
+    queryClient.removeQueries({ queryKey: ["me"] });
+  };
 
   useEffect(() => {
-    if (meData && !user) {
+    if (token && meData && !user) {
       setUser(meData);
     }
-  }, [meData, user, setUser]);
+  }, [token, meData, user, setUser]);
 
   const login = async (_email: string, _password: string) => {
     // This will be handled by the hook

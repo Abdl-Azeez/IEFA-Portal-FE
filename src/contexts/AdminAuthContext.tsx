@@ -37,17 +37,17 @@ const ADMIN_PROFILE: AdminUser = {
 
 export const AdminAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [admin, setAdmin] = useState<AdminUser | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return saved ? (JSON.parse(saved) as AdminUser) : null
-  })
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    return saved ? (JSON.parse(saved) as AdminUser) : null;
+  });
 
   useEffect(() => {
     if (admin) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(admin))
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(admin));
     } else {
-      localStorage.removeItem(STORAGE_KEY)
+      sessionStorage.removeItem(STORAGE_KEY);
     }
-  }, [admin])
+  }, [admin]);
 
   const adminLogin = async (email: string, password: string) => {
     if (email.toLowerCase() === ADMIN_EMAIL && password === ADMIN_ACCESS_KEY) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Bell, Globe2, Lock, Mail, Loader2 } from "lucide-react";
+import { Bell, Globe2, Lock, Mail, Loader2, Save } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useChangePassword } from "@/hooks/useAuth";
+import { useChangePassword, useUpdateSettings } from "@/hooks/useAuth";
+import { useAuthStore } from "@/stores/auth";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -31,26 +32,97 @@ const itemVariants = {
   },
 };
 
+const REGIONS = [
+  "Nigeria",
+  "West Africa",
+  "East Africa",
+  "North Africa",
+  "Pan-African",
+  "Middle East",
+  "South Asia",
+  "Southeast Asia",
+  "Global",
+];
+
 export default function Settings() {
-  const changePassword = useChangePassword()
-  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
-  const [pwErrors, setPwErrors] = useState<Record<string, string>>({})
+  const { user } = useAuthStore();
+  const changePassword = useChangePassword();
+  const updateSettings = useUpdateSettings();
+
+  // --- Password form ---
+  const [pwForm, setPwForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
+
+  // --- Notification / email preferences ---
+  const [emailPrefs, setEmailPrefs] = useState({
+    researchHighlights: true,
+    platformUpdates: false,
+    eventsAndPrograms: true,
+  });
+  const [notifPrefs, setNotifPrefs] = useState({
+    newReportsAndDataViews: true,
+    communityRepliesAndMentions: false,
+  });
+  const [region, setRegion] = useState("Nigeria");
+
+  // Initialise from persisted user settings when the user object loads
+  useEffect(() => {
+    if (user?.settings) {
+      const s = user.settings;
+      setEmailPrefs({
+        researchHighlights: s.researchHighlights ?? true,
+        platformUpdates: s.platformUpdates ?? false,
+        eventsAndPrograms: s.eventsAndPrograms ?? true,
+      });
+      setNotifPrefs({
+        newReportsAndDataViews: s.newReportsAndDataViews ?? true,
+        communityRepliesAndMentions: s.communityRepliesAndMentions ?? false,
+      });
+      if (s.primaryRegion) setRegion(s.primaryRegion);
+    }
+  }, [user?.id]);
+
+  function handleSavePreferences() {
+    updateSettings.mutate({
+      ...emailPrefs,
+      ...notifPrefs,
+      primaryRegion: region,
+    });
+  }
 
   function validatePw() {
-    const errs: Record<string, string> = {}
-    if (!pwForm.currentPassword) errs.currentPassword = 'Current password is required'
-    if (!pwForm.newPassword || pwForm.newPassword.length < 8) errs.newPassword = 'New password must be at least 8 characters'
-    if (pwForm.newPassword !== pwForm.confirmPassword) errs.confirmPassword = 'Passwords do not match'
-    setPwErrors(errs)
-    return Object.keys(errs).length === 0
+    const errs: Record<string, string> = {};
+    if (!pwForm.currentPassword)
+      errs.currentPassword = "Current password is required";
+    if (!pwForm.newPassword || pwForm.newPassword.length < 8)
+      errs.newPassword = "New password must be at least 8 characters";
+    if (pwForm.newPassword !== pwForm.confirmPassword)
+      errs.confirmPassword = "Passwords do not match";
+    setPwErrors(errs);
+    return Object.keys(errs).length === 0;
   }
 
   function handleChangePassword() {
-    if (!validatePw()) return
+    if (!validatePw()) return;
     changePassword.mutate(
-      { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword },
-      { onSuccess: () => setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' }) },
-    )
+      {
+        currentPassword: pwForm.currentPassword,
+        newPassword: pwForm.newPassword,
+        confirmNewPassword: pwForm.confirmPassword,
+      },
+      {
+        onSuccess: () =>
+          setPwForm({
+            currentPassword: "",
+            newPassword: "",
+            confirmPassword: "",
+          }),
+      },
+    );
   }
 
   useEffect(() => {
@@ -69,8 +141,8 @@ export default function Settings() {
           Settings
         </h1>
         <p className="mt-2 text-[#737692]">
-          Configure how IEFA works for you. These controls are illustrative for
-          now, and can be wired to real preferences later.
+          Manage your notification preferences, region defaults, and account
+          security.
         </p>
       </motion.div>
 
@@ -95,32 +167,31 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <label className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer">
-                  <span className="font-medium text-[#000000]">
-                    Research highlights
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-[#D52B1E]"
-                    defaultChecked
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer">
-                  <span className="font-medium text-[#000000]">
-                    Platform updates
-                  </span>
-                  <input type="checkbox" className="h-4 w-4 accent-[#D52B1E]" />
-                </label>
-                <label className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer">
-                  <span className="font-medium text-[#000000]">
-                    Events and programs
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-[#D52B1E]"
-                    defaultChecked
-                  />
-                </label>
+                {(
+                  [
+                    { key: "researchHighlights", label: "Research highlights" },
+                    { key: "platformUpdates", label: "Platform updates" },
+                    { key: "eventsAndPrograms", label: "Events and programs" },
+                  ] as { key: keyof typeof emailPrefs; label: string }[]
+                ).map(({ key, label }) => (
+                  <label
+                    key={key}
+                    className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer"
+                  >
+                    <span className="font-medium text-[#000000]">{label}</span>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[#D52B1E]"
+                      checked={emailPrefs[key]}
+                      onChange={(e) =>
+                        setEmailPrefs((p) => ({
+                          ...p,
+                          [key]: e.target.checked,
+                        }))
+                      }
+                    />
+                  </label>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -138,30 +209,43 @@ export default function Settings() {
                     In-app notifications
                   </CardTitle>
                   <CardDescription className="text-[#737692]">
-                    Decide what shows up in your notification tray (to be
-                    built).
+                    Decide what shows up in your notification tray.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <label className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer">
-                  <span className="font-medium text-[#000000]">
-                    New reports and data views
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-[#D52B1E]"
-                    defaultChecked
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer">
-                  <span className="font-medium text-[#000000]">
-                    Community replies and mentions
-                  </span>
-                  <input type="checkbox" className="h-4 w-4 accent-[#D52B1E]" />
-                </label>
+                {(
+                  [
+                    {
+                      key: "newReportsAndDataViews",
+                      label: "New reports and data views",
+                    },
+                    {
+                      key: "communityRepliesAndMentions",
+                      label: "Community replies and mentions",
+                    },
+                  ] as { key: keyof typeof notifPrefs; label: string }[]
+                ).map(({ key, label }) => (
+                  <label
+                    key={key}
+                    className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer"
+                  >
+                    <span className="font-medium text-[#000000]">{label}</span>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[#D52B1E]"
+                      checked={notifPrefs[key]}
+                      onChange={(e) =>
+                        setNotifPrefs((p) => ({
+                          ...p,
+                          [key]: e.target.checked,
+                        }))
+                      }
+                    />
+                  </label>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -176,7 +260,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <CardTitle className="text-[#000000]">
-                    Region & language
+                    Region &amp; language
                   </CardTitle>
                   <CardDescription className="text-[#737692]">
                     These defaults will influence content and data views.
@@ -191,13 +275,15 @@ export default function Settings() {
                     Primary region
                   </span>
                   <Select
-                    variant="student"
                     className="mt-2"
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
                   >
-                    <option>Nigeria</option>
-                    <option>West Africa</option>
-                    <option>Pan-African</option>
-                    <option>Global</option>
+                    {REGIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
                   </Select>
                 </label>
               </div>
@@ -205,7 +291,25 @@ export default function Settings() {
           </Card>
         </motion.div>
 
-        <motion.div variants={itemVariants}>
+        <motion.div
+          variants={itemVariants}
+          className="lg:col-span-2 flex justify-end"
+        >
+          <Button
+            onClick={handleSavePreferences}
+            disabled={updateSettings.isPending}
+            className="bg-[#D52B1E] hover:bg-[#B8241B] gap-2"
+          >
+            {updateSettings.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Save Preferences
+          </Button>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="lg:col-span-2">
           <Card className="transition-all duration-300 hover:shadow-xl">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -221,18 +325,25 @@ export default function Settings() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="currentPassword">Current Password</Label>
                   <Input
                     id="currentPassword"
                     type="password"
                     value={pwForm.currentPassword}
-                    onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+                    onChange={(e) =>
+                      setPwForm((f) => ({
+                        ...f,
+                        currentPassword: e.target.value,
+                      }))
+                    }
                     placeholder="Enter current password"
                   />
                   {pwErrors.currentPassword && (
-                    <p className="text-xs text-red-500">{pwErrors.currentPassword}</p>
+                    <p className="text-xs text-red-500">
+                      {pwErrors.currentPassword}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-1.5">
@@ -241,11 +352,15 @@ export default function Settings() {
                     id="newPassword"
                     type="password"
                     value={pwForm.newPassword}
-                    onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+                    onChange={(e) =>
+                      setPwForm((f) => ({ ...f, newPassword: e.target.value }))
+                    }
                     placeholder="At least 8 characters"
                   />
                   {pwErrors.newPassword && (
-                    <p className="text-xs text-red-500">{pwErrors.newPassword}</p>
+                    <p className="text-xs text-red-500">
+                      {pwErrors.newPassword}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-1.5">
@@ -254,19 +369,30 @@ export default function Settings() {
                     id="confirmPassword"
                     type="password"
                     value={pwForm.confirmPassword}
-                    onChange={(e) => setPwForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                    onChange={(e) =>
+                      setPwForm((f) => ({
+                        ...f,
+                        confirmPassword: e.target.value,
+                      }))
+                    }
                     placeholder="Repeat new password"
                   />
                   {pwErrors.confirmPassword && (
-                    <p className="text-xs text-red-500">{pwErrors.confirmPassword}</p>
+                    <p className="text-xs text-red-500">
+                      {pwErrors.confirmPassword}
+                    </p>
                   )}
                 </div>
+              </div>
+              <div className="mt-4">
                 <Button
                   onClick={handleChangePassword}
                   disabled={changePassword.isPending}
                   className="bg-[#D52B1E] hover:bg-[#B8241B] gap-2"
                 >
-                  {changePassword.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {changePassword.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
                   Update Password
                 </Button>
               </div>

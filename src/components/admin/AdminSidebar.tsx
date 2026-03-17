@@ -16,9 +16,11 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   ShieldCheck,
   Briefcase,
-} from 'lucide-react'
+} from "lucide-react";
 import { useState } from 'react'
 
 interface NavItem {

@@ -282,8 +282,15 @@ export default function AdminResearch() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="res-pdf" className="block text-xs font-medium text-slate-600 mb-1">PDF URL</label>
-              <Input id="res-pdf" value={form.pdfUrl ?? ''} onChange={(e) => setForm((f) => ({ ...f, pdfUrl: e.target.value }))} placeholder="https://…" className="h-9 text-sm" />
+              <p className="block text-xs font-medium text-slate-600 mb-1">PDF / Document</p>
+              <ImageUpload
+                id="res-pdf"
+                mode="document"
+                accept=".pdf,.doc,.docx"
+                label="Click to upload PDF"
+                value={form.pdfUrl ?? ''}
+                onChange={(url) => setForm((f) => ({ ...f, pdfUrl: url }))}
+              />
             </div>
             <div>
               <p className="block text-xs font-medium text-slate-600 mb-1">Cover Image</p>

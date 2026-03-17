@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
+import { ImageUpload } from '@/components/ui/image-upload'
 import { TableSkeleton, CardGridSkeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { exportToCsv } from '@/lib/utils'
@@ -266,8 +267,15 @@ export default function AdminData() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="ds-file" className="block text-xs font-medium text-slate-600 mb-1">File URL</label>
-              <Input id="ds-file" value={form.fileUrl ?? ''} onChange={(e) => setForm((f) => ({ ...f, fileUrl: e.target.value }))} placeholder="https://…" className="h-9 text-sm" />
+              <p className="block text-xs font-medium text-slate-600 mb-1">Dataset File</p>
+              <ImageUpload
+                id="ds-file"
+                mode="document"
+                accept=".csv,.xlsx,.xls,.json,.zip"
+                label="Click to upload dataset"
+                value={form.fileUrl ?? ''}
+                onChange={(url) => setForm((f) => ({ ...f, fileUrl: url }))}
+              />
             </div>
             <div>
               <label htmlFor="ds-format" className="block text-xs font-medium text-slate-600 mb-1">Format</label>

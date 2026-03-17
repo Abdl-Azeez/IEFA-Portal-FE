@@ -284,6 +284,17 @@ interface UpdatePlaylistDto {
 }
 
 // ─── Playlist queries / mutations ─────────────────────────────────────────────
+export const usePlaylist = (id: string) => {
+  return useQuery<Playlist>({
+    queryKey: ["playlist", id],
+    queryFn: async () => {
+      const response = await api.get(`/playlists/${id}`);
+      return response.data;
+    },
+    enabled: !!id,
+  });
+};
+
 export const usePlaylists = () => {
   return useQuery<Playlist[]>({
     queryKey: ['playlists'],
