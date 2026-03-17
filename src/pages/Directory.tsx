@@ -1447,29 +1447,36 @@ export default function Directory() {
     [sector],
   );
 
+  // Sector entries further filtered by geography — used for category counts
+  const geoSectorEntries = useMemo(() => {
+    if (geography === 'local') return sectorEntries.filter((e) => e.country === 'Nigeria');
+    if (geography === 'global') return sectorEntries.filter((e) => e.country !== 'Nigeria');
+    return sectorEntries;
+  }, [sectorEntries, geography]);
+
   const allCountries = useMemo(
     () =>
-      [...new Set(sectorEntries.map((e) => e.country))].sort((a, b) =>
+      [...new Set(geoSectorEntries.map((e) => e.country))].sort((a, b) =>
         a.localeCompare(b),
       ),
-    [sectorEntries],
+    [geoSectorEntries],
   );
 
   const allServices = useMemo(() => {
     const set = new Set<string>();
-    sectorEntries.forEach((e) => e.keyServices.forEach((s) => set.add(s)));
+    geoSectorEntries.forEach((e) => e.keyServices.forEach((s) => set.add(s)));
     return [...set].sort((a, b) => a.localeCompare(b));
-  }, [sectorEntries]);
+  }, [geoSectorEntries]);
 
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: sectorEntries.length };
-    sectorEntries.forEach((e) =>
+    const counts: Record<string, number> = { All: geoSectorEntries.length };
+    geoSectorEntries.forEach((e) =>
       e.categories.forEach((c) => {
         counts[c] = (counts[c] ?? 0) + 1;
       }),
     );
     return counts;
-  }, [sectorEntries]);
+  }, [geoSectorEntries]);
 
   const filteredEntries = useMemo(() => {
     return sectorEntries.filter((e) => {
@@ -1546,13 +1553,18 @@ export default function Directory() {
     (yearRange[0] ? 1 : 0) +
     (yearRange[1] ? 1 : 0);
 
-  const finCount = DIRECTORY_DATA.filter(
+  const geoFilteredData = geography === 'local'
+    ? DIRECTORY_DATA.filter((e) => e.country === 'Nigeria')
+    : geography === 'global'
+    ? DIRECTORY_DATA.filter((e) => e.country !== 'Nigeria')
+    : DIRECTORY_DATA;
+  const finCount = geoFilteredData.filter(
     (e) => e.sector === "financial",
   ).length;
-  const nonFinCount = DIRECTORY_DATA.filter(
+  const nonFinCount = geoFilteredData.filter(
     (e) => e.sector === "non-financial",
   ).length;
-  const countryCount = new Set(DIRECTORY_DATA.map((e) => e.country)).size;
+  const countryCount = new Set(geoFilteredData.map((e) => e.country)).size;
 
   return (
     <motion.div

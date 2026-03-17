@@ -529,7 +529,13 @@ export default function Podcast() {
                 key={cat}
                 onClick={() => {
                   setActiveCategoryFilter(cat)
-                  setActiveShowId(null)
+                  // Only deselect the active show if it won't appear in the new filter
+                  if (cat !== 'All' && activeShowId) {
+                    const activeShow = shows.find((s) => s.id === activeShowId)
+                    if (activeShow && activeShow.category !== cat) {
+                      setActiveShowId(null)
+                    }
+                  }
                 }}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 whitespace-nowrap ${
                   activeCategoryFilter === cat

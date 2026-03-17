@@ -11,6 +11,7 @@ import {
   Calculator,
   Lock,
   TrendingUp,
+  Bitcoin,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ResourceCard } from "@/components/resources/ResourceCard";
@@ -441,21 +442,21 @@ const SAMPLE_RESOURCES: ResourceItem[] = [
     displayImage: "https://picsum.photos/seed/tp7/600/400",
     authorName: "IEFA Digital Tools",
     authorType: "organization",
-    title: "Halal Crypto Screener",
+    title: "Halal Crypto Screening",
     topic: "Screener Tool",
     category: "Digital Tools",
     briefIntro:
       "A live screener tool that filters cryptocurrencies based on Shariah compliance criteria — excluding coins linked to gambling, interest-bearing protocols, and prohibited business models. Identify halal crypto assets with confidence.",
-    datePublished: "Apr 1, 2026",
+    datePublished: "Mar 17, 2026",
     previewHtml:
-      "<h2>Halal Crypto Screener</h2><p>This interactive tool allows you to screen cryptocurrencies against a Shariah compliance framework developed in consultation with Islamic finance scholars.</p><h3>Screening Criteria</h3><ul><li><strong>Business Activity:</strong> Excludes tokens linked to gambling, alcohol, adult content, or interest-based protocols.</li><li><strong>Protocol Type:</strong> Evaluates consensus mechanisms and yield structures for riba concerns.</li><li><strong>Shariah Board Certification:</strong> Highlights coins with formal Shariah board endorsements.</li><li><strong>Purification Guidance:</strong> Provides purification ratios where applicable.</li></ul><p>Use the screener to build and validate a halal crypto portfolio aligned with your ethical and religious values.</p>",
+      "<h2>Halal Crypto Screening</h2><p>This interactive tool allows you to screen cryptocurrencies against a Shariah compliance framework developed in consultation with Islamic finance scholars.</p><h3>Screening Criteria</h3><ul><li><strong>Business Activity:</strong> Excludes tokens linked to gambling, alcohol, adult content, or interest-based protocols.</li><li><strong>Protocol Type:</strong> Evaluates consensus mechanisms and yield structures for riba concerns.</li><li><strong>Shariah Board Certification:</strong> Highlights coins with formal Shariah board endorsements.</li><li><strong>Purification Guidance:</strong> Provides purification ratios where applicable.</li></ul><p>Use the screener to build and validate a halal crypto portfolio aligned with your ethical and religious values.</p><p style=\"margin-top:1.5rem\"><a href=\"/tools/halal-crypto\" style=\"display:inline-block;background:#D52B1E;color:#fff;padding:0.6rem 1.4rem;border-radius:8px;font-weight:600;text-decoration:none;\">Launch Screening Tool &rarr;</a></p>",
     previewUrl: null,
     downloadUrl: null,
     viewCount: 0,
     downloadCount: 0,
     section: "tools-practical",
     tags: ["crypto", "halal", "screener", "digital tools"],
-    createdAt: "2026-04-01",
+    createdAt: "2026-03-17",
   },
 ];
 
@@ -739,6 +740,29 @@ export default function Resources() {
                                 >
                                   <Lock className="h-3.5 w-3.5" /> Coming Soon
                                 </button>
+                              </div>
+                              {/* Halal Crypto Screener */}
+                              <div className="relative overflow-hidden rounded-xl border-2 border-dashed border-gray-200 bg-white/70 p-6 flex flex-col items-center text-center gap-3 hover:border-[#D52B1E]/40 transition-colors">
+                                <div className="h-14 w-14 rounded-2xl bg-[#D52B1E]/10 flex items-center justify-center">
+                                  <Bitcoin className="h-7 w-7 text-[#D52B1E]" />
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-gray-800 mb-1">
+                                    Halal Crypto Screener
+                                  </h3>
+                                  <p className="text-xs text-[#737692] leading-relaxed">
+                                    Filter cryptocurrencies against Shariah
+                                    compliance criteria — excluding coins linked
+                                    to gambling, interest-bearing protocols, and
+                                    prohibited business models.
+                                  </p>
+                                </div>
+                                <a
+                                  href="/tools/halal-crypto"
+                                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#D52B1E] text-white text-sm font-medium hover:bg-[#B82318] transition-colors border border-[#D52B1E]"
+                                >
+                                  Launch Screener
+                                </a>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
