@@ -10,20 +10,18 @@ import {
   PieChart,
   BookOpen,
   Lock,
-  Landmark,
-  Hash,
-  Percent,
-  Activity,
-  DollarSign,
-  Users,
-  ShoppingBag,
-  Award,
-  CheckCircle,
   Search,
   X,
+  ShoppingBag,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  CreditCard,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 
 /* ── Animation variants ─────────────────────────────────────────────────── */
 const containerVariants = {
@@ -36,16 +34,32 @@ const itemVariants = {
 };
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
-interface ScopeTag {
-  label: string;
-  premium: boolean;
-}
+type Geography = "Nigeria" | "Africa" | "Global";
+type VisualizationType =
+  | "KPI card"
+  | "Line chart"
+  | "Bar chart"
+  | "Stacked bar"
+  | "Pie chart"
+  | "Gauge"
+  | "Map"
+  | "Bubble chart"
+  | "Heat map"
+  | "Ranking table"
+  | "Trend line"
+  | "Leaderboard"
+  | "Area chart"
+  | "Timeline chart"
+  | "Table";
 
-interface MetricDef {
+interface MetricRow {
   name: string;
-  scopes: ScopeTag[];
-  icon: React.ElementType;
-  chartType: 0 | 1 | 2; // 0 = bar, 1 = line, 2 = donut
+  geography: Geography;
+  value: string;
+  year: string;
+  sourceType: string;
+  visualization: VisualizationType;
+  premium: boolean;
 }
 
 interface SectionDef {
@@ -53,15 +67,7 @@ interface SectionDef {
   title: string;
   icon: React.ElementType;
   description: string;
-  metrics: MetricDef[];
-}
-
-/* ── Scope parser: "Nigeria, Africa {P} & Global {P}" → ScopeTag[] ──────── */
-function parseScope(raw: string): ScopeTag[] {
-  return raw.split(/,\s*|\s*&\s*/).map((part) => {
-    const premium = part.includes("{P}");
-    return { label: part.replaceAll("{P}", "").trim(), premium };
-  });
+  metrics: MetricRow[];
 }
 
 /* ── Section definitions ────────────────────────────────────────────────── */
@@ -71,50 +77,29 @@ const SECTIONS: SectionDef[] = [
     title: "Market Overview",
     icon: Globe,
     description:
-      "This section provides you with a quick snapshot of the Islamic finance ecosystem at national and global levels.",
+      "A quick snapshot of the Islamic finance ecosystem at national, continental, and global levels.",
     metrics: [
-      {
-        name: "Total Islamic Finance Assets",
-        scopes: parseScope("Nigeria, Africa & Global {P}"),
-        icon: DollarSign,
-        chartType: 1,
-      },
-      {
-        name: "Growth Rate",
-        scopes: parseScope("Nigeria, Africa & Global {P}"),
-        icon: TrendingUp,
-        chartType: 1,
-      },
-      {
-        name: "Market Share vs Conventional Finance",
-        scopes: parseScope("Nigeria, Africa & Global {P}"),
-        icon: PieChart,
-        chartType: 2,
-      },
-      {
-        name: "Number of Islamic Financial Institutions",
-        scopes: parseScope("Nigeria, Africa & Global {P}"),
-        icon: Landmark,
-        chartType: 0,
-      },
-      {
-        name: "Sukuk Outstanding Value",
-        scopes: parseScope("Nigeria, Africa & Global {P}"),
-        icon: BarChart3,
-        chartType: 0,
-      },
-      {
-        name: "Takaful Contributions",
-        scopes: parseScope("Nigeria, Africa {P} & Global {P}"),
-        icon: Shield,
-        chartType: 0,
-      },
-      {
-        name: "Islamic FinTech Count",
-        scopes: parseScope("Nigeria, Africa {P} & Global {P}"),
-        icon: Hash,
-        chartType: 1,
-      },
+      { name: "Total Islamic Finance Assets", geography: "Nigeria", value: "—", year: "2024", sourceType: "Regulatory", visualization: "KPI card", premium: false },
+      { name: "Total Islamic Finance Assets", geography: "Africa", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Bar chart", premium: false },
+      { name: "Total Islamic Finance Assets", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Heat map", premium: true },
+      { name: "Growth Rate (YoY)", geography: "Nigeria", value: "—", year: "2023–2024", sourceType: "Regulatory", visualization: "Line chart", premium: false },
+      { name: "Growth Rate (YoY)", geography: "Africa", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Line chart", premium: false },
+      { name: "Growth Rate (YoY)", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Line chart", premium: true },
+      { name: "Market Share vs Conventional Finance", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Stacked bar", premium: false },
+      { name: "Market Share vs Conventional Finance", geography: "Africa", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Stacked bar", premium: false },
+      { name: "Market Share vs Conventional Finance", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Stacked bar", premium: true },
+      { name: "Number of Islamic Financial Institutions", geography: "Nigeria", value: "—", year: "2024", sourceType: "Regulatory", visualization: "KPI card", premium: false },
+      { name: "Number of Islamic Financial Institutions", geography: "Africa", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Bubble chart", premium: false },
+      { name: "Number of Islamic Financial Institutions", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Bubble chart", premium: true },
+      { name: "Sukuk Outstanding Value", geography: "Nigeria", value: "—", year: "2017–2024", sourceType: "Regulatory", visualization: "Line chart", premium: false },
+      { name: "Sukuk Outstanding Value", geography: "Africa", value: "—", year: "2023", sourceType: "Reports", visualization: "Stacked bar", premium: false },
+      { name: "Sukuk Outstanding Value", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Heat map", premium: true },
+      { name: "Takaful Contributions", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Stacked bar", premium: false },
+      { name: "Takaful Contributions", geography: "Africa", value: "—", year: "2023", sourceType: "Paid database", visualization: "Line chart", premium: true },
+      { name: "Takaful Contributions", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Bar chart", premium: true },
+      { name: "Islamic FinTech Count", geography: "Nigeria", value: "—", year: "2024", sourceType: "Research", visualization: "KPI card", premium: false },
+      { name: "Islamic FinTech Count", geography: "Africa", value: "—", year: "2024", sourceType: "Research", visualization: "Bar chart", premium: true },
+      { name: "Islamic FinTech Count", geography: "Global", value: "—", year: "2024", sourceType: "Research", visualization: "Bar chart", premium: true },
     ],
   },
   {
@@ -124,48 +109,13 @@ const SECTIONS: SectionDef[] = [
     description:
       "Track performance of full-fledged Islamic banks and Islamic banking windows.",
     metrics: [
-      {
-        name: "Total Islamic Banking Assets",
-        scopes: parseScope("Nigeria"),
-        icon: DollarSign,
-        chartType: 1,
-      },
-      {
-        name: "Total Deposits & Financing",
-        scopes: parseScope("Nigeria"),
-        icon: BarChart3,
-        chartType: 0,
-      },
-      {
-        name: "Non-Performing Financing Ratio",
-        scopes: parseScope("Nigeria"),
-        icon: Percent,
-        chartType: 1,
-      },
-      {
-        name: "Number of Licensed Banks",
-        scopes: parseScope("Nigeria"),
-        icon: Hash,
-        chartType: 0,
-      },
-      {
-        name: "Islamic Banking Assets by Country",
-        scopes: parseScope("Africa"),
-        icon: Globe,
-        chartType: 0,
-      },
-      {
-        name: "Capital Adequacy & Liquidity Ratios",
-        scopes: parseScope("Africa"),
-        icon: Activity,
-        chartType: 1,
-      },
-      {
-        name: "Number of Islamic Financial Institutions",
-        scopes: parseScope("Global {P}"),
-        icon: Landmark,
-        chartType: 2,
-      },
+      { name: "Total Islamic Banking Assets", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Line chart", premium: false },
+      { name: "Total Deposits & Financing", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Stacked bar", premium: false },
+      { name: "Non-Performing Financing Ratio", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Gauge", premium: false },
+      { name: "Number of Licensed Banks", geography: "Nigeria", value: "—", year: "2024", sourceType: "Regulatory", visualization: "KPI card", premium: false },
+      { name: "Islamic Banking Assets by Country", geography: "Africa", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Heat map", premium: false },
+      { name: "Capital Adequacy & Liquidity Ratios", geography: "Africa", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Line chart", premium: false },
+      { name: "Number of Islamic Financial Institutions", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Bubble chart", premium: true },
     ],
   },
   {
@@ -175,62 +125,11 @@ const SECTIONS: SectionDef[] = [
     description:
       "Monitor sovereign and corporate Sukuk issuance and performance.",
     metrics: [
-      {
-        name: "Sovereign Sukuk Outstanding Value",
-        scopes: parseScope("Nigeria"),
-        icon: DollarSign,
-        chartType: 0,
-      },
-      {
-        name: "Sukuk Issuance Trend",
-        scopes: parseScope("Nigeria"),
-        icon: TrendingUp,
-        chartType: 1,
-      },
-      {
-        name: "Sukuk Outstanding Value",
-        scopes: parseScope("Africa"),
-        icon: BarChart3,
-        chartType: 0,
-      },
-      {
-        name: "Sukuk Issuance by Country",
-        scopes: parseScope("Global {P}"),
-        icon: Globe,
-        chartType: 0,
-      },
-      {
-        name: "Sector Allocation / Maturity",
-        scopes: parseScope("Global {P}"),
-        icon: PieChart,
-        chartType: 2,
-      },
-    ],
-  },
-  {
-    id: "islamic-capital-market",
-    title: "Islamic Capital Market",
-    icon: BarChart3,
-    description: "Track Shariah-compliant equities, indices, and funds.",
-    metrics: [
-      {
-        name: "Shariah-Compliant Stocks Count",
-        scopes: parseScope("Global {P}"),
-        icon: Hash,
-        chartType: 0,
-      },
-      {
-        name: "Compliance Status of Stocks",
-        scopes: parseScope("Global {P}"),
-        icon: CheckCircle,
-        chartType: 2,
-      },
-      {
-        name: "Stock Prices & Historical Data",
-        scopes: parseScope("Global {P}"),
-        icon: TrendingUp,
-        chartType: 1,
-      },
+      { name: "Sovereign Sukuk Outstanding Value", geography: "Nigeria", value: "—", year: "2017–2024", sourceType: "Regulatory", visualization: "Line chart", premium: false },
+      { name: "Sukuk Issuance Trend", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Area chart", premium: false },
+      { name: "Sukuk Outstanding Value", geography: "Africa", value: "—", year: "2023", sourceType: "Reports", visualization: "Stacked bar", premium: false },
+      { name: "Sukuk Issuance by Country", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Bar chart", premium: true },
+      { name: "Sector Allocation / Maturity", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Pie chart", premium: true },
     ],
   },
   {
@@ -239,24 +138,9 @@ const SECTIONS: SectionDef[] = [
     icon: Shield,
     description: "Track the development of Islamic insurance markets.",
     metrics: [
-      {
-        name: "Total Contributions",
-        scopes: parseScope("Nigeria"),
-        icon: DollarSign,
-        chartType: 1,
-      },
-      {
-        name: "Claims Paid / Ratio",
-        scopes: parseScope("Nigeria"),
-        icon: Percent,
-        chartType: 1,
-      },
-      {
-        name: "Market Share by Operator",
-        scopes: parseScope("Nigeria"),
-        icon: PieChart,
-        chartType: 2,
-      },
+      { name: "Total Contributions", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Stacked bar", premium: false },
+      { name: "Claims Paid / Ratio", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Gauge", premium: false },
+      { name: "Market Share by Operator", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Pie chart", premium: false },
     ],
   },
   {
@@ -265,381 +149,674 @@ const SECTIONS: SectionDef[] = [
     icon: Coins,
     description: "Track access to Shariah-compliant micro financial services.",
     metrics: [
-      {
-        name: "Non-interest Microfinance Banks",
-        scopes: parseScope("Nigeria"),
-        icon: Landmark,
-        chartType: 0,
-      },
-      {
-        name: "Financial Inclusion Rate",
-        scopes: parseScope("Nigeria"),
-        icon: Users,
-        chartType: 1,
-      },
-      {
-        name: "Islamic Microfinance Institutions",
-        scopes: parseScope("Africa"),
-        icon: Globe,
-        chartType: 0,
-      },
-      {
-        name: "Islamic Microfinance Market",
-        scopes: parseScope("Global"),
-        icon: BarChart3,
-        chartType: 0,
-      },
+      { name: "Non-interest Microfinance Banks", geography: "Nigeria", value: "—", year: "2025", sourceType: "Regulatory", visualization: "Map", premium: false },
+      { name: "Financial Inclusion Rate", geography: "Nigeria", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Line chart", premium: false },
+      { name: "Islamic Microfinance Institutions", geography: "Africa", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Bar chart", premium: false },
+      { name: "Islamic Microfinance Market", geography: "Global", value: "—", year: "2022", sourceType: "Research", visualization: "KPI card", premium: false },
+    ],
+  },
+  {
+    id: "islamic-capital-market",
+    title: "Islamic Capital Market",
+    icon: BarChart3,
+    description: "Track Shariah-compliant equities, indices, and funds.",
+    metrics: [
+      { name: "Shariah-Compliant Stocks Count", geography: "Global", value: "—", year: "2024", sourceType: "API", visualization: "Bar chart", premium: true },
+      { name: "Compliance Status of Stocks", geography: "Global", value: "—", year: "2024", sourceType: "API", visualization: "Table", premium: true },
+      { name: "Stock Prices & Historical Data", geography: "Global", value: "—", year: "2024", sourceType: "API", visualization: "Line chart", premium: true },
     ],
   },
   {
     id: "halal-economy",
     title: "Halal Economy",
     icon: ShoppingBag,
-    description: "Track industries linked to Islamic finance.",
+    description: "Track industries linked to Islamic finance and the broader halal economy.",
     metrics: [
-      {
-        name: "Halal Food Market",
-        scopes: parseScope("Global"),
-        icon: ShoppingBag,
-        chartType: 0,
-      },
-      {
-        name: "Halal Pharmaceutical Market",
-        scopes: parseScope("Global"),
-        icon: Activity,
-        chartType: 1,
-      },
-      {
-        name: "Halal Economy Market",
-        scopes: parseScope("Africa"),
-        icon: Globe,
-        chartType: 2,
-      },
+      { name: "Global Halal Economy Size", geography: "Global", value: "—", year: "2023", sourceType: "Research", visualization: "KPI card", premium: false },
+      { name: "Halal Food Market", geography: "Global", value: "—", year: "2023", sourceType: "Research", visualization: "Pie chart", premium: false },
+      { name: "Halal Pharmaceutical Market", geography: "Global", value: "—", year: "2023", sourceType: "Research", visualization: "Bar chart", premium: false },
+      { name: "Halal Economy Market", geography: "Africa", value: "—", year: "2023", sourceType: "Research", visualization: "Map", premium: false },
     ],
   },
   {
     id: "research-insights",
     title: "Research & Insights",
     icon: BookOpen,
-    description: "Track research and insights linked to Islamic finance.",
+    description: "Research indicators, country rankings, and policy insights.",
     metrics: [
-      {
-        name: "Global Islamic Finance Assets",
-        scopes: parseScope("Global"),
-        icon: BarChart3,
-        chartType: 1,
-      },
-      {
-        name: "Islamic Finance Country Rankings",
-        scopes: parseScope("Global"),
-        icon: Award,
-        chartType: 0,
-      },
+      { name: "Islamic Finance Development Indicator Score", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Ranking table", premium: true },
+      { name: "Global Islamic Finance Assets", geography: "Global", value: "—", year: "2023", sourceType: "Regulatory", visualization: "Trend line", premium: false },
+      { name: "Islamic Finance Country Rankings", geography: "Global", value: "—", year: "2023", sourceType: "Paid database", visualization: "Leaderboard", premium: true },
     ],
   },
 ];
 
-/* ── Chart placeholders ─────────────────────────────────────────────────── */
-function BarChartPlaceholder({ color }: Readonly<{ color: string }>) {
-  const heights = [38, 62, 50, 80, 55, 88, 70, 45, 75, 60];
+/* ── Geography badge styles ──────────────────────────────────────────────── */
+const GEO_STYLES: Record<Geography, { bg: string; text: string; dot: string; flag: string }> = {
+  Nigeria: { bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", dot: "bg-emerald-400", flag: "🇳🇬" },
+  Africa:  { bg: "bg-blue-50 border-blue-200",    text: "text-blue-700",    dot: "bg-blue-400",    flag: "🌍" },
+  Global:  { bg: "bg-violet-50 border-violet-200",  text: "text-violet-700",  dot: "bg-violet-400",  flag: "🌐" },
+};
+
+const VIZ_ICONS: Record<string, React.ElementType> = {
+  "KPI card": BarChart3,
+  "Line chart": TrendingUp,
+  "Bar chart": BarChart3,
+  "Stacked bar": BarChart3,
+  "Pie chart": PieChart,
+  "Gauge": PieChart,
+  "Map": Globe,
+  "Bubble chart": Globe,
+  "Heat map": Globe,
+  "Ranking table": BarChart3,
+  "Trend line": TrendingUp,
+  "Leaderboard": BarChart3,
+  "Area chart": TrendingUp,
+  "Timeline chart": TrendingUp,
+  "Table": BarChart3,
+};
+
+/* ── Visualization preview placeholders ───────────────────────────────────── */
+function PreviewBarChart() {
+  const data = [
+    { label: "2019", value: 35 },
+    { label: "2020", value: 48 },
+    { label: "2021", value: 55 },
+    { label: "2022", value: 68 },
+    { label: "2023", value: 82 },
+    { label: "2024", value: 90 },
+  ];
+  const max = Math.max(...data.map((d) => d.value));
   return (
-    <div className="flex items-end gap-[3px] h-full w-full">
-      {heights.map((h, idx) => (
-        <div
-          key={`bar-${h}`}
-          className="flex-1 rounded-t-[3px] transition-all duration-500 group-hover:opacity-90"
-          style={{
-            height: `${h}%`,
-            background: `linear-gradient(to top, ${color}40, ${color}15)`,
-            transitionDelay: `${idx * 30}ms`,
-          }}
-        />
+    <div className="space-y-2">
+      <div className="flex items-end gap-3 h-40">
+        {data.map((d) => (
+          <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
+            <div
+              className="w-full rounded-t-md bg-gradient-to-t from-[#D52B1E] to-[#D52B1E]/60 transition-all duration-500"
+              style={{ height: `${(d.value / max) * 100}%` }}
+            />
+            <span className="text-[10px] text-gray-400">{d.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PreviewLineChart() {
+  return (
+    <svg className="w-full h-40" viewBox="0 0 300 120" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="preview-line-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#D52B1E" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#D52B1E" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M0,100 C30,90 50,70 80,75 C110,80 130,35 160,40 C190,45 210,20 240,25 C270,30 290,10 300,5"
+        fill="none" stroke="#D52B1E" strokeWidth="2.5" strokeLinecap="round"
+      />
+      <path
+        d="M0,100 C30,90 50,70 80,75 C110,80 130,35 160,40 C190,45 210,20 240,25 C270,30 290,10 300,5 L300,120 L0,120Z"
+        fill="url(#preview-line-grad)"
+      />
+      {[[0, 100], [80, 75], [160, 40], [240, 25], [300, 5]].map(([cx, cy]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4" fill="#D52B1E" opacity="0.7" />
+      ))}
+    </svg>
+  );
+}
+
+function PreviewPieChart() {
+  const segments = [
+    { pct: 45, color: "#D52B1E", label: "Segment A" },
+    { pct: 25, color: "#0891b2", label: "Segment B" },
+    { pct: 18, color: "#7c3aed", label: "Segment C" },
+    { pct: 12, color: "#059669", label: "Segment D" },
+  ];
+  let cumulative = 0;
+  return (
+    <div className="flex items-center gap-6">
+      <svg width="140" height="140" viewBox="0 0 140 140">
+        {segments.map((seg) => {
+          const start = cumulative;
+          cumulative += seg.pct;
+          const startAngle = (start / 100) * 360 - 90;
+          const endAngle = (cumulative / 100) * 360 - 90;
+          const largeArc = seg.pct > 50 ? 1 : 0;
+          const r = 55;
+          const cx = 70, cy = 70;
+          const x1 = cx + r * Math.cos((startAngle * Math.PI) / 180);
+          const y1 = cy + r * Math.sin((startAngle * Math.PI) / 180);
+          const x2 = cx + r * Math.cos((endAngle * Math.PI) / 180);
+          const y2 = cy + r * Math.sin((endAngle * Math.PI) / 180);
+          return (
+            <path
+              key={seg.label}
+              d={`M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`}
+              fill={seg.color} opacity="0.75"
+            />
+          );
+        })}
+        <circle cx="70" cy="70" r="30" fill="white" />
+      </svg>
+      <div className="space-y-1.5">
+        {segments.map((seg) => (
+          <div key={seg.label} className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
+            {seg.label} ({seg.pct}%)
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PreviewStackedBar() {
+  const rows = [
+    { label: "2021", a: 60, b: 40 },
+    { label: "2022", a: 55, b: 45 },
+    { label: "2023", a: 48, b: 52 },
+    { label: "2024", a: 42, b: 58 },
+  ];
+  return (
+    <div className="space-y-2.5">
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">{r.label}</span>
+          <div className="flex-1 flex h-6 rounded-md overflow-hidden">
+            <div className="bg-[#D52B1E]/70 transition-all" style={{ width: `${r.a}%` }} />
+            <div className="bg-blue-400/70 transition-all" style={{ width: `${r.b}%` }} />
+          </div>
+        </div>
+      ))}
+      <div className="flex items-center gap-4 pt-1">
+        <span className="flex items-center gap-1.5 text-[10px] text-gray-500"><span className="w-2 h-2 rounded-sm bg-[#D52B1E]/70" /> Conventional</span>
+        <span className="flex items-center gap-1.5 text-[10px] text-gray-500"><span className="w-2 h-2 rounded-sm bg-blue-400/70" /> Islamic</span>
+      </div>
+    </div>
+  );
+}
+
+function PreviewKPI() {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {[
+        { label: "Total Value", value: "—", sub: "Awaiting data" },
+        { label: "YoY Growth", value: "—", sub: "Awaiting data" },
+        { label: "Market Share", value: "—", sub: "Awaiting data" },
+        { label: "Institutions", value: "—", sub: "Awaiting data" },
+      ].map((kpi) => (
+        <div key={kpi.label} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
+          <p className="text-2xl font-bold text-gray-300">{kpi.value}</p>
+          <p className="text-xs font-medium text-gray-700 mt-1">{kpi.label}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{kpi.sub}</p>
+        </div>
       ))}
     </div>
   );
 }
 
-function LineChartPlaceholder({ color }: Readonly<{ color: string }>) {
-  const gradId = `lg-${color.replaceAll("#", "")}`;
+function PreviewMap() {
   return (
-    <svg
-      className="w-full h-full"
-      viewBox="0 0 160 64"
-      preserveAspectRatio="none"
-    >
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M0,52 C12,48 24,38 36,42 C48,46 56,18 72,22 C88,26 96,12 112,15 C128,18 140,8 160,4"
-        fill="none"
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.55"
-      />
-      <path
-        d="M0,52 C12,48 24,38 36,42 C48,46 56,18 72,22 C88,26 96,12 112,15 C128,18 140,8 160,4 L160,64 L0,64Z"
-        fill={`url(#${gradId})`}
-      />
-      <circle cx="160" cy="4" r="3" fill={color} opacity="0.7" />
-    </svg>
+    <div className="flex flex-col items-center justify-center h-40 bg-gray-50 rounded-xl border border-gray-100">
+      <Globe className="h-12 w-12 text-gray-200 mb-2" />
+      <p className="text-sm text-gray-400 font-medium">Interactive Map</p>
+      <p className="text-[10px] text-gray-300 mt-0.5">Geographic data visualization</p>
+    </div>
   );
 }
 
-function DonutChartPlaceholder({ color }: Readonly<{ color: string }>) {
+function PreviewGauge() {
   return (
-    <div className="flex justify-center items-center h-full">
-      <svg width="72" height="72" viewBox="0 0 72 72">
-        <circle
-          cx="36"
-          cy="36"
-          r="26"
-          fill="none"
-          stroke="#f3f4f6"
-          strokeWidth="7"
-        />
-        <circle
-          cx="36"
-          cy="36"
-          r="26"
-          fill="none"
-          stroke={color}
-          strokeWidth="7"
-          strokeDasharray="95 68"
-          strokeDashoffset="12"
-          strokeLinecap="round"
-          opacity="0.55"
-        />
-        <circle
-          cx="36"
-          cy="36"
-          r="26"
-          fill="none"
-          stroke={color}
-          strokeWidth="7"
-          strokeDasharray="32 131"
-          strokeDashoffset="-83"
-          strokeLinecap="round"
-          opacity="0.28"
-        />
-        <text
-          x="36"
-          y="38"
-          textAnchor="middle"
-          fontSize="11"
-          fontWeight="700"
-          fill={color}
-          opacity="0.65"
-        >
-          —
-        </text>
+    <div className="flex justify-center items-center py-4">
+      <svg width="180" height="100" viewBox="0 0 180 100">
+        <path d="M20,90 A70,70 0 0,1 160,90" fill="none" stroke="#f3f4f6" strokeWidth="14" strokeLinecap="round" />
+        <path d="M20,90 A70,70 0 0,1 110,23" fill="none" stroke="#D52B1E" strokeWidth="14" strokeLinecap="round" opacity="0.6" />
+        <text x="90" y="80" textAnchor="middle" fontSize="20" fontWeight="700" fill="#374151">—</text>
+        <text x="90" y="95" textAnchor="middle" fontSize="9" fill="#9ca3af">Awaiting data</text>
       </svg>
     </div>
   );
 }
 
-/* ── Scope styles ────────────────────────────────────────────────────────── */
-const SCOPE_STYLES: Record<
-  string,
-  { bg: string; text: string; border: string; dot: string }
-> = {
-  Nigeria: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-    border: "border-emerald-200",
-    dot: "bg-emerald-400",
-  },
-  Africa: {
-    bg: "bg-blue-50",
-    text: "text-blue-700",
-    border: "border-blue-200",
-    dot: "bg-blue-400",
-  },
-  Global: {
-    bg: "bg-violet-50",
-    text: "text-violet-700",
-    border: "border-violet-200",
-    dot: "bg-violet-400",
-  },
-};
+function PreviewTable() {
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <table className="w-full text-xs">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-3 py-2 text-left text-gray-500 font-semibold">Rank</th>
+            <th className="px-3 py-2 text-left text-gray-500 font-semibold">Country</th>
+            <th className="px-3 py-2 text-right text-gray-500 font-semibold">Score</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {[1, 2, 3, 4, 5].map((rank) => (
+            <tr key={rank} className="hover:bg-gray-50/50">
+              <td className="px-3 py-2 text-gray-400">#{rank}</td>
+              <td className="px-3 py-2"><span className="bg-gray-100 rounded h-3 w-24 inline-block" /></td>
+              <td className="px-3 py-2 text-right text-gray-300">—</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-const CHART_COLORS = [
-  "#D52B1E",
-  "#0891b2",
-  "#7c3aed",
-  "#059669",
-  "#d97706",
-  "#dc2626",
-  "#2563eb",
-  "#9333ea",
-  "#047857",
-  "#b45309",
-];
+function getVisualizationPreview(type: VisualizationType) {
+  switch (type) {
+    case "Bar chart": return <PreviewBarChart />;
+    case "Line chart": case "Trend line": case "Area chart": case "Timeline chart": return <PreviewLineChart />;
+    case "Pie chart": return <PreviewPieChart />;
+    case "Stacked bar": return <PreviewStackedBar />;
+    case "KPI card": return <PreviewKPI />;
+    case "Map": case "Heat map": case "Bubble chart": return <PreviewMap />;
+    case "Gauge": return <PreviewGauge />;
+    case "Ranking table": case "Leaderboard": case "Table": return <PreviewTable />;
+    default: return <PreviewBarChart />;
+  }
+}
 
-const CHART_TYPE_LABELS: Record<number, string> = {
-  0: "Distribution",
-  1: "Trend",
-  2: "Composition",
-};
-
-const SCOPE_DOT_COLORS: Record<string, string> = {
-  Nigeria: "#10b981",
-  Africa: "#3b82f6",
-  Global: "#8b5cf6",
-};
-
-/* ── Metric card ─────────────────────────────────────────────────────────── */
-function MetricCard({
+/* ── Preview modal ───────────────────────────────────────────────────────── */
+function MetricPreviewModal({
   metric,
-  index,
-  sectionColor,
-}: Readonly<{ metric: MetricDef; index: number; sectionColor: string }>) {
-  const anyPremium = metric.scopes.some((s) => s.premium);
-  const allPremium = metric.scopes.every((s) => s.premium);
-  const IconComp = metric.icon;
-  const chartColor = anyPremium ? "#d97706" : sectionColor;
+  open,
+  onClose,
+}: Readonly<{ metric: MetricRow | null; open: boolean; onClose: () => void }>) {
+  if (!metric) return null;
+  const geo = GEO_STYLES[metric.geography];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{
-        duration: 0.4,
-        delay: index * 0.07,
-        ease: [0.25, 0.46, 0.45, 0.94],
-      }}
-      className={`group relative rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 flex flex-col ${
-        anyPremium
-          ? "bg-gradient-to-br from-amber-50/80 via-white to-orange-50/40 border border-amber-200/60 hover:shadow-[0_8px_30px_-8px_rgba(217,119,6,0.18)] hover:border-amber-300/80"
-          : "bg-white border border-gray-200/80 hover:shadow-[0_8px_30px_-8px_rgba(213,43,30,0.12)] hover:border-gray-300"
-      }`}
-    >
-      {/* Background decorative elements */}
-      <div
-        className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-[0.04] group-hover:opacity-[0.08] transition-opacity duration-500"
-        style={{ backgroundColor: chartColor }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-6 -left-6 w-20 h-20 rounded-full opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-500"
-        style={{ backgroundColor: chartColor }}
-      />
-
-      {/* ── Top section: icon badge + metric name ── */}
-      <div className="relative px-5 pt-5 pb-3 flex items-start gap-3">
-        {/* Floating icon with glow */}
-        <div className="relative">
-          <div
-            className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-105"
-            style={{
-              background: anyPremium
-                ? "linear-gradient(135deg, #fef3c7, #fde68a)"
-                : `linear-gradient(135deg, ${chartColor}15, ${chartColor}25)`,
-            }}
-          >
-            <IconComp
-              className="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
-              style={{ color: anyPremium ? "#b45309" : chartColor }}
-            />
+    <Dialog open={open} onClose={onClose} title="" maxWidth="max-w-2xl">
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">{metric.name}</h2>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${geo.bg} ${geo.text}`}>
+                {geo.flag} {metric.geography}
+              </span>
+              <span className="text-xs text-gray-400">{metric.year}</span>
+              <span className="text-xs text-gray-400">•</span>
+              <span className="text-xs text-gray-500">{metric.sourceType}</span>
+            </div>
           </div>
-          {/* Live pulse dot */}
-          <span
-            className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white"
-            style={{
-              backgroundColor: anyPremium ? "#f59e0b" : "#22c55e",
-            }}
-          />
+          {metric.premium ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+              <Lock className="w-2.5 h-2.5" /> Premium
+            </span>
+          ) : (
+            <span className="inline-flex items-center text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+              Free
+            </span>
+          )}
         </div>
 
-        <div className="flex-1 min-w-0 pt-0.5">
-          <h3 className="text-[13px] font-bold text-gray-800 leading-tight line-clamp-2">
-            {metric.name}
-          </h3>
-          {/* Scope mini-tags inline */}
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {metric.scopes.map((scope) => {
-              const style = SCOPE_STYLES[scope.label] || SCOPE_STYLES.Global;
-              return (
-                <span
-                  key={scope.label}
-                  className={`inline-flex items-center gap-1 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-[1px] rounded-md border ${
-                    scope.premium
-                      ? "bg-amber-50 text-amber-600 border-amber-200/80"
-                      : `${style.bg} ${style.text} ${style.border}`
-                  }`}
-                >
-                  {scope.premium ? (
-                    <Lock className="w-[7px] h-[7px]" />
-                  ) : (
-                    <span className={`w-1 h-1 rounded-full ${style.dot}`} />
-                  )}
-                  {scope.label}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Premium / Free indicator */}
-        {allPremium && (
-          <span className="absolute top-3 right-3 flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[8px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-full shadow-sm">
-            <Lock className="w-2 h-2" /> Pro
+        {/* Visualization type badge */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Visualization type:</span>
+          <span className="inline-flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+            {metric.visualization}
           </span>
+        </div>
+
+        {/* Preview area */}
+        {metric.premium ? (
+          <div className="relative rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50/50 to-orange-50/30 p-8">
+            <div className="absolute inset-0 backdrop-blur-[2px] rounded-xl flex flex-col items-center justify-center gap-3 z-10">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 rounded-full shadow-lg">
+                <Lock className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-bold text-gray-800">Premium Data</p>
+              <p className="text-xs text-gray-500 text-center max-w-xs">
+                This metric requires a premium subscription. Upgrade your plan to access the full visualization and data.
+              </p>
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full gap-1.5 mt-1 shadow-md"
+              >
+                <CreditCard className="w-3.5 h-3.5" /> Upgrade to Premium
+              </Button>
+            </div>
+            {/* Blurred preview behind the overlay */}
+            <div className="opacity-20 blur-sm pointer-events-none">
+              {getVisualizationPreview(metric.visualization)}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white p-6">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Preview — {metric.visualization}
+              </span>
+              <span className="text-[10px] text-gray-300 italic">Sample visualization</span>
+            </div>
+            {getVisualizationPreview(metric.visualization)}
+            <p className="text-[10px] text-gray-400 mt-4 text-center italic">
+              Actual data will be displayed once available from the backend.
+            </p>
+          </div>
         )}
       </div>
+    </Dialog>
+  );
+}
 
-      {/* ── Chart area ── */}
-      <div className="relative px-5 pb-1 flex-1 min-h-[80px]">
-        <div className="h-[72px] relative">
-          {metric.chartType === 0 && <BarChartPlaceholder color={chartColor} />}
-          {metric.chartType === 1 && (
-            <LineChartPlaceholder color={chartColor} />
-          )}
-          {metric.chartType === 2 && (
-            <DonutChartPlaceholder color={chartColor} />
-          )}
+/* ── Metric table row component ──────────────────────────────────────────── */
+function MetricTableRow({
+  metric,
+  index,
+  onPreview,
+}: Readonly<{ metric: MetricRow; index: number; onPreview: (m: MetricRow) => void }>) {
+  const geo = GEO_STYLES[metric.geography];
+  const VizIcon = VIZ_ICONS[metric.visualization] || BarChart3;
 
-          {/* Glass overlay with status */}
-          <div className="absolute inset-0 rounded-lg flex items-center justify-center bg-white/40 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            {anyPremium && (
-              <span className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold px-3.5 py-1.5 rounded-full shadow-lg">
-                <Lock className="w-3 h-3" /> Unlock with Premium
-              </span>
-            )}
-            {!anyPremium && (
-              <span className="flex items-center gap-1.5 bg-gray-900 text-white text-[10px] font-bold px-3.5 py-1.5 rounded-full shadow-lg">
-                <Activity className="w-3 h-3" /> Coming Soon
-              </span>
-            )}
-          </div>
+  return (
+    <motion.tr
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.25, delay: index * 0.03 }}
+      className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-150 cursor-pointer ${
+        metric.premium
+          ? "bg-amber-50/30 hover:bg-amber-50/60"
+          : "hover:bg-gray-50/80"
+      }`}
+      onClick={() => onPreview(metric)}
+    >
+      {/* S/N */}
+      <td className="py-3.5 px-4 text-xs text-gray-400 font-medium tabular-nums w-12">
+        {index + 1}
+      </td>
+
+      {/* Metric Name */}
+      <td className="py-3.5 px-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-800 leading-snug">
+            {metric.name}
+          </span>
+          {metric.premium && (
+            <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-[2px] rounded-full shrink-0">
+              <Lock className="w-2 h-2" /> Pro
+            </span>
+          )}
         </div>
-      </div>
+      </td>
 
-      {/* ── Bottom bar: type label + visual indicator ── */}
-      <div className="px-5 pb-4 pt-2 flex items-center justify-between">
-        <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
-          {CHART_TYPE_LABELS[metric.chartType]}
+      {/* Geography */}
+      <td className="py-3.5 px-4">
+        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${geo.bg} ${geo.text}`}>
+          <span>{geo.flag}</span>
+          {metric.geography}
         </span>
-        <div className="flex items-center gap-1">
-          {metric.scopes.map((scope) => {
-            const dotColor = scope.premium
-              ? "#f59e0b"
-              : SCOPE_DOT_COLORS[scope.label] || "#8b5cf6";
-            return (
-              <span
-                key={scope.label}
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: dotColor }}
-              />
-            );
-          })}
+      </td>
+
+      {/* Value */}
+      <td className="py-3.5 px-4">
+        <span className={`text-sm tabular-nums ${
+          metric.value === "—"
+            ? "text-gray-300 italic"
+            : "font-semibold text-gray-800"
+        }`}>
+          {metric.premium && metric.value === "—" ? (
+            <span className="inline-flex items-center gap-1 text-amber-400">
+              <Lock className="w-3 h-3" /> Locked
+            </span>
+          ) : (
+            metric.value
+          )}
+        </span>
+      </td>
+
+      {/* Year */}
+      <td className="py-3.5 px-4 text-sm text-gray-500 tabular-nums whitespace-nowrap">
+        {metric.year}
+      </td>
+
+      {/* Source Type */}
+      <td className="py-3.5 px-4">
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md border ${
+          metric.sourceType === "Regulatory"
+            ? "bg-green-50 text-green-700 border-green-200"
+            : metric.sourceType === "Paid database" || metric.sourceType === "API"
+            ? "bg-amber-50 text-amber-700 border-amber-200"
+            : metric.sourceType === "Research"
+            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+            : "bg-gray-50 text-gray-600 border-gray-200"
+        }`}>
+          {metric.sourceType}
+        </span>
+      </td>
+
+      {/* Visualization */}
+      <td className="py-3.5 px-4">
+        <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+          <VizIcon className="w-3.5 h-3.5 text-gray-400" />
+          {metric.visualization}
+        </span>
+      </td>
+
+      {/* Access */}
+      <td className="py-3.5 px-4">
+        <div className="flex items-center gap-2">
+          {metric.premium ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              <Lock className="w-2.5 h-2.5" /> Paid
+            </span>
+          ) : (
+            <span className="inline-flex items-center text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              Free
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onPreview(metric); }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-[#D52B1E]"
+            title="Preview visualization"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
         </div>
+      </td>
+    </motion.tr>
+  );
+}
+
+/* ── Section summary stats ───────────────────────────────────────────────── */
+function SectionSummary({ metrics }: Readonly<{ metrics: MetricRow[] }>) {
+  const freeCount = metrics.filter((m) => !m.premium).length;
+  const paidCount = metrics.filter((m) => m.premium).length;
+  const geos = [...new Set(metrics.map((m) => m.geography))];
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 mb-4">
+      <span className="text-xs text-gray-500">
+        <span className="font-semibold text-gray-700">{metrics.length}</span> metrics
+      </span>
+      <span className="w-px h-3.5 bg-gray-200" />
+      <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        {freeCount} free
+      </span>
+      {paidCount > 0 && (
+        <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+          <Lock className="w-2.5 h-2.5" />
+          {paidCount} premium
+        </span>
+      )}
+      <span className="w-px h-3.5 bg-gray-200" />
+      {geos.map((g) => {
+        const style = GEO_STYLES[g];
+        return (
+          <span key={g} className="inline-flex items-center gap-1 text-xs text-gray-500">
+            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+            {g}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Data table component ────────────────────────────────────────────────── */
+function DataTable({
+  metrics,
+}: Readonly<{ metrics: MetricRow[] }>) {
+  const [sortField, setSortField] = useState<"name" | "geography" | "year" | "premium" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [geoFilter, setGeoFilter] = useState<Geography | "all">("all");
+  const [previewMetric, setPreviewMetric] = useState<MetricRow | null>(null);
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let result = [...metrics];
+    if (geoFilter !== "all") {
+      result = result.filter((m) => m.geography === geoFilter);
+    }
+    if (sortField) {
+      result.sort((a, b) => {
+        const valA = String(a[sortField]);
+        const valB = String(b[sortField]);
+        return sortDir === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      });
+    }
+    return result;
+  }, [metrics, geoFilter, sortField, sortDir]);
+
+  const geos = [...new Set(metrics.map((m) => m.geography))];
+  const SortIcon = sortDir === "asc" ? ChevronUp : ChevronDown;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+        <span className="text-xs text-gray-400 font-medium mr-1">Filter:</span>
+        <button
+          type="button"
+          onClick={() => setGeoFilter("all")}
+          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+            geoFilter === "all"
+              ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+              : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+          }`}
+        >
+          All
+        </button>
+        {geos.map((g) => {
+          const style = GEO_STYLES[g];
+          return (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGeoFilter(g)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors inline-flex items-center gap-1 ${
+                geoFilter === g
+                  ? `${style.bg} ${style.text} font-semibold`
+                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              {style.flag} {g}
+            </button>
+          );
+        })}
+        <span className="ml-auto text-[11px] text-gray-400">
+          {filtered.length} of {metrics.length} rows
+        </span>
       </div>
-    </motion.div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50/80">
+              <th className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-12">
+                #
+              </th>
+              <th
+                className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                onClick={() => handleSort("name")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Metric
+                  {sortField === "name" && <SortIcon className="w-3 h-3" />}
+                </span>
+              </th>
+              <th
+                className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                onClick={() => handleSort("geography")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Geography
+                  {sortField === "geography" && <SortIcon className="w-3 h-3" />}
+                </span>
+              </th>
+              <th className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                Value
+              </th>
+              <th
+                className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                onClick={() => handleSort("year")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Year
+                  {sortField === "year" && <SortIcon className="w-3 h-3" />}
+                </span>
+              </th>
+              <th className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                Source
+              </th>
+              <th className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                Visualization
+              </th>
+              <th
+                className="py-3 px-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                onClick={() => handleSort("premium")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Access
+                  {sortField === "premium" && <SortIcon className="w-3 h-3" />}
+                </span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((metric, idx) => (
+              <MetricTableRow
+                key={`${metric.name}-${metric.geography}`}
+                metric={metric}
+                index={idx}
+                onPreview={setPreviewMetric}
+              />
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-12 text-center">
+                  <p className="text-sm text-gray-400">No metrics match the current filter.</p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Preview modal */}
+      <MetricPreviewModal
+        metric={previewMetric}
+        open={previewMetric !== null}
+        onClose={() => setPreviewMetric(null)}
+      />
+    </div>
   );
 }
 
@@ -652,6 +829,9 @@ export default function Data() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  const totalMetrics = SECTIONS.reduce((sum, s) => sum + s.metrics.length, 0);
+  const totalFree = SECTIONS.reduce((sum, s) => sum + s.metrics.filter((m) => !m.premium).length, 0);
+
   // Global search across all sections
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -662,7 +842,9 @@ export default function Data() {
         (m) =>
           m.name.toLowerCase().includes(q) ||
           section.title.toLowerCase().includes(q) ||
-          m.scopes.some((s) => s.label.toLowerCase().includes(q)),
+          m.geography.toLowerCase().includes(q) ||
+          m.sourceType.toLowerCase().includes(q) ||
+          m.visualization.toLowerCase().includes(q),
       ),
     })).filter((r) => r.matches.length > 0);
   }, [search]);
@@ -722,12 +904,16 @@ export default function Data() {
             {/* Stats */}
             <div className="flex md:flex-col gap-3 shrink-0">
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-white">8</p>
+                <p className="text-2xl font-bold text-white">{SECTIONS.length}</p>
                 <p className="text-xs text-gray-500">Sections</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-[#D52B1E]">34</p>
+                <p className="text-2xl font-bold text-[#D52B1E]">{totalMetrics}</p>
                 <p className="text-xs text-gray-500">Metrics</p>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
+                <p className="text-2xl font-bold text-emerald-400">{totalFree}</p>
+                <p className="text-xs text-gray-500">Free</p>
               </div>
             </div>
           </div>
@@ -761,7 +947,7 @@ export default function Data() {
         </div>
       </motion.div>
 
-      {/* ── Search Results (cross-section) ──────────────────────────── */}
+      {/* ── Search Results (cross-section tables) ────────────────────── */}
       {searchResults ? (
         <motion.div
           variants={itemVariants}
@@ -801,23 +987,14 @@ export default function Data() {
             </div>
           )}
 
-          {/* Grouped results */}
+          {/* Grouped results as tables */}
           {searchResults.map(({ section, matches }) => {
             const SectionIcon = section.icon;
-            const sectionColor =
-              CHART_COLORS[SECTIONS.indexOf(section) % CHART_COLORS.length];
             return (
               <div key={section.id}>
-                {/* Section header */}
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div
-                    className="h-8 w-8 rounded-lg flex items-center justify-center"
-                    style={{ background: `${sectionColor}15` }}
-                  >
-                    <SectionIcon
-                      className="h-4 w-4"
-                      style={{ color: sectionColor }}
-                    />
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#D52B1E]/10">
+                    <SectionIcon className="h-4 w-4 text-[#D52B1E]" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-gray-800">
@@ -828,18 +1005,7 @@ export default function Data() {
                     </p>
                   </div>
                 </div>
-
-                {/* Matched metric cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {matches.map((metric, idx) => (
-                    <MetricCard
-                      key={metric.name}
-                      metric={metric}
-                      index={idx}
-                      sectionColor={sectionColor}
-                    />
-                  ))}
-                </div>
+                <DataTable metrics={matches} />
               </div>
             );
           })}
@@ -848,7 +1014,7 @@ export default function Data() {
         /* ── Tab Navigation (default, no search) ────────────────────── */
         <motion.div variants={itemVariants}>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {/* Arrow-shaped tabs — matches Resources page */}
+            {/* Arrow-shaped tabs */}
             <TabsList className="flex flex-nowrap overflow-x-auto scrollbar-hide w-full justify-start bg-transparent border-0 rounded-none p-0 h-auto shadow-none">
               {SECTIONS.map((section, idx) => {
                 const Icon = section.icon;
@@ -888,27 +1054,17 @@ export default function Data() {
                     transition={{ duration: 0.3 }}
                   >
                     {/* Section description */}
-                    <div className="bg-gradient-to-r from-[#D52B1E]/5 via-[#D52B1E]/3 to-transparent rounded-xl p-4 mb-6 border-l-4 border-[#D52B1E]">
+                    <div className="bg-gradient-to-r from-[#D52B1E]/5 via-[#D52B1E]/3 to-transparent rounded-xl p-4 mb-5 border-l-4 border-[#D52B1E]">
                       <p className="text-sm text-[#737692]">
                         {section.description}
                       </p>
                     </div>
 
-                    {/* Metrics grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {section.metrics.map((metric, idx) => (
-                        <MetricCard
-                          key={metric.name}
-                          metric={metric}
-                          index={idx}
-                          sectionColor={
-                            CHART_COLORS[
-                              SECTIONS.indexOf(section) % CHART_COLORS.length
-                            ]
-                          }
-                        />
-                      ))}
-                    </div>
+                    {/* Summary stats */}
+                    <SectionSummary metrics={section.metrics} />
+
+                    {/* Data table */}
+                    <DataTable metrics={section.metrics} />
                   </motion.div>
                 </AnimatePresence>
               </TabsContent>

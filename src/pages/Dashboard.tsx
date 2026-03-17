@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { TrendingUp, ChevronUp, Play, Clock, BookOpen, ChevronRight } from 'lucide-react'
+import { TrendingUp, ChevronUp, Play, Clock, BookOpen, ChevronRight, Calculator, Coins, Wrench } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
@@ -525,6 +525,88 @@ export function Dashboard() {
           </Card>
         </motion.div>
       </div>
+
+      {/* IEFA Tools Section */}
+      <motion.div variants={itemVariants}>
+        <Card className="overflow-hidden bg-white shadow-sm border-0">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center">
+                  <Wrench className="h-4 w-4 text-[#D52B1E]" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-semibold text-[#000000]">
+                    IEFA Tools
+                  </CardTitle>
+                  <p className="text-xs text-[#737692] mt-0.5">
+                    Islamic finance calculators and screeners
+                  </p>
+                </div>
+              </div>
+              <motion.button
+                className="text-sm text-[#D52B1E] font-medium flex items-center gap-1 hover:underline"
+                whileHover={{ x: 3 }}
+                onClick={() => navigate('/tools/zakat')}
+              >
+                Open Tools <ChevronRight className="h-4 w-4" />
+              </motion.button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                {
+                  title: 'Zakat Calculator',
+                  description: 'Calculate your annual Zakat accurately based on gold, savings, livestock and trade goods.',
+                  icon: Calculator,
+                  href: '/tools/zakat',
+                  color: 'from-emerald-50 to-teal-50',
+                  iconColor: 'text-emerald-600',
+                  iconBg: 'bg-emerald-100',
+                },
+                {
+                  title: 'Halal Stock Screening',
+                  description: 'Screen stocks for Shariah compliance using AAOIFI and other recognized standards.',
+                  icon: TrendingUp,
+                  href: '/tools/halal-stocks',
+                  color: 'from-blue-50 to-indigo-50',
+                  iconColor: 'text-blue-600',
+                  iconBg: 'bg-blue-100',
+                },
+                {
+                  title: 'Halal Crypto Screening',
+                  description: 'Identify Shariah-screened digital assets and halal DeFi protocols.',
+                  icon: Coins,
+                  href: '/tools/halal-crypto',
+                  color: 'from-purple-50 to-violet-50',
+                  iconColor: 'text-purple-600',
+                  iconBg: 'bg-purple-100',
+                },
+              ].map((tool, index) => (
+                <motion.div
+                  key={tool.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + index * 0.1 }}
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  className={`group cursor-pointer rounded-2xl bg-gradient-to-br ${tool.color} p-5 border border-transparent hover:border-[#D52B1E]/20 transition-all duration-200`}
+                  onClick={() => navigate(tool.href)}
+                >
+                  <div className={`w-10 h-10 rounded-xl ${tool.iconBg} flex items-center justify-center mb-3`}>
+                    <tool.icon className={`h-5 w-5 ${tool.iconColor}`} />
+                  </div>
+                  <h3 className="text-sm font-semibold text-[#000000] mb-1.5">{tool.title}</h3>
+                  <p className="text-xs text-[#737692] leading-relaxed mb-3 line-clamp-3">{tool.description}</p>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-[#D52B1E] group-hover:underline">
+                    Open tool <ChevronRight className="h-3 w-3" />
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </motion.div>
   );
 }

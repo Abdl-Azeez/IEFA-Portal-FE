@@ -219,6 +219,55 @@ function fmtDate(iso?: string) {
   });
 }
 
+/* ── Coming-soon placeholder for non-global market tabs ─────────────────── */
+function MarketComingSoon({
+  market,
+  description,
+  icon,
+  comingSoon,
+}: {
+  market: string;
+  description: string;
+  icon: React.ReactNode;
+  comingSoon?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="flex flex-col items-center justify-center py-24 text-center"
+    >
+      <div className="mb-6 flex items-center justify-center w-24 h-24 rounded-3xl bg-[#D52B1E]/5 border border-[#D52B1E]/10">
+        {icon}
+      </div>
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="text-2xl font-bold text-[#000000]">{market}</h2>
+        {comingSoon && (
+          <Badge className="bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold">
+            Coming Soon
+          </Badge>
+        )}
+      </div>
+      <p className="text-[#737692] max-w-md leading-relaxed mb-6">
+        {description}
+      </p>
+      {!comingSoon && (
+        <div className="flex items-center gap-2 text-sm text-[#D52B1E] font-medium bg-[#D52B1E]/5 border border-[#D52B1E]/20 rounded-full px-5 py-2">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          Data integration in progress
+        </div>
+      )}
+      {comingSoon && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-full px-5 py-2">
+          <Clock className="h-3.5 w-3.5" />
+          This market view is coming soon
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export function MarketInsights() {
   const {
     data: dashboard,
@@ -507,8 +556,47 @@ export function MarketInsights() {
         </div>
       </motion.div>
 
-      {/* Market Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Market Tabs */}
+      <Tabs defaultValue="global" className="space-y-6">
+        <TabsList className="bg-white border border-gray-100 rounded-xl p-1.5 h-auto shadow-sm flex flex-wrap gap-1">
+          <TabsTrigger
+            value="global"
+            className="rounded-xl px-4 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm text-[#737692] hover:text-gray-800 transition-all"
+          >
+            Global Market
+          </TabsTrigger>
+          <TabsTrigger
+            value="ngx"
+            className="rounded-xl px-4 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm text-[#737692] hover:text-gray-800 transition-all"
+          >
+            NGX Market
+          </TabsTrigger>
+          <TabsTrigger
+            value="ngx-islamic"
+            className="rounded-xl px-4 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm text-[#737692] hover:text-gray-800 transition-all"
+          >
+            NGX Islamic
+          </TabsTrigger>
+          <TabsTrigger
+            value="crypto"
+            className="rounded-xl px-4 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm text-[#737692] hover:text-gray-800 transition-all"
+          >
+            Crypto Market
+          </TabsTrigger>
+          <TabsTrigger
+            value="halal-crypto"
+            className="rounded-xl px-4 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm text-[#737692] hover:text-gray-800 transition-all flex items-center gap-1.5"
+          >
+            Halal Crypto
+            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full leading-none">
+              Soon
+            </span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="global" className="space-y-6 mt-0">
+          {/* Market Overview Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {marketOverview.map((market, index) => (
           <MarketCard key={market.title} {...market} delay={index * 0.1} />
         ))}
@@ -989,6 +1077,45 @@ export function MarketInsights() {
           </Card>
         </motion.div>
       )}
+        </TabsContent>
+
+        {/* NGX Market Tab */}
+        <TabsContent value="ngx" className="mt-0">
+          <MarketComingSoon
+            market="NGX Market"
+            description="Nigerian Exchange Group (NGX) market data, Shariah-screened equity listings, and Islamic investment vehicles on the Nigerian capital market."
+            icon={<Building2 className="h-12 w-12 text-[#D52B1E]/40" />}
+          />
+        </TabsContent>
+
+        {/* NGX Islamic Tab */}
+        <TabsContent value="ngx-islamic" className="mt-0">
+          <MarketComingSoon
+            market="NGX Islamic Index"
+            description="Track the NGX Lotus Islamic Index (LII) — a benchmark of Shariah-compliant equities listed on the Nigerian Exchange."
+            icon={<BarChart3 className="h-12 w-12 text-[#D52B1E]/40" />}
+          />
+        </TabsContent>
+
+        {/* Crypto Market Tab */}
+        <TabsContent value="crypto" className="mt-0">
+          <MarketComingSoon
+            market="Crypto Market"
+            description="Global cryptocurrency market overview — top assets by market cap, trending coins, and digital asset analytics."
+            icon={<Activity className="h-12 w-12 text-[#D52B1E]/40" />}
+          />
+        </TabsContent>
+
+        {/* Halal Crypto Tab */}
+        <TabsContent value="halal-crypto" className="mt-0">
+          <MarketComingSoon
+            market="Halal Crypto Market"
+            description="Shariah-screened digital assets, halal DeFi protocols, and Islamic finance-compliant blockchain projects. Data integrations are currently in progress."
+            comingSoon
+            icon={<Activity className="h-12 w-12 text-[#D52B1E]/40" />}
+          />
+        </TabsContent>
+      </Tabs>
     </motion.div>
   );
 }

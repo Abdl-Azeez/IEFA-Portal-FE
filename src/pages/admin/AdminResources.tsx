@@ -183,6 +183,58 @@ export default function AdminResources() {
   const [glossaryForm, setGlossaryForm] = useState<GlossaryForm>(EMPTY_GLOSSARY_FORM)
   const [glossaryData, setGlossaryData] = useState<GlossaryEntry[]>(INITIAL_GLOSSARY)
 
+  /* Glossary bulk import */
+  const [bulkImportOpen, setBulkImportOpen] = useState(false)
+  const [bulkPreview, setBulkPreview] = useState<GlossaryEntry[]>([])
+  const [bulkError, setBulkError] = useState<string | null>(null)
+
+  function handleBulkFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBulkError(null)
+    setBulkPreview([])
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      if (!text) { setBulkError('Could not read file.'); return }
+      const lines = text.split(/\r?\n/).filter(l => l.trim())
+      if (lines.length < 2) { setBulkError('File must have a header row and at least one data row.'); return }
+      // Auto-detect delimiter: comma or semicolon or tab
+      const header = lines[0]
+      const delim = header.includes('\t') ? '\t' : header.includes(';') ? ';' : ','
+      const cols = header.split(delim).map(c => c.replace(/^"|"$/g, '').trim().toLowerCase())
+      const termIdx = cols.findIndex(c => c === 'term' || c === 'word' || c === 'title')
+      const defIdx = cols.findIndex(c => c === 'definition' || c === 'description' || c === 'meaning' || c === 'desc')
+      const statusIdx = cols.findIndex(c => c === 'status')
+      if (termIdx === -1 || defIdx === -1) {
+        setBulkError(`Could not find 'term' and 'definition' columns. Found: ${cols.join(', ')}`)
+        return
+      }
+      const parsed: GlossaryEntry[] = []
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(delim).map(c => c.replace(/^"|"$/g, '').trim())
+        const term = row[termIdx]
+        const definition = row[defIdx]
+        if (!term || !definition) continue
+        const rawStatus = (row[statusIdx] ?? '').toLowerCase()
+        const status: 'published' | 'draft' = rawStatus === 'published' ? 'published' : 'draft'
+        parsed.push({ id: `bulk-${Date.now()}-${i}`, term, definition, status })
+      }
+      if (parsed.length === 0) { setBulkError('No valid rows found in the file.'); return }
+      setBulkPreview(parsed)
+    }
+    reader.readAsText(file)
+    // reset input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  function confirmBulkImport() {
+    setGlossaryData(prev => [...bulkPreview, ...prev])
+    setBulkPreview([])
+    setBulkImportOpen(false)
+    setBulkError(null)
+  }
+
   const section = SECTIONS.find(s => s.key === activeSection)
   const items = (sectionData[activeSection] ?? []).filter(r =>
     !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.author.toLowerCase().includes(search.toLowerCase())
@@ -275,14 +327,27 @@ export default function AdminResources() {
             <p className="text-slate-500 text-sm">Manage all resource sections — guides, publications, standards, tools & glossary</p>
           </div>
         </div>
-        <Button
-          size="sm"
-          className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
-          onClick={activeSection === 'glossary' ? openCreateGlossary : openCreate}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {activeSection === 'glossary' ? 'Add Term' : 'Upload Resource'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {activeSection === 'glossary' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-lg gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
+              onClick={() => { setBulkImportOpen(true); setBulkPreview([]); setBulkError(null) }}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Bulk Import
+            </Button>
+          )}
+          <Button
+            size="sm"
+            className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
+            onClick={activeSection === 'glossary' ? openCreateGlossary : openCreate}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {activeSection === 'glossary' ? 'Add Term' : 'Upload Resource'}
+          </Button>
+        </div>
       </motion.div>
 
       {/* Stats */}
@@ -476,6 +541,88 @@ export default function AdminResources() {
             <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setGlossaryModalOpen(false)}>Cancel</Button>
             <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg" disabled={!glossaryForm.term.trim()} onClick={saveGlossary}>
               {editGlossaryId ? 'Save Changes' : 'Add Term'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Bulk Import Modal */}
+      <Dialog open={bulkImportOpen} onClose={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }} title="Bulk Import Glossary Terms" maxWidth="max-w-2xl">
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
+            <strong>Accepted formats:</strong> CSV or Excel (exported as CSV). The file must have a header row with at least two columns named <strong>term</strong> and <strong>definition</strong>. An optional <strong>status</strong> column (published/draft) is also supported. Delimiters: comma, semicolon, or tab.
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-2">Choose CSV / Excel file</label>
+            <label className="flex items-center gap-3 cursor-pointer w-full h-24 border-2 border-dashed border-gray-200 rounded-xl px-4 hover:bg-gray-50 transition-colors">
+              <input type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="sr-only" onChange={handleBulkFile} />
+              <Upload className="h-6 w-6 text-gray-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-700">Click to select file</p>
+                <p className="text-xs text-gray-400 mt-0.5">CSV, TSV or Excel (.csv / .xls / .xlsx)</p>
+              </div>
+            </label>
+          </div>
+
+          {bulkError && (
+            <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <strong>Error:</strong> {bulkError}
+            </div>
+          )}
+
+          {bulkPreview.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-slate-700">Preview — {bulkPreview.length} term{bulkPreview.length !== 1 ? 's' : ''} found</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 overflow-hidden max-h-64 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
+                    <tr>
+                      <th className="px-3 py-2 text-left">#</th>
+                      <th className="px-3 py-2 text-left">Term</th>
+                      <th className="px-3 py-2 text-left">Definition</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {bulkPreview.map((g, i) => (
+                      <tr key={g.id} className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-400">{i + 1}</td>
+                        <td className="px-3 py-2 font-semibold text-slate-800">{g.term}</td>
+                        <td className="px-3 py-2 text-slate-500 max-w-xs">
+                          <p className="line-clamp-2">{g.definition}</p>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${g.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {g.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-700">
+            <strong>Note:</strong> Imported terms will be added to the local glossary list. Glossary APIs are under development — data will not persist on refresh.
+          </div>
+
+          <div className="flex justify-end gap-3 pt-1">
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
+              disabled={bulkPreview.length === 0}
+              onClick={confirmBulkImport}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Import {bulkPreview.length > 0 ? `${bulkPreview.length} Terms` : 'Terms'}
             </Button>
           </div>
         </div>

@@ -436,6 +436,27 @@ const SAMPLE_RESOURCES: ResourceItem[] = [
     tags: ["home financing", "guide"],
     createdAt: "2026-02-28",
   },
+  {
+    id: "tp-7",
+    displayImage: "https://picsum.photos/seed/tp7/600/400",
+    authorName: "IEFA Digital Tools",
+    authorType: "organization",
+    title: "Halal Crypto Screener",
+    topic: "Screener Tool",
+    category: "Digital Tools",
+    briefIntro:
+      "A live screener tool that filters cryptocurrencies based on Shariah compliance criteria — excluding coins linked to gambling, interest-bearing protocols, and prohibited business models. Identify halal crypto assets with confidence.",
+    datePublished: "Apr 1, 2026",
+    previewHtml:
+      "<h2>Halal Crypto Screener</h2><p>This interactive tool allows you to screen cryptocurrencies against a Shariah compliance framework developed in consultation with Islamic finance scholars.</p><h3>Screening Criteria</h3><ul><li><strong>Business Activity:</strong> Excludes tokens linked to gambling, alcohol, adult content, or interest-based protocols.</li><li><strong>Protocol Type:</strong> Evaluates consensus mechanisms and yield structures for riba concerns.</li><li><strong>Shariah Board Certification:</strong> Highlights coins with formal Shariah board endorsements.</li><li><strong>Purification Guidance:</strong> Provides purification ratios where applicable.</li></ul><p>Use the screener to build and validate a halal crypto portfolio aligned with your ethical and religious values.</p>",
+    previewUrl: null,
+    downloadUrl: null,
+    viewCount: 0,
+    downloadCount: 0,
+    section: "tools-practical",
+    tags: ["crypto", "halal", "screener", "digital tools"],
+    createdAt: "2026-04-01",
+  },
 ];
 
 /* ── Helper: get categories for a given section ─────────────────────────── */

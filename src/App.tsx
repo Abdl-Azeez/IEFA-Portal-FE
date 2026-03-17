@@ -18,6 +18,9 @@ import Support from "@/pages/Support";
 import Profile from "@/pages/Profile";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import ZakatCalculator from "@/pages/tools/ZakatCalculator";
+import HalalStockScreening from "@/pages/tools/HalalStockScreening";
+import HalalCryptoScreening from "@/pages/tools/HalalCryptoScreening";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -163,6 +166,31 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              }
+            />
+            {/* Tools routes */}
+            <Route
+              path="tools/zakat"
+              element={
+                <ProtectedRoute>
+                  <ZakatCalculator />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="tools/halal-stocks"
+              element={
+                <ProtectedRoute>
+                  <HalalStockScreening />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="tools/halal-crypto"
+              element={
+                <ProtectedRoute>
+                  <HalalCryptoScreening />
                 </ProtectedRoute>
               }
             />

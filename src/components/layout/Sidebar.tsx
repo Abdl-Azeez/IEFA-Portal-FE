@@ -1,6 +1,7 @@
-import { motion } from 'framer-motion'
-import { LayoutDashboard, Newspaper, TrendingUp, BookOpen, Settings, HelpCircle, Users, ChevronLeft, ChevronRight, FolderOpen, FileText, Database, Mic, Briefcase, UserCircle } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { LayoutDashboard, Newspaper, TrendingUp, BookOpen, Settings, HelpCircle, Users, ChevronLeft, ChevronRight, FolderOpen, FileText, Database, Mic, Briefcase, UserCircle, Calculator, Coins, Wrench } from 'lucide-react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -25,6 +26,12 @@ const helpNavigation = [
   { name: 'Support', href: '/support', icon: HelpCircle },
 ]
 
+const toolsNavigation = [
+  { name: 'Zakat Calculator', href: '/tools/zakat', icon: Calculator },
+  { name: 'Halal Stock Screening', href: '/tools/halal-stocks', icon: TrendingUp },
+  { name: 'Halal Crypto Screening', href: '/tools/halal-crypto', icon: Coins },
+]
+
 interface SidebarProps {
   isCollapsed: boolean
   onToggle: () => void
@@ -32,6 +39,9 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const { isAuthenticated } = useAuth()
+  const location = useLocation()
+  const isToolsActive = location.pathname.startsWith('/tools')
+  const [toolsOpen, setToolsOpen] = useState(isToolsActive)
 
   const visibleMenuNavigation = isAuthenticated ? menuNavigation : menuNavigation.filter(item => item.name === 'Dashboard')
 
@@ -150,6 +160,105 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
               </NavLink>
             ))}
           </nav>
+
+          {/* Tools sub-menu */}
+          {isAuthenticated && (
+            <div className="mt-1">
+              <button
+                onClick={() => setToolsOpen((o) => !o)}
+                title={isCollapsed ? 'Tools' : undefined}
+                className={`group flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200 w-full relative overflow-hidden hover:bg-[#FFEFEF] ${
+                  isToolsActive ? 'bg-primary text-white' : 'text-[#737692]'
+                } ${isCollapsed ? 'justify-center' : ''}`}
+              >
+                {isToolsActive && (
+                  <motion.div
+                    className="absolute inset-0 bg-primary rounded-lg"
+                    layoutId="activeNavTools"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <motion.div
+                  className="relative z-10 flex items-center gap-2 w-full"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+                    <Wrench className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${isToolsActive ? 'text-white' : 'text-[#737692] group-hover:text-primary'}`} />
+                  </motion.div>
+                  {!isCollapsed && (
+                    <>
+                      <span className={isToolsActive ? 'text-white flex-1 text-left' : 'flex-1 text-left'}>Tools</span>
+                      <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${toolsOpen ? 'rotate-90' : ''} ${isToolsActive ? 'text-white' : 'text-[#737692]'}`} />
+                    </>
+                  )}
+                </motion.div>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {toolsOpen && !isCollapsed && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="ml-4 pl-3 border-l border-gray-100 space-y-0.5 py-1">
+                      {toolsNavigation.map((item) => (
+                        <NavLink
+                          key={item.name}
+                          to={item.href}
+                          className={({ isActive }) =>
+                            `group flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative overflow-hidden hover:bg-[#FFEFEF] ${
+                              isActive ? 'bg-primary text-white' : 'text-[#737692]'
+                            }`
+                          }
+                        >
+                          {({ isActive }) => (
+                            <>
+                              {isActive && (
+                                <motion.div
+                                  className="absolute inset-0 bg-primary rounded-lg"
+                                  layoutId={`activeToolNav-${item.name}`}
+                                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                                />
+                              )}
+                              <div className="relative z-10 flex items-center gap-2">
+                                <item.icon className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? 'text-white' : 'text-[#737692] group-hover:text-primary'}`} />
+                                <span className={isActive ? 'text-white text-xs' : 'text-xs'}>{item.name}</span>
+                              </div>
+                            </>
+                          )}
+                        </NavLink>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Collapsed: show tool sub-items as icon-only */}
+              {toolsOpen && isCollapsed && (
+                <div className="space-y-0.5 mt-0.5">
+                  {toolsNavigation.map((item) => (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      title={item.name}
+                      className={({ isActive }) =>
+                        `flex items-center justify-center rounded-lg px-3 py-2.5 transition-all duration-200 hover:bg-[#FFEFEF] ${
+                          isActive ? 'bg-primary text-white' : 'text-[#737692]'
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <item.icon className={`h-3.5 w-3.5 ${isActive ? 'text-white' : 'text-[#737692]'}`} />
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Spacer to push Help section to bottom */}

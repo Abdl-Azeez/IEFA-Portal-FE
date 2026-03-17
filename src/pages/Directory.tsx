@@ -1398,6 +1398,7 @@ export default function Directory() {
     const s = searchParams.get('sector');
     return s === 'non-financial' ? 'non-financial' : 'financial';
   });
+  const [geography, setGeography] = useState<'all' | 'local' | 'global'>('all');
   const [selectedCategory, setSelectedCategory] = useState(() => {
     return searchParams.get('category') ?? 'All';
   });
@@ -1472,6 +1473,8 @@ export default function Directory() {
 
   const filteredEntries = useMemo(() => {
     return sectorEntries.filter((e) => {
+      if (geography === 'local' && e.country !== 'Nigeria') return false;
+      if (geography === 'global' && e.country === 'Nigeria') return false;
       if (
         selectedCategory !== "All" &&
         !e.categories.includes(selectedCategory)
@@ -1505,6 +1508,7 @@ export default function Directory() {
     });
   }, [
     sectorEntries,
+    geography,
     selectedCategory,
     searchQuery,
     selectedCountries,
@@ -1590,6 +1594,29 @@ export default function Directory() {
                     <p className="text-xl font-bold text-white">{stat.value}</p>
                     <p className="text-xs text-gray-500">{stat.label}</p>
                   </div>
+                ))}
+              </div>
+
+              {/* Geography filter */}
+              <div className="flex items-center gap-2 pt-2">
+                <span className="text-xs text-gray-400 font-medium uppercase tracking-widest mr-1">View:</span>
+                {([
+                  { id: 'all' as const, label: '🌐 All', desc: 'All regions' },
+                  { id: 'local' as const, label: '🇳🇬 Local', desc: 'Nigeria only' },
+                  { id: 'global' as const, label: '🌍 Global', desc: 'International' },
+                ] as const).map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => { setGeography(g.id); setCurrentPage(1); }}
+                    title={g.desc}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border ${
+                      geography === g.id
+                        ? 'bg-[#D52B1E] text-white border-[#D52B1E] shadow-lg shadow-[#D52B1E]/25'
+                        : 'bg-white/10 text-gray-300 border-white/20 hover:bg-white/20 hover:text-white'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
                 ))}
               </div>
             </div>

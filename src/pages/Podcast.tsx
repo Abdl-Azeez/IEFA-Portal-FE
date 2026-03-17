@@ -311,6 +311,11 @@ export default function Podcast() {
   const shows: PodcastShow[] = (showsResponse as any)?.data ?? []
 
   const [activeShowId, setActiveShowId] = useState<string | null>(null)
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('All')
+
+  // Derive unique categories from shows for the filter tabs
+  const showCategories = ['All', ...Array.from(new Set(shows.map(s => s.category).filter(Boolean) as string[]))]
+  const filteredShows = activeCategoryFilter === 'All' ? shows : shows.filter(s => s.category === activeCategoryFilter)
 
   const { data: episodesData, isLoading: epsLoading } = usePodcastEpisodes(
     activeShowId ?? undefined,
@@ -487,7 +492,7 @@ export default function Podcast() {
 
       {/* SHOWS SHELF */}
       <motion.div variants={slideUp}>
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold text-[#000000]">Shows</h2>
             <p className="text-sm text-[#737692] mt-0.5">
@@ -516,6 +521,28 @@ export default function Podcast() {
           )}
         </div>
 
+        {/* Category filter tabs */}
+        {!showsLoading && showCategories.length > 1 && (
+          <div className="flex flex-wrap gap-2 mb-5">
+            {showCategories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setActiveCategoryFilter(cat)
+                  setActiveShowId(null)
+                }}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 whitespace-nowrap ${
+                  activeCategoryFilter === cat
+                    ? 'bg-[#D52B1E] border-[#D52B1E] text-white shadow-sm'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-[#D52B1E]/40 hover:text-[#D52B1E]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
         {showsLoading ? (
           <div className="flex items-center justify-center h-44">
             <Loader2 className="h-6 w-6 animate-spin text-[#D52B1E] mr-2" />
@@ -526,13 +553,18 @@ export default function Podcast() {
             <Mic2 className="h-10 w-10 mb-2 opacity-25" />
             <p className="font-medium">No shows available yet</p>
           </div>
+        ) : filteredShows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-44 bg-gray-50 rounded-2xl text-[#737692]">
+            <Mic2 className="h-10 w-10 mb-2 opacity-25" />
+            <p className="font-medium">No shows in this category</p>
+          </div>
         ) : (
           <div
             ref={showsScrollRef}
             className="flex gap-4 overflow-x-auto pb-2"
             style={{ scrollbarWidth: "none" }}
           >
-            {shows.map((show) => (
+            {filteredShows.map((show) => (
               <ShowCard
                 key={show.id}
                 show={show}
@@ -548,7 +580,7 @@ export default function Podcast() {
 
       {/* EMPTY STATE */}
       <AnimatePresence>
-        {!activeShow && !showsLoading && shows.length > 0 && (
+        {!activeShow && !showsLoading && filteredShows.length > 0 && (
           <motion.div
             key="empty"
             initial={{ opacity: 0, y: 16 }}

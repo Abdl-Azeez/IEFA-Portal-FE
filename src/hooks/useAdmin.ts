@@ -1025,6 +1025,35 @@ export const useAdminCreateDataCategory = () => {
   });
 };
 
+export const useAdminUpdateDataCategory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: { name?: string; slug?: string; description?: string; icon?: string; sortOrder?: number };
+    }) => {
+      const { data } = await api.patch<DataCategory>(
+        `/datasets/categories/${id}`,
+        dto,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "datasets", "categories"] });
+      toast({ title: "Category updated" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Update failed",
+        variant: "destructive",
+      }),
+  });
+};
+
 export const useAdminDeleteDataCategory = () => {
   const qc = useQueryClient();
   return useMutation({
