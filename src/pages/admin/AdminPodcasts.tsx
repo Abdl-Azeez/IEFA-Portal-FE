@@ -297,7 +297,7 @@ export default function AdminPodcasts() {
               onChange={(e) => setShowForm((f) => ({ ...f, description: e.target.value }))}
               placeholder="About this show…"
               rows={3}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:border-[#D52B1E] resize-none"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E] resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -370,7 +370,7 @@ export default function AdminPodcasts() {
               onChange={(e) => setEpForm((f) => ({ ...f, description: e.target.value }))}
               placeholder="Episode summary…"
               rows={3}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:border-[#D52B1E] resize-none"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E] resize-none"
             />
           </div>
           <div className="grid grid-cols-3 gap-3">

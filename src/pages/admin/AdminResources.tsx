@@ -468,7 +468,7 @@ export default function AdminResources() {
               onChange={e => setForm(f => ({ ...f, briefIntro: e.target.value }))}
               placeholder="Short description shown on the resource card…"
               rows={3}
-              className="w-full bg-white text-gray-900 text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-[#D52B1E]"
+              className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E]"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -520,7 +520,7 @@ export default function AdminResources() {
               onChange={e => setGlossaryForm(f => ({ ...f, definition: e.target.value }))}
               placeholder="Clear definition of the term…"
               rows={4}
-              className="w-full bg-white text-gray-900 text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-[#D52B1E]"
+              className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E]"
             />
           </div>
           <div>

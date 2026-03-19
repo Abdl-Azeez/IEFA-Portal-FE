@@ -5,59 +5,112 @@ import api from "./api";
 export interface CommunityCategoryAPI {
   id: string;
   name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DiscussionAuthorAPI {
   id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  country: string | null;
+  profilePhotoUrl: string | null;
+  role: string;
+  isVerified: boolean;
+  isActive: boolean;
+  isModerator: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiscussionInteractionAPI {
+  id: string;
+  user: DiscussionAuthorAPI;
+  type: "like" | "comment";
+  content: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiscussionGroupAPI {
+  id: string;
   name: string;
-  avatar?: string;
+  description?: string;
 }
 
 export interface DiscussionAPI {
   id: string;
   title: string;
-  /** Full content of the discussion */
-  content?: string;
-  /** Short description / excerpt (some APIs use this) */
-  description?: string;
-  author?: DiscussionAuthorAPI;
-  /** Flat author fields (alternate API shape) */
-  authorId?: string;
-  authorName?: string;
-  authorAvatar?: string;
+  content: string;
+  category: CommunityCategoryAPI | null;
+  group: DiscussionGroupAPI | null;
+  author: DiscussionAuthorAPI;
+  isPinned: boolean;
+  isLocked: boolean;
+  viewCount: number;
+  interactions: DiscussionInteractionAPI[];
   createdAt: string;
   updatedAt: string;
-  repliesCount?: number;
-  viewsCount?: number;
-  likesCount?: number;
-  sharesCount?: number;
-  categoryId?: string;
-  category?: CommunityCategoryAPI;
-  groupId?: string;
-  isAnswered?: boolean;
-  isPinned?: boolean;
+  /** Populated only on detail view */
   isBookmarked?: boolean;
-  tags?: string[];
   status?: string;
   flagged?: boolean;
-  /** Comment/like interactions — returned by getDiscussionById */
-  interactions?: DiscussionInteractionAPI[];
 }
 
 export interface CommunityGroupAPI {
   id: string;
   name: string;
+  slug?: string;
   description?: string;
+  coverImageUrl?: string;
   memberCount?: number;
-  members?: number;
+  members?:
+    | number
+    | Array<{
+        id: string;
+        email?: string;
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        country?: string;
+        profilePhotoUrl?: string | null;
+        role?: string;
+        isVerified?: boolean;
+        isActive?: boolean;
+        isModerator?: boolean;
+        lastLoginAt?: string;
+        createdAt?: string;
+        updatedAt?: string;
+      }>;
   isPrivate?: boolean;
   createdAt?: string;
-  /** Current discussion topic */
   topic?: string;
-  /** Formatted next session string */
   nextSession?: string;
-  /** Whether the current user is a member */
   isMember?: boolean;
+}
+
+export function getCommunityGroupMemberCount(group: CommunityGroupAPI): number {
+  if (typeof group.memberCount === "number") {
+    return group.memberCount;
+  }
+
+  if (Array.isArray(group.members)) {
+    return group.members.length;
+  }
+
+  if (typeof group.members === "number") {
+    return group.members;
+  }
+
+  return 0;
 }
 
 export interface CommunityEventAPI {
@@ -65,21 +118,34 @@ export interface CommunityEventAPI {
   title: string;
   description?: string;
   date?: string;
+  endTime?: string;
   startDate?: string;
   time?: string;
   startTime?: string;
   location?: string;
   type?: string;
+  capacity?: number;
+  isVirtual?: boolean;
+  virtualLink?: string;
   attendeeCount?: number;
   attendees?: number;
   isRegistered?: boolean;
 }
 
-export interface DiscussionInteractionAPI {
-  id: string;
-  type: "like" | "comment";
-  content?: string;
+export interface CreateEventDto {
+  title: string;
+  description?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+  type?: string;
+  capacity?: number;
+  isVirtual?: boolean;
+  virtualLink?: string;
 }
+
+export type UpdateEventDto = Partial<CreateEventDto>;
 
 /* ── DTO types (sent to backend) ────────────────────────────────────────── */
 
@@ -104,6 +170,26 @@ export interface CreateInteractionDto {
   content?: string;
 }
 
+export interface CreateCommunityCategoryDto {
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  sortOrder?: number;
+}
+
+export type UpdateCommunityCategoryDto = Partial<CreateCommunityCategoryDto>;
+
+export interface CreateCommunityGroupDto {
+  name: string;
+  slug: string;
+  description?: string;
+  coverImageUrl?: string;
+  isPrivate?: boolean;
+}
+
+export type UpdateCommunityGroupDto = Partial<CreateCommunityGroupDto>;
+
 /* ── Service functions ──────────────────────────────────────────────────── */
 
 export const communityService = {
@@ -113,9 +199,14 @@ export const communityService = {
       .get<CommunityCategoryAPI[]>("/community/categories")
       .then((r) => r.data),
 
-  createCategory: (data: { name: string }) =>
+  createCategory: (data: CreateCommunityCategoryDto) =>
     api
       .post<CommunityCategoryAPI>("/community/categories", data)
+      .then((r) => r.data),
+
+  updateCategory: (id: string, data: UpdateCommunityCategoryDto) =>
+    api
+      .patch<CommunityCategoryAPI>(`/community/categories/${id}`, data)
       .then((r) => r.data),
 
   /* -- Discussions -- */
@@ -172,16 +263,12 @@ export const communityService = {
   getGroupById: (id: string) =>
     api.get<CommunityGroupAPI>(`/community/groups/${id}`).then((r) => r.data),
 
-  createGroup: (data: {
-    name: string;
-    description?: string;
-    isPrivate?: boolean;
-  }) =>
+  createGroup: (data: CreateCommunityGroupDto) =>
     api.post<CommunityGroupAPI>("/community/groups", data).then((r) => r.data),
 
   updateGroup: (
     id: string,
-    data: Partial<{ name: string; description: string; isPrivate: boolean }>,
+    data: UpdateCommunityGroupDto,
   ) =>
     api
       .patch<CommunityGroupAPI>(`/community/groups/${id}`, data)
@@ -208,12 +295,12 @@ export const communityService = {
       .get<CommunityEventAPI>(`/community/events/${id}`)
       .then((r) => r.data),
 
-  createEvent: (data: Partial<CommunityEventAPI>) =>
+  createEvent: (data: CreateEventDto) =>
     api
       .post<CommunityEventAPI>("/community/events", data)
       .then((r) => r.data),
 
-  updateEvent: (id: string, data: Partial<CommunityEventAPI>) =>
+  updateEvent: (id: string, data: UpdateEventDto) =>
     api
       .patch<CommunityEventAPI>(`/community/events/${id}`, data)
       .then((r) => r.data),

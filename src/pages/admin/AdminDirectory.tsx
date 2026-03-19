@@ -448,7 +448,7 @@ function EntryFormModal({
               }
               rows={3}
               placeholder="Brief description of the organization..."
-              className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 resize-none"
+              className="w-full bg-background text-foreground border border-gray-200 rounded-xl px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 resize-none"
             />
             {errors.overview && (
               <p className="text-xs text-red-500 mt-1">{errors.overview}</p>
@@ -1137,7 +1137,7 @@ function CategoryFormModal({
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="Brief description of this category"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
             />
           </div>
           <div>

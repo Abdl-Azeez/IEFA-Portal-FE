@@ -21,12 +21,14 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   communityService,
   apiSortToUiSort,
+  getCommunityGroupMemberCount,
   type DiscussionAPI,
   type CommunityGroupAPI,
   type CommunityEventAPI,
   type CommunityCategoryAPI,
 } from "@/lib/communityService";
 import type {
+  Attachment,
   CommunityCategory,
   DiscussionPost,
   DetailedDiscussionPost,
@@ -38,57 +40,49 @@ import StartDiscussionModal from "@/components/community/StartDiscussionModal";
 import PosterProfilePopup from "@/components/community/PosterProfilePopup";
 import { useAuth } from "@/contexts/AuthContext";
 
-const CATEGORIES: CommunityCategory[] = [
-  "Markets & Investing",
-  "Savings",
-  "Zakat",
-  "Every day islamic finance",
-  "General Discussion",
-  "Q&A",
-  "Resources",
-];
 
-const categoryColors: Record<CommunityCategory, string> = {
-  "Markets & Investing": "bg-[#D52B1E]",
-  Savings: "bg-blue-600",
-  Zakat: "bg-green-600",
-  "Every day islamic finance": "bg-orange-600",
-  "General Discussion": "bg-purple-600",
-  "Q&A": "bg-yellow-600",
-  Resources: "bg-indigo-600",
-};
+const CATEGORY_PALETTE = [
+  "bg-[#D52B1E]", "bg-blue-600", "bg-green-600", "bg-orange-600",
+  "bg-purple-600", "bg-yellow-600", "bg-indigo-600", "bg-teal-600",
+];
+function getCategoryColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return CATEGORY_PALETTE[h % CATEGORY_PALETTE.length];
+}
 
 /* -- API â†’ UI mapping helpers ---------------------------------------------- */
 function apiDiscussionToPost(
   d: DiscussionAPI,
-  apiCategories: CommunityCategoryAPI[],
+  _apiCategories: CommunityCategoryAPI[],
 ): DiscussionPost {
-  const catName =
-    d.category?.name ??
-    apiCategories.find((c) => c.id === d.categoryId)?.name ??
-    "General Discussion";
+  const catName = d.category?.name ?? "General Discussion";
+  const authorName =
+    [d.author?.firstName, d.author?.lastName].filter(Boolean).join(" ") ||
+    "Unknown";
+  const replies =
+    d.interactions?.filter((i) => i.type === "comment").length ?? 0;
+  const likes = d.interactions?.filter((i) => i.type === "like").length ?? 0;
   return {
     id: d.id,
     title: d.title,
-    description: d.description ?? d.content ?? "",
+    description: d.content ?? "",
     category: catName as CommunityCategory,
-    poster:
-      d.author?.name ?? d.authorName ?? "Unknown",
-    posterAvatar: d.author?.avatar ?? d.authorAvatar ?? "ðŸ‘¤",
-    posterId: d.author?.id ?? d.authorId ?? "",
+    poster: authorName,
+    posterAvatar: d.author?.profilePhotoUrl ?? undefined,
+    posterId: d.author?.id ?? "",
     createdAt: new Date(d.createdAt),
     updatedAt: new Date(d.updatedAt),
-    replies: d.repliesCount ?? 0,
-    views: d.viewsCount ?? 0,
-    likes: d.likesCount ?? 0,
-    shares: d.sharesCount ?? 0,
-    isAnswered: d.isAnswered ?? false,
+    replies,
+    views: d.viewCount ?? 0,
+    likes,
+    shares: 0,
+    isAnswered: false,
     isPinned: d.isPinned ?? false,
     isSaved: d.isBookmarked ?? false,
-    tags: d.tags,
+    tags: undefined,
   };
 }
-
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -125,7 +119,7 @@ export default function Community() {
   const [selectedPoster, setSelectedPoster] = useState<UserProfile | null>(
     null,
   );
-  const { isModerator } = useAuth();
+  const { isModerator, user } = useAuth();
 
   // state to track hover card
   const [hoverProfile, setHoverProfile] = useState<{
@@ -159,6 +153,7 @@ export default function Community() {
 
   /* -- API state -- */
   const [apiCategories, setApiCategories] = useState<CommunityCategoryAPI[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [discussionPosts, setDiscussionPosts] = useState<DiscussionPost[]>([]);
   const [groups, setGroups] = useState<CommunityGroupAPI[]>([]);
   const [events, setEvents] = useState<CommunityEventAPI[]>([]);
@@ -168,13 +163,22 @@ export default function Community() {
   const [apiError, setApiError] = useState<string | null>(null);
   /** Maps discussionId â†’ likeInteractionId (so we can delete the like later) */
   const likeInteractionIds = useRef<Map<string, string>>(new Map());
+  /** Incremented on back-navigation to trigger a discussions re-fetch */
+  const [discussionRefreshKey, setDiscussionRefreshKey] = useState(0);
+  /** Like state passed into the detail page */
+  const [initialLikeForDetail, setInitialLikeForDetail] = useState(false);
+  const [initialLikeIdForDetail, setInitialLikeIdForDetail] = useState<
+    string | undefined
+  >(undefined);
 
   /* -- Load community categories (needed to map categoryId â†’ name) -- */
   useEffect(() => {
+    setCategoriesLoading(true);
     communityService
       .getCategories()
       .then(setApiCategories)
-      .catch((err) => console.error("Failed to load community categories:", err));
+      .catch((err) => console.error("Failed to load community categories:", err))
+      .finally(() => setCategoriesLoading(false));
   }, []);
 
   /* -- Load discussions (re-fetches when filters change) -- */
@@ -204,7 +208,7 @@ export default function Community() {
       })
       .finally(() => setDiscussionsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, searchQuery, apiCategories]);
+  }, [filters, searchQuery, apiCategories, discussionRefreshKey]);
 
   /* -- Load groups when tab is selected -- */
   useEffect(() => {
@@ -216,6 +220,19 @@ export default function Community() {
       .catch((err) => console.error("Failed to load groups:", err))
       .finally(() => setGroupsLoading(false));
   }, [selectedTab]);
+
+  // Ensure groups are available in discussion modal for optional group selection.
+  useEffect(() => {
+    if (!showStartDiscussionModal || groups.length > 0) return;
+    setGroupsLoading(true);
+    communityService
+      .getGroups()
+      .then(setGroups)
+      .catch((err) =>
+        console.error("Failed to load groups for discussion modal:", err),
+      )
+      .finally(() => setGroupsLoading(false));
+  }, [showStartDiscussionModal, groups.length]);
 
   /* -- Load events when tab is selected -- */
   useEffect(() => {
@@ -335,6 +352,11 @@ export default function Community() {
     return filtered;
   }, [discussionPosts, searchQuery, filters, savedPosts]);
 
+  const joinedGroupsForModal = useMemo(
+    () => groups.filter((g) => g.isMember),
+    [groups],
+  );
+
   // Format time for posts
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -441,21 +463,31 @@ export default function Community() {
   const handlePostClick = async (post: DiscussionPost) => {
     let fullContent = post.description;
     let repliesList: import("@/types/community").Reply[] = [];
+    let initialIsLiked = false;
+    let initialLikeInteractionId: string | undefined;
+    let full: import("@/lib/communityService").DiscussionAPI | undefined;
     try {
-      const full = await communityService.getDiscussionById(post.id);
-      fullContent = full.content ?? full.description ?? post.description;
+      full = await communityService.getDiscussionById(post.id);
+      fullContent = full.content ?? post.description;
       const interactions = full.interactions ?? [];
+      const myLike = interactions.find(
+        (i) => i.type === "like" && i.user?.id === user?.id,
+      );
+      initialIsLiked = !!myLike;
+      initialLikeInteractionId = myLike?.id;
       repliesList = interactions
         .filter((i) => i.type === "comment")
         .map((i) => ({
           id: i.id,
           postId: post.id,
-          userId: "",
-          userName: "Member",
-          userAvatar: "👤",
-          userTitle: "Member",
+          userId: i.user?.id ?? "",
+          userName:
+            [i.user?.firstName, i.user?.lastName].filter(Boolean).join(" ") ||
+            "Member",
+          userAvatar: i.user?.profilePhotoUrl ?? "👤",
+          userTitle: i.user?.role ?? "Member",
           content: i.content ?? "",
-          createdAt: new Date(),
+          createdAt: i.createdAt ? new Date(i.createdAt) : new Date(),
           updatedAt: new Date(),
           likes: 0,
         }));
@@ -463,25 +495,33 @@ export default function Community() {
       // fall back to list-level data
     }
 
+    const freshLikeCount = (full?.interactions ?? []).filter((i) => i.type === "like").length;
+    const freshReplyCount = (full?.interactions ?? []).filter((i) => i.type === "comment").length;
+    setInitialLikeForDetail(initialIsLiked);
+    setInitialLikeIdForDetail(initialLikeInteractionId);
+
     const posterProfile: UserProfile = {
-      id: post.posterId,
-      name: post.poster,
-      title: "Islamic Finance Professional",
-      displayPicture: post.posterAvatar || "👤",
-      bio: "Passionate about Islamic finance education",
-      joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-      totalPosts: 25,
-      totalViews: 1200,
-      totalReplies: 85,
-      totalLikes: 340,
-      isVerified: false,
-      isModerator: false,
+      id: full?.author?.id ?? post.posterId,
+      name: [full?.author?.firstName, full?.author?.lastName].filter(Boolean).join(" ") || post.poster,
+      title: full?.author?.role ?? "Member",
+      displayPicture: full?.author?.profilePhotoUrl || post.posterAvatar || "",
+      bio: "",
+      joinedDate: full?.author?.createdAt ? new Date(full.author.createdAt) : new Date(),
+      totalPosts: 0,
+      totalViews: full?.viewCount ?? post.views,
+      totalReplies: freshReplyCount,
+      totalLikes: freshLikeCount,
+      isVerified: full?.author?.isVerified ?? false,
+      isModerator: full?.author?.isModerator ?? false,
       rating: 4.5,
     };
 
     const detailedPost: DetailedDiscussionPost = {
       ...post,
       content: fullContent,
+      likes: freshLikeCount,
+      replies: freshReplyCount,
+      views: full?.viewCount ?? post.views,
       posterDetails: posterProfile,
       attachments: [],
       repliesList,
@@ -490,7 +530,6 @@ export default function Community() {
 
     setSelectedPost(detailedPost);
   };
-
   const handlePosterProfileClick = (
     post: DiscussionPost,
     e: React.MouseEvent,
@@ -501,15 +540,15 @@ export default function Community() {
       id: post.posterId,
       name: post.poster,
       title: "Islamic Finance Professional",
-      displayPicture: post.posterAvatar || "ðŸ‘¤",
-      bio: "Passionate about Islamic finance education",
+      displayPicture: post.posterAvatar || "",
+      bio: "",
       joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-      totalPosts: 25,
-      totalViews: 1200,
-      totalReplies: 85,
-      totalLikes: 340,
-      isVerified: Math.random() > 0.5,
-      isModerator: Math.random() > 0.8,
+      totalPosts: 0,
+      totalViews: 0,
+      totalReplies: post.replies,
+      totalLikes: post.likes,
+      isVerified: false,
+      isModerator: false,
       rating: 4.5,
     };
 
@@ -542,14 +581,20 @@ export default function Community() {
   }, []);
 
   const handleCreateDiscussion = useCallback(
-    async (data: any) => {
-      const catId = apiCategories.find((c) => c.name === data.category)?.id;
+    async (data: {
+      title: string;
+      content: string;
+      categoryId: string;
+      groupId?: string;
+      attachments: Attachment[];
+      mentions: string[];
+    }) => {
       try {
         const created = await communityService.createDiscussion({
           title: data.title,
           content: data.content,
-          categoryId: catId,
-          tags: data.tags,
+          categoryId: data.categoryId,
+          groupId: data.groupId,
         });
         setDiscussionPosts((prev) => [
           apiDiscussionToPost(created, apiCategories),
@@ -565,12 +610,20 @@ export default function Community() {
   );
 
   // Show detail page if post is selected
+  const handleBack = useCallback(() => {
+    setSelectedPost(null);
+    setDiscussionRefreshKey((k) => k + 1);
+  }, []);
+
   if (selectedPost) {
     return (
       <DiscussionDetailPage
         post={selectedPost}
-        onBack={() => setSelectedPost(null)}
+        onBack={handleBack}
         isModerator={isModerator}
+        currentUserId={user?.id}
+        initialIsLiked={initialLikeForDetail}
+        initialLikeInteractionId={initialLikeIdForDetail}
         onPin={handlePinPost}
         onDelete={handleDeletePost}
       />
@@ -600,8 +653,10 @@ export default function Community() {
         onMouseLeave={clearProfileHover}
       >
         <div className="flex flex-col items-center text-center">
-          <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-2xl mb-2">
-            {post.posterAvatar}
+          <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-2xl mb-2 overflow-hidden">
+            {post.posterAvatar?.startsWith("http")
+              ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
+              : <span>{post.posterAvatar || "👤"}</span>}
           </div>
           <h3 className="font-semibold text-[#000000]">{post.poster}</h3>
           <p className="text-xs text-[#737692]">Islamic Finance Professional</p>
@@ -795,7 +850,7 @@ export default function Community() {
                         >
                           All
                         </motion.button>
-                        {CATEGORIES.map((category) => (
+                        {apiCategories.map((cat) => cat.name).map((category) => (
                           <motion.button
                             key={category}
                             whileHover={{ scale: 1.05 }}
@@ -1045,7 +1100,7 @@ export default function Community() {
                                 {post.title}
                               </h3>
                               <Badge
-                                className={`${categoryColors[post.category]} text-white hover:${categoryColors[post.category]}`}
+                                className={`${getCategoryColor(post.category)} text-white hover:${getCategoryColor(post.category)}`}
                               >
                                 {post.category}
                               </Badge>
@@ -1103,8 +1158,10 @@ export default function Community() {
                                 }
                                 className="flex-shrink-0 hover:opacity-80 transition-opacity"
                               >
-                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-lg shadow-sm cursor-pointer">
-                                  {post.posterAvatar}
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-lg shadow-sm cursor-pointer overflow-hidden">
+                                  {post.posterAvatar?.startsWith("http")
+                                    ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
+                                    : <span>{post.posterAvatar || "👤"}</span>}
                                 </div>
                               </button>
 
@@ -1237,7 +1294,7 @@ export default function Community() {
                             </CardTitle>
                             <div className="flex items-center gap-2 text-sm text-[#737692]">
                               <Users className="h-4 w-4" />
-                              <span>{group.memberCount ?? group.members ?? 0} members</span>
+                              <span>{getCommunityGroupMemberCount(group)} members</span>
                             </div>
                           </div>
                           <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -1277,7 +1334,14 @@ export default function Community() {
                                   setGroups((prev) =>
                                     prev.map((g) =>
                                       g.id === group.id
-                                        ? { ...g, isMember: false, memberCount: (g.memberCount ?? 0) - 1 }
+                                        ? {
+                                            ...g,
+                                            isMember: false,
+                                            memberCount: Math.max(
+                                              0,
+                                              getCommunityGroupMemberCount(g) - 1,
+                                            ),
+                                          }
                                         : g,
                                     ),
                                   );
@@ -1286,7 +1350,12 @@ export default function Community() {
                                   setGroups((prev) =>
                                     prev.map((g) =>
                                       g.id === group.id
-                                        ? { ...g, isMember: true, memberCount: (g.memberCount ?? 0) + 1 }
+                                        ? {
+                                            ...g,
+                                            isMember: true,
+                                            memberCount:
+                                              getCommunityGroupMemberCount(g) + 1,
+                                          }
                                         : g,
                                     ),
                                   );
@@ -1567,6 +1636,10 @@ export default function Community() {
         <StartDiscussionModal
           isOpen={showStartDiscussionModal}
           onClose={() => setShowStartDiscussionModal(false)}
+          categories={apiCategories.map((c) => ({ id: c.id, name: c.name }))}
+          groups={joinedGroupsForModal.map((g) => ({ id: g.id, name: g.name }))}
+          categoriesLoading={categoriesLoading}
+          groupsLoading={groupsLoading}
           onSubmit={handleCreateDiscussion}
         />
 

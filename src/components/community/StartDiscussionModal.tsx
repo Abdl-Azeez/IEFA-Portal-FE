@@ -4,18 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { useState } from 'react'
-import type { CommunityCategory, Attachment } from '@/types/community'
-
-const CATEGORIES: CommunityCategory[] = [
-  'Markets & Investing',
-  'Savings',
-  'Zakat',
-  'Every day islamic finance',
-  'General Discussion',
-  'Q&A',
-  'Resources'
-]
+import { useEffect, useState } from 'react'
+import type { Attachment } from '@/types/community'
 
 const COMMUNITY_GUIDELINES = [
   'Be respectful and constructive in your discussions',
@@ -31,23 +21,43 @@ const COMMUNITY_GUIDELINES = [
 interface StartDiscussionModalProps {
   isOpen: boolean
   onClose: () => void
+  categories?: Array<{ id: string; name: string }>
+  groups?: Array<{ id: string; name: string }>
+  categoriesLoading?: boolean
+  groupsLoading?: boolean
   onSubmit: (data: {
     title: string
     content: string
-    category: CommunityCategory
+    categoryId: string
+    groupId?: string
     attachments: Attachment[]
     mentions: string[]
   }) => void
 }
 
-export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: StartDiscussionModalProps) {
+export default function StartDiscussionModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  categories = [],
+  groups = [],
+  categoriesLoading = false,
+  groupsLoading = false,
+}: StartDiscussionModalProps) {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [category, setCategory] = useState<CommunityCategory>('General Discussion')
+  const [categoryId, setCategoryId] = useState<string>('')
+  const [groupId, setGroupId] = useState<string>('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [mentions, setMentions] = useState<string[]>([])
   const [selectedFont, setSelectedFont] = useState('normal')
   const [agreedToGuidelines, setAgreedToGuidelines] = useState(false)
+
+  useEffect(() => {
+    if (!categoryId && categories.length > 0) {
+      setCategoryId(categories[0].id)
+    }
+  }, [categories, categoryId])
 
   if (!isOpen) return null
 
@@ -74,7 +84,7 @@ export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: Star
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!title.trim() || !content.trim()) {
+    if (!title.trim() || !content.trim() || !categoryId) {
       alert('Please fill in all required fields')
       return
     }
@@ -87,7 +97,8 @@ export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: Star
     onSubmit({
       title,
       content,
-      category,
+      categoryId,
+      groupId: groupId || undefined,
       attachments,
       mentions
     })
@@ -95,7 +106,8 @@ export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: Star
     // Reset form
     setTitle('')
     setContent('')
-    setCategory('General Discussion')
+    setCategoryId(categories[0]?.id ?? '')
+    setGroupId('')
     setAttachments([])
     setMentions([])
     setAgreedToGuidelines(false)
@@ -188,14 +200,47 @@ export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: Star
                 </label>
                 <Select
                   variant="student"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as CommunityCategory)}
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
                   className="p-3 h-auto"
+                  disabled={categoriesLoading || categories.length === 0}
                 >
-                  {CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {categoriesLoading && <option value="">Loading categories...</option>}
+                  {!categoriesLoading && categories.length === 0 && (
+                    <option value="">No categories available</option>
+                  )}
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </Select>
+                {(categoriesLoading || categories.length === 0) && (
+                  <p className="text-xs text-[#737692] mt-1">
+                    {categoriesLoading ? 'Fetching categories...' : 'No category options loaded yet.'}
+                  </p>
+                )}
+              </div>
+
+              {/* Group Selection (Optional) */}
+              <div>
+                <label className="block text-sm font-semibold text-[#000000] mb-2">
+                  Group (Optional)
+                </label>
+                <Select
+                  variant="student"
+                  value={groupId}
+                  onChange={(e) => setGroupId(e.target.value)}
+                  className="p-3 h-auto"
+                  disabled={groupsLoading}
+                >
+                  <option value="">No specific group</option>
+                  {groupsLoading && <option value="" disabled>Loading groups...</option>}
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>{group.name}</option>
+                  ))}
+                </Select>
+                {groupsLoading && (
+                  <p className="text-xs text-[#737692] mt-1">Fetching groups...</p>
+                )}
               </div>
 
               {/* Content Input */}
@@ -209,7 +254,7 @@ export default function StartDiscussionModal({ isOpen, onClose, onSubmit }: Star
                   placeholder="Share your thoughts, questions, or insights here. You can mention other users with @username"
                   maxLength={5000}
                   required
-                  className={`w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D52B1E] resize-vertical min-h-[200px] text-[#000000] placeholder-gray-400 ${
+                  className={`w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D52B1E] resize-vertical min-h-[200px] bg-background text-foreground placeholder:text-muted-foreground ${
                     selectedFont === 'bold' ? 'font-bold' :
                     selectedFont === 'italic' ? 'italic' :
                     selectedFont === 'monospace' ? 'font-mono' : ''

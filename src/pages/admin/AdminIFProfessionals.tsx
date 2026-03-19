@@ -517,7 +517,7 @@ export default function AdminIFProfessionals() {
               }
               placeholder="Brief description of the professional…"
               rows={4}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:border-[#D52B1E] resize-none"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E] resize-none"
             />
           </div>
 

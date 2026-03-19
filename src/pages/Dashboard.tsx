@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { TrendingUp, ChevronUp, Play, Clock, BookOpen, ChevronRight, Calculator, Coins, Wrench } from 'lucide-react'
+import { TrendingUp, ChevronUp, Play, Clock, BookOpen, ChevronRight, Calculator, Coins, Wrench, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExternalNews, type ExternalNewsArticle } from '@/hooks/useNews'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -132,27 +133,135 @@ const stockData = {
   ],
 }
 
-// News Data
-const newsData = [
-  {
-    id: 1,
-    title: "Nigeria's Islamic Finance Assets Record Steady Growth in 2025",
-    content: "Nigeria's Islamic finance sector continues to expand, driven by rising demand for non-interest banking, ethical investments, and Sukuk instruments suppor...",
-    image: "https://images.unsplash.com/photo-1621504450181-5d356f61d307?w=400&h=300&fit=crop",
-  },
-  {
-    id: 2,
-    title: "Nigerian Universities Expand Islamic Finance and Ethical Banking Programs",
-    content: "More tertiary institutions are introducing Islamic finance courses, responding to industry demand for skilled professionals in Shariah auditi...",
-    image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&h=300&fit=crop",
-  },
-  {
-    id: 3,
-    title: "Central Bank Announces New Sukuk Bond Framework",
-    content: "The Central Bank has introduced a new regulatory framework for Sukuk bonds, aiming to boost Islamic finance adoption across the country...",
-    image: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=400&h=300&fit=crop",
-  },
-]
+interface DashboardNewsItem {
+  id: string
+  title: string
+  content: string
+  image: string
+  link?: string
+  source: string
+  publishedAt?: string
+}
+
+const DASHBOARD_NEWS_QUERY = 'Islamic finance OR sukuk OR takaful'
+
+function hashString(value: string): number {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0
+  }
+  return hash
+}
+
+function getExternalSourceLabel(article: ExternalNewsArticle): string {
+  if (!article.source) return 'Global Feed'
+  if (typeof article.source === 'string') return article.source
+  return article.source._ || 'Global Feed'
+}
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function summarizeExternalNews(article: ExternalNewsArticle): string {
+  const text = stripHtml(article.description ?? '')
+  if (!text) return 'Fresh market intelligence from the live external news feed.'
+  return text.length > 150 ? `${text.slice(0, 147).trim()}...` : text
+}
+
+function buildNewsPalette(seed: number) {
+  const palettes = [
+    ['#7A1C12', '#D52B1E', '#F4A261', '#FCE7D7'],
+    ['#123C69', '#2A6F97', '#61A5C2', '#EAF4F4'],
+    ['#113A2D', '#2D6A4F', '#74C69D', '#E9F7EF'],
+    ['#3D1F47', '#7B2CBF', '#C77DFF', '#F3E8FF'],
+    ['#5A2A0C', '#BC6C25', '#DDA15E', '#FEFAE0'],
+  ] as const
+  return palettes[seed % palettes.length]
+}
+
+function getKeywordCluster(title: string): string[] {
+  const words = title
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 3)
+
+  return words.slice(0, 3).map((word) => word.toUpperCase())
+}
+
+function createDashboardNewsImage(article: ExternalNewsArticle, index: number): string {
+  const title = article.title ?? 'Islamic Finance'
+  const source = getExternalSourceLabel(article)
+  const seed = hashString(`${title}-${source}-${index}`)
+  const [base, accent, glow, paper] = buildNewsPalette(seed)
+  const keywordCluster = getKeywordCluster(title)
+  const angle = seed % 360
+  const circleX = 70 + (seed % 220)
+  const circleY = 60 + ((seed >> 3) % 120)
+  const squareX = 220 + ((seed >> 5) % 100)
+  const squareY = 20 + ((seed >> 7) % 100)
+  const lines = [title.slice(0, 26), title.slice(26, 58)].filter(Boolean)
+  const markup = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${base}" />
+          <stop offset="55%" stop-color="${accent}" />
+          <stop offset="100%" stop-color="${glow}" />
+        </linearGradient>
+        <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${paper}" stop-opacity="0.95" />
+          <stop offset="100%" stop-color="${paper}" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="800" height="600" fill="url(#bg)" />
+      <g opacity="0.16">
+        <circle cx="${circleX}" cy="${circleY}" r="190" fill="url(#halo)" />
+        <rect x="${squareX}" y="${squareY}" width="280" height="280" rx="48" fill="${paper}" transform="rotate(${angle} 360 160)" />
+        <path d="M-40 510 C 140 400, 320 580, 520 470 S 820 420, 860 520 L 860 640 L -40 640 Z" fill="${paper}" />
+      </g>
+      <g opacity="0.18" stroke="${paper}" stroke-width="2" fill="none">
+        <path d="M80 110 H300" />
+        <path d="M80 142 H270" />
+        <path d="M80 174 H240" />
+        <path d="M510 96 H700" />
+        <path d="M510 128 H670" />
+      </g>
+      <rect x="54" y="50" width="148" height="34" rx="17" fill="rgba(255,255,255,0.18)" />
+      <text x="128" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#FFFFFF" letter-spacing="2">LIVE FEED</text>
+      <text x="54" y="406" font-family="Georgia, serif" font-size="18" fill="${paper}" opacity="0.92">${source.slice(0, 28).replace(/&/g, '&amp;')}</text>
+      ${keywordCluster
+        .map(
+          (word, wordIndex) => `<text x="54" y="${460 + wordIndex * 32}" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF" opacity="0.92">${word.replace(/&/g, '&amp;')}</text>`,
+        )
+        .join('')}
+      <text x="54" y="250" font-family="Georgia, serif" font-size="38" font-weight="700" fill="#FFFFFF">${lines[0]?.replace(/&/g, '&amp;') ?? ''}</text>
+      <text x="54" y="294" font-family="Georgia, serif" font-size="38" font-weight="700" fill="#FFFFFF">${lines[1]?.replace(/&/g, '&amp;') ?? ''}</text>
+      <circle cx="694" cy="468" r="56" fill="rgba(255,255,255,0.16)" />
+      <path d="M670 468 h48 M694 444 v48" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.85" />
+    </svg>
+  `
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(markup)}`
+}
+
+function mapExternalArticleToDashboardNews(
+  article: ExternalNewsArticle,
+  index: number,
+): DashboardNewsItem {
+  const source = getExternalSourceLabel(article)
+  const id = article.link || article.title || `external-${index}`
+
+  return {
+    id,
+    title: article.title ?? 'Untitled external news',
+    content: summarizeExternalNews(article),
+    image: createDashboardNewsImage(article, index),
+    link: article.link,
+    source,
+    publishedAt: article.pubDate,
+  }
+}
 
 // Stock Table Component
 interface StockTableProps {
@@ -192,18 +301,22 @@ function StockTable({ data }: StockTableProps) {
 
 // News Card Component
 interface NewsCardProps {
-  news: typeof newsData[0]
+  news: DashboardNewsItem
 }
 
 function NewsCard({ news }: NewsCardProps) {
   return (
     <div className="flex flex-col h-full w-full flex-shrink-0">
-      <div className="rounded-xl overflow-hidden mb-4 aspect-[4/3]">
+      <div className="rounded-xl overflow-hidden mb-4 aspect-[4/3] shadow-[0_18px_50px_-24px_rgba(0,0,0,0.45)] ring-1 ring-black/5">
         <img
           src={news.image}
           alt={news.title}
           className="w-full h-full object-cover"
         />
+      </div>
+      <div className="flex items-center gap-2 mb-2 text-[11px] uppercase tracking-[0.18em] text-[#D52B1E] font-semibold">
+        <span>{news.source}</span>
+        {news.publishedAt && <span className="text-[#737692] tracking-normal normal-case">{new Date(news.publishedAt).toLocaleDateString()}</span>}
       </div>
       <h3 className="text-base font-semibold text-[#000000] mb-2 leading-tight">
         {news.title}
@@ -211,9 +324,19 @@ function NewsCard({ news }: NewsCardProps) {
       <p className="text-sm text-[#737692] mb-3 line-clamp-4">
         {news.content}
       </p>
-      <button className="text-sm font-medium text-primary underline underline-offset-2 text-left hover:text-primary/80 transition-colors">
-        Read More
-      </button>
+      {news.link ? (
+        <a
+          href={news.link}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary underline underline-offset-2 text-left hover:text-primary/80 transition-colors"
+        >
+          Read More
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      ) : (
+        <span className="text-sm font-medium text-primary/70">Live update</span>
+      )}
     </div>
   )
 }
@@ -221,9 +344,21 @@ function NewsCard({ news }: NewsCardProps) {
 export function Dashboard() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { data: externalNews = [], isLoading: externalNewsLoading } = useExternalNews(DASHBOARD_NEWS_QUERY)
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+
+  const liveNews = useMemo(
+    () => externalNews.slice(0, 6).map(mapExternalArticleToDashboardNews),
+    [externalNews],
+  )
+
+  const infiniteNews = useMemo(() => {
+    if (liveNews.length === 0) return []
+    if (liveNews.length === 1) return [...liveNews, ...liveNews]
+    return [...liveNews, ...liveNews]
+  }, [liveNews])
 
   // Scroll to top on page load
   useEffect(() => {
@@ -238,21 +373,25 @@ export function Dashboard() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Duplicate news for infinite loop
-  const infiniteNews = [...newsData, ...newsData];
-
   // Auto-slide news every 5 seconds
   useEffect(() => {
+    if (liveNews.length <= 1) return undefined
+
     const interval = setInterval(() => {
       setCurrentNewsIndex((prev) => prev + 1);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [liveNews.length]);
+
+  useEffect(() => {
+    setCurrentNewsIndex(0)
+    setIsTransitioning(true)
+  }, [liveNews.length])
 
   // Reset to beginning when reaching the end of the duplicated section
   useEffect(() => {
-    if (currentNewsIndex >= newsData.length) {
+    if (liveNews.length > 0 && currentNewsIndex >= liveNews.length) {
       // Wait for transition to complete
       setTimeout(() => {
         setIsTransitioning(false);
@@ -261,7 +400,7 @@ export function Dashboard() {
         setTimeout(() => setIsTransitioning(true), 50);
       }, 600); // Match transition duration
     }
-  }, [currentNewsIndex]);
+  }, [currentNewsIndex, liveNews.length]);
 
   return (
     <motion.div
@@ -349,28 +488,61 @@ export function Dashboard() {
 
         {/* Right Column - News Slider */}
         <motion.div variants={itemVariants} className="overflow-hidden">
-          <motion.div
-            className="flex gap-4 sm:gap-6"
-            animate={{
-              x: isMobile
-                ? `calc(-${currentNewsIndex * 100}% - ${currentNewsIndex * 16}px)`
-                : `calc(-${currentNewsIndex * 50}% - ${currentNewsIndex * 24}px)`,
-            }}
-            transition={
-              isTransitioning
-                ? { duration: 0.6, ease: "easeInOut" }
-                : { duration: 0 }
-            }
-          >
-            {infiniteNews.map((news, index) => (
-              <div
-                key={`${news.id}-${index}`}
-                className="w-full sm:w-[calc(50%-12px)] flex-shrink-0"
-              >
-                <NewsCard news={news} />
-              </div>
-            ))}
-          </motion.div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#D52B1E]">
+                Live News Wire
+              </p>
+              <h2 className="text-lg font-semibold text-[#000000]">
+                External Islamic finance headlines
+              </h2>
+            </div>
+          </div>
+
+          {externalNewsLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={index} className="space-y-4 animate-pulse">
+                  <div className="aspect-[4/3] rounded-xl bg-gray-200" />
+                  <div className="h-3 w-24 rounded bg-gray-100" />
+                  <div className="h-5 w-full rounded bg-gray-200" />
+                  <div className="h-4 w-5/6 rounded bg-gray-100" />
+                  <div className="h-4 w-2/3 rounded bg-gray-100" />
+                </div>
+              ))}
+            </div>
+          ) : infiniteNews.length > 0 ? (
+            <motion.div
+              className="flex gap-4 sm:gap-6"
+              animate={{
+                x: isMobile
+                  ? `calc(-${currentNewsIndex * 100}% - ${currentNewsIndex * 16}px)`
+                  : `calc(-${currentNewsIndex * 50}% - ${currentNewsIndex * 24}px)`,
+              }}
+              transition={
+                isTransitioning
+                  ? { duration: 0.6, ease: "easeInOut" }
+                  : { duration: 0 }
+              }
+            >
+              {infiniteNews.map((news, index) => (
+                <div
+                  key={`${news.id}-${index}`}
+                  className="w-full sm:w-[calc(50%-12px)] flex-shrink-0"
+                >
+                  <NewsCard news={news} />
+                </div>
+              ))}
+            </motion.div>
+          ) : (
+            <Card className="border-0 bg-[#FFF6F5] shadow-none">
+              <CardContent className="p-6">
+                <p className="text-sm text-[#737692]">
+                  Live external news is currently unavailable. The dashboard will resume showing fresh headlines as soon as the feed responds.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </motion.div>
       </div>
 

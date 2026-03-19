@@ -1,10 +1,23 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { MessageSquare, Search, MoreVertical, Trash2, Eye, CheckCircle, XCircle, Flag, Users, Calendar, Plus, Edit2, Tag, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { communityService, type DiscussionAPI, type CommunityGroupAPI, type CommunityEventAPI, type CommunityCategoryAPI } from '@/lib/communityService'
+import { communityService, getCommunityGroupMemberCount, type CreateEventDto, type DiscussionAPI, type CommunityGroupAPI, type CommunityEventAPI, type CommunityCategoryAPI } from '@/lib/communityService'
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+
+const normalizeTime = (value: string) => {
+  if (!value) return undefined
+  return /^\d{2}:\d{2}:\d{2}$/.test(value) ? value : `${value}:00`
+}
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { y: 16, opacity: 0 }, show: { y: 0, opacity: 1 } }
@@ -15,6 +28,25 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 type ActiveTab = 'discussions' | 'groups' | 'events' | 'categories'
+
+type GroupMemberPreview = {
+  id: string
+  name: string
+  email: string
+  role: string
+  avatarUrl?: string | null
+}
+
+const parseGroupMembers = (group: CommunityGroupAPI): GroupMemberPreview[] => {
+  if (!Array.isArray(group.members)) return []
+  return group.members.map((m) => ({
+    id: m.id,
+    name: [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || 'Member',
+    email: m.email ?? '—',
+    role: m.role ?? 'member',
+    avatarUrl: m.profilePhotoUrl ?? null,
+  }))
+}
 
 /* ── Event form modal ─────────────────────────────────────────────────────── */
 function EventFormModal({
@@ -28,20 +60,41 @@ function EventFormModal({
 }) {
   const [title, setTitle] = useState(event?.title ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
-  const [date, setDate] = useState(event?.startDate ?? event?.date ?? '')
-  const [time, setTime] = useState(event?.startTime ?? event?.time ?? '')
+  const [date, setDate] = useState(event?.date ?? event?.startDate ?? '')
+  const [startTime, setStartTime] = useState(event?.startTime ?? event?.time ?? '')
+  const [endTime, setEndTime] = useState(event?.endTime ?? '')
   const [location, setLocation] = useState(event?.location ?? '')
   const [type, setType] = useState(event?.type ?? '')
+  const [capacity, setCapacity] = useState(event?.capacity ?? 0)
+  const [isVirtual, setIsVirtual] = useState(Boolean(event?.isVirtual))
+  const [virtualLink, setVirtualLink] = useState(event?.virtualLink ?? '')
+  const [virtualLinkError, setVirtualLinkError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) { setErr('Title is required'); return }
+    if (isVirtual && !virtualLink.trim()) {
+      setVirtualLinkError('Virtual Link is required when Virtual event is enabled.')
+      return
+    }
     setSaving(true)
     setErr(null)
+    setVirtualLinkError(null)
     try {
-      const payload: Partial<CommunityEventAPI> = { title, description, startDate: date, startTime: time, location, type }
+      const payload: CreateEventDto = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        date: date || undefined,
+        startTime: normalizeTime(startTime),
+        endTime: normalizeTime(endTime),
+        location: location.trim() || undefined,
+        type: type.trim() || undefined,
+        capacity,
+        isVirtual,
+        virtualLink: isVirtual ? (virtualLink.trim() || undefined) : undefined,
+      }
       let saved: CommunityEventAPI
       if (event) {
         saved = await communityService.updateEvent(event.id, payload)
@@ -72,7 +125,7 @@ function EventFormModal({
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
               placeholder="Event description" />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -81,14 +134,53 @@ function EventFormModal({
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Time</label>
-              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="h-9 text-sm" />
+              <label className="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-9 text-sm" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">End Time</label>
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-9 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
+              <Input type="number" value={capacity} onChange={(e) => setCapacity(Number(e.target.value || 0))} className="h-9 text-sm" min={0} />
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Location</label>
             <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Online / City" className="h-9 text-sm" />
           </div>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={isVirtual}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setIsVirtual(checked)
+                if (!checked) setVirtualLinkError(null)
+              }}
+              className="rounded border-slate-300"
+            />
+            Virtual event
+          </label>
+          {isVirtual && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Virtual Link</label>
+              <Input
+                value={virtualLink}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setVirtualLink(value)
+                  if (value.trim()) setVirtualLinkError(null)
+                }}
+                placeholder="https://..."
+                className={`h-9 text-sm ${virtualLinkError ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
+              />
+              {virtualLinkError && <p className="text-xs text-red-500 mt-1">{virtualLinkError}</p>}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
             <Input value={type} onChange={(e) => setType(e.target.value)} placeholder="e.g. Webinar, Meetup" className="h-9 text-sm" />
@@ -118,16 +210,36 @@ function CommCategoryFormModal({
   onSaved: (c: CommunityCategoryAPI) => void
 }) {
   const [name, setName] = useState(cat?.name ?? '')
+  const [slug, setSlug] = useState(cat?.slug ?? '')
+  const [description, setDescription] = useState(cat?.description ?? '')
+  const [icon, setIcon] = useState(cat?.icon ?? '')
+  const [sortOrder, setSortOrder] = useState(cat?.sortOrder ?? 0)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!cat) setSlug(slugify(name))
+  }, [name, cat])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) { setErr('Name is required'); return }
+    const cleanName = name.trim()
+    const cleanSlug = slug.trim()
+    if (!cleanName) { setErr('Name is required'); return }
+    if (!cleanSlug) { setErr('Slug is required'); return }
     setSaving(true)
     setErr(null)
     try {
-      const saved = await communityService.createCategory({ name })
+      const payload = {
+        name: cleanName,
+        slug: cleanSlug,
+        description: description.trim() || undefined,
+        icon: icon.trim() || undefined,
+        sortOrder,
+      }
+      const saved = cat
+        ? await communityService.updateCategory(cat.id, payload)
+        : await communityService.createCategory(payload)
       onSaved(saved)
     } catch (ex: unknown) {
       setErr(ex instanceof Error ? ex.message : 'Save failed')
@@ -149,11 +261,131 @@ function CommCategoryFormModal({
             <label className="block text-xs font-medium text-slate-600 mb-1">Category Name *</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Islamic Finance" className="h-9 text-sm" autoFocus />
           </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
+            <Input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="e.g. markets-investing" className="h-9 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+              placeholder="Category description" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Icon</label>
+              <Input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="e.g. chart-line" className="h-9 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Sort Order</label>
+              <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value || 0))} className="h-9 text-sm" />
+            </div>
+          </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose} className="rounded-lg">Cancel</Button>
             <Button type="submit" size="sm" disabled={saving} className="rounded-lg bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Saving…' : cat ? 'Save Changes' : 'Save'}
+            </Button>
+          </div>
+        </form>
+      </motion.div>
+    </div>,
+    document.body,
+  )
+}
+
+/* ── Group form modal ─────────────────────────────────────────────────────── */
+function GroupFormModal({
+  group,
+  onClose,
+  onSaved,
+}: {
+  group?: CommunityGroupAPI
+  onClose: () => void
+  onSaved: (g: CommunityGroupAPI) => void
+}) {
+  const [name, setName] = useState(group?.name ?? '')
+  const [slug, setSlug] = useState(group?.slug ?? '')
+  const [description, setDescription] = useState(group?.description ?? '')
+  const [coverImageUrl, setCoverImageUrl] = useState(group?.coverImageUrl ?? '')
+  const [isPrivate, setIsPrivate] = useState(Boolean(group?.isPrivate))
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!group) setSlug(slugify(name))
+  }, [name, group])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanName = name.trim()
+    const cleanSlug = slug.trim()
+    if (!cleanName) { setErr('Name is required'); return }
+    if (!cleanSlug) { setErr('Slug is required'); return }
+
+    setSaving(true)
+    setErr(null)
+    try {
+      const payload = {
+        name: cleanName,
+        slug: cleanSlug,
+        description: description.trim() || undefined,
+        coverImageUrl: coverImageUrl.trim() || undefined,
+        isPrivate,
+      }
+      const saved = group
+        ? await communityService.updateGroup(group.id, payload)
+        : await communityService.createGroup(payload)
+      onSaved(saved)
+    } catch (ex: unknown) {
+      setErr(ex instanceof Error ? ex.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-slate-800">{group ? 'Edit Group' : 'Create Group'}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Group Name *</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. CIFP Study Group" className="h-9 text-sm" autoFocus />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
+            <Input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="e.g. cifp-study-group" className="h-9 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+              placeholder="Group description" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Cover Image URL</label>
+            <Input value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="https://..." className="h-9 text-sm" />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Private group
+          </label>
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} className="rounded-lg">Cancel</Button>
+            <Button type="submit" size="sm" disabled={saving} className="rounded-lg bg-[#D52B1E] hover:bg-[#B8241B] text-white">
+              {saving ? 'Saving…' : group ? 'Save Changes' : 'Create Group'}
             </Button>
           </div>
         </form>
@@ -178,6 +410,9 @@ export default function AdminCommunity() {
   const [groupsLoading, setGroupsLoading] = useState(false)
   const [groupsError, setGroupsError] = useState<string | null>(null)
   const [groupSearch, setGroupSearch] = useState('')
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
+  const [membersLoadingGroupId, setMembersLoadingGroupId] = useState<string | null>(null)
+  const [groupMembersById, setGroupMembersById] = useState<Record<string, GroupMemberPreview[]>>({})
 
   // ── Events ───────────────────────────────────────────────────────────────
   const [events, setEvents] = useState<CommunityEventAPI[]>([])
@@ -194,7 +429,16 @@ export default function AdminCommunity() {
   const [categories, setCategories] = useState<CommunityCategoryAPI[]>([])
   const [catsLoading, setCatsLoading] = useState(false)
   const [catsError, setCatsError] = useState<string | null>(null)
-  const [catModal, setCatModal] = useState<{ type: 'create' } | null>(null)
+  const [catModal, setCatModal] = useState<
+    | { type: 'create' }
+    | { type: 'edit'; category: CommunityCategoryAPI }
+    | null
+  >(null)
+  const [groupModal, setGroupModal] = useState<
+    | { type: 'create' }
+    | { type: 'edit'; group: CommunityGroupAPI }
+    | null
+  >(null)
 
   // ── Fetch functions ──────────────────────────────────────────────────────
   const fetchDiscussions = useCallback(async () => {
@@ -287,6 +531,34 @@ export default function AdminCommunity() {
     }
   }
 
+  const handleToggleGroupMembers = useCallback(async (group: CommunityGroupAPI) => {
+    if (expandedGroupId === group.id) {
+      setExpandedGroupId(null)
+      return
+    }
+
+    setExpandedGroupId(group.id)
+
+    if (groupMembersById[group.id]) return
+
+    const inlineMembers = parseGroupMembers(group)
+    if (inlineMembers.length > 0) {
+      setGroupMembersById((prev) => ({ ...prev, [group.id]: inlineMembers }))
+      return
+    }
+
+    setMembersLoadingGroupId(group.id)
+    try {
+      const detailed = await communityService.getGroupById(group.id)
+      const parsed = parseGroupMembers(detailed)
+      setGroupMembersById((prev) => ({ ...prev, [group.id]: parsed }))
+    } catch {
+      setGroupMembersById((prev) => ({ ...prev, [group.id]: [] }))
+    } finally {
+      setMembersLoadingGroupId(null)
+    }
+  }, [expandedGroupId, groupMembersById])
+
   const handleDeleteEvent = async (id: string) => {
     try {
       await communityService.deleteEvent(id)
@@ -299,7 +571,11 @@ export default function AdminCommunity() {
   const filtered = discussions.filter(
     (d) =>
       d.title.toLowerCase().includes(search.toLowerCase()) ||
-      (typeof d.author === 'string' ? d.author : d.author?.name ?? '').toLowerCase().includes(search.toLowerCase()),
+      (
+        typeof d.author === 'string'
+          ? d.author
+          : [d.author?.firstName, d.author?.lastName].filter(Boolean).join(' ')
+      ).toLowerCase().includes(search.toLowerCase()),
   )
   const filteredGroups = groups.filter((g) => g.name.toLowerCase().includes(groupSearch.toLowerCase()))
   const filteredEvents = events.filter((e) => e.title.toLowerCase().includes(eventSearch.toLowerCase()))
@@ -413,11 +689,15 @@ export default function AdminCommunity() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">
-                          {typeof d.author === 'string' ? d.author : d.author?.name ?? '—'}
+                          {typeof d.author === 'string'
+                            ? d.author
+                            : [d.author?.firstName, d.author?.lastName].filter(Boolean).join(' ') || '—'}
                         </td>
-                        <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">{d.repliesCount ?? 0}</td>
-                        <td className="px-4 py-3 text-slate-400 text-xs hidden md:table-cell">{(d.viewsCount ?? 0).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-slate-400 text-xs hidden lg:table-cell">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : d.date ?? ''}</td>
+                        <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">
+                          {d.interactions?.filter((i) => i.type === 'comment').length ?? 0}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400 text-xs hidden md:table-cell">{(d.viewCount ?? 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-slate-400 text-xs hidden lg:table-cell">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : ''}</td>
                         <td className="px-4 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[d.status ?? 'active'] ?? ''}`}>{d.status ?? 'active'}</span></td>
                         <td className="px-4 py-3 text-right">
                           <div className="relative inline-block">
@@ -452,6 +732,9 @@ export default function AdminCommunity() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input placeholder="Search groups…" value={groupSearch} onChange={(e) => setGroupSearch(e.target.value)} className="pl-9 h-9 text-sm rounded-lg" />
               </div>
+              <Button size="sm" onClick={() => setGroupModal({ type: 'create' })} className="rounded-lg bg-[#D52B1E] hover:bg-[#B8241B] text-white gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> Add Group
+              </Button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -480,26 +763,81 @@ export default function AdminCommunity() {
                   ) : filteredGroups.length === 0 ? (
                     <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400 text-sm">No groups found.</td></tr>
                   ) : (
-                    filteredGroups.map((g) => (
-                      <tr key={g.id} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-medium text-slate-800">{g.name}</td>
-                        <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell line-clamp-1">{g.description ?? '—'}</td>
-                        <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{g.memberCount ?? g.members ?? 0}</td>
-                        <td className="px-4 py-3 hidden lg:table-cell">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${g.isPrivate ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
-                            {g.isPrivate ? 'Private' : 'Public'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => { if (confirm(`Delete group "${g.name}"?`)) handleDeleteGroup(g.id) }}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    filteredGroups.map((g) => {
+                      const isExpanded = expandedGroupId === g.id
+                      const members = groupMembersById[g.id] ?? []
+                      const isLoadingMembers = membersLoadingGroupId === g.id
+
+                      return (
+                        <Fragment key={g.id}>
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3 font-medium text-slate-800">{g.name}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell line-clamp-1">{g.description ?? '—'}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{getCommunityGroupMemberCount(g)}</td>
+                            <td className="px-4 py-3 hidden lg:table-cell">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${g.isPrivate ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
+                                {g.isPrivate ? 'Private' : 'Public'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleToggleGroupMembers(g)}
+                                  className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${isExpanded ? 'border-[#D52B1E] text-[#D52B1E] bg-red-50' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                  {isExpanded ? 'Hide Members' : 'Show Members'}
+                                </button>
+                                <button
+                                  onClick={() => setGroupModal({ type: 'edit', group: g })}
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => { if (confirm(`Delete group "${g.name}"?`)) handleDeleteGroup(g.id) }}
+                                  className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={5} className="px-4 pb-4">
+                                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                                  <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">Group Members</p>
+                                  {isLoadingMembers ? (
+                                    <p className="text-xs text-slate-500">Loading members...</p>
+                                  ) : members.length === 0 ? (
+                                    <p className="text-xs text-slate-500">No member details available for this group.</p>
+                                  ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      {members.map((m) => (
+                                        <div key={m.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
+                                          <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-[11px] font-semibold text-slate-600 overflow-hidden">
+                                            {m.avatarUrl ? (
+                                              <img src={m.avatarUrl} alt={m.name} className="h-full w-full object-cover" />
+                                            ) : (
+                                              m.name.slice(0, 2).toUpperCase()
+                                            )}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="text-xs font-medium text-slate-800 truncate">{m.name}</p>
+                                            <p className="text-[11px] text-slate-500 truncate">{m.email}</p>
+                                          </div>
+                                          <span className="ml-auto text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{m.role}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
@@ -552,7 +890,7 @@ export default function AdminCommunity() {
                       <tr key={e.id} className="hover:bg-slate-50/50">
                         <td className="px-4 py-3 font-medium text-slate-800 line-clamp-1">{e.title}</td>
                         <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">
-                          {(e.startDate ?? e.date) ? new Date(e.startDate ?? e.date ?? '').toLocaleDateString() : '—'}
+                          {(e.date ?? e.startDate) ? new Date(e.date ?? e.startDate ?? '').toLocaleDateString() : '—'}
                         </td>
                         <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{e.location ?? '—'}</td>
                         <td className="px-4 py-3 hidden lg:table-cell">
@@ -611,6 +949,12 @@ export default function AdminCommunity() {
                       <Tag className="h-3.5 w-3.5 text-[#D52B1E] shrink-0" />
                       <span className="text-sm font-medium text-slate-700 truncate">{c.name}</span>
                     </div>
+                    <button
+                      onClick={() => setCatModal({ type: 'edit', category: c })}
+                      className="p-1 rounded hover:bg-slate-200 text-slate-500"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -637,10 +981,29 @@ export default function AdminCommunity() {
         )}
         {catModal && (
           <CommCategoryFormModal
+            cat={catModal.type === 'edit' ? catModal.category : undefined}
             onClose={() => setCatModal(null)}
             onSaved={(saved) => {
-              setCategories((prev) => [...prev, saved])
+              if (catModal.type === 'edit') {
+                setCategories((prev) => prev.map((c) => (c.id === saved.id ? saved : c)))
+              } else {
+                setCategories((prev) => [saved, ...prev])
+              }
               setCatModal(null)
+            }}
+          />
+        )}
+        {groupModal && (
+          <GroupFormModal
+            group={groupModal.type === 'edit' ? groupModal.group : undefined}
+            onClose={() => setGroupModal(null)}
+            onSaved={(saved) => {
+              if (groupModal.type === 'edit') {
+                setGroups((prev) => prev.map((g) => (g.id === saved.id ? saved : g)))
+              } else {
+                setGroups((prev) => [saved, ...prev])
+              }
+              setGroupModal(null)
             }}
           />
         )}

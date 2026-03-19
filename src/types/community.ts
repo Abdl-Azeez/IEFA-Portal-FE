@@ -1,12 +1,5 @@
-// Community Categories
-export type CommunityCategory = 
-  | 'Markets & Investing'
-  | 'Savings'
-  | 'Zakat'
-  | 'Every day islamic finance'
-  | 'General Discussion'
-  | 'Q&A'
-  | 'Resources'
+// Community Categories (dynamic from API)
+export type CommunityCategory = string
 
 // User Profile Type
 export interface UserProfile {

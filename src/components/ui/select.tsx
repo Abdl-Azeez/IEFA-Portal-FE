@@ -99,10 +99,10 @@ export function Select({
         disabled={disabled}
         onClick={handleToggle}
         className={cn(
-          "relative w-full flex items-center justify-between gap-2 bg-white border rounded-lg px-3 text-left transition-all duration-150 focus:outline-none",
+          "relative w-full flex items-center justify-between gap-2 bg-background border rounded-lg px-3 text-left transition-all duration-150 focus:outline-none",
           isAdmin
-            ? "h-9 text-sm text-slate-800 border-gray-200 hover:border-gray-300"
-            : "h-10 text-sm text-gray-900 border-gray-200 hover:border-gray-300",
+            ? "h-9 text-sm text-foreground border-gray-200 hover:border-gray-300"
+            : "h-10 text-sm text-foreground border-gray-200 hover:border-gray-300",
           open && "border-[#D52B1E] ring-2 ring-[#D52B1E]/10",
           disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
           className,
@@ -143,7 +143,7 @@ export function Select({
                   "w-full flex items-center justify-between px-3 py-2.5 text-sm text-left transition-colors",
                   opt.value === value
                     ? "bg-[#FFEFEF] text-[#D52B1E] font-semibold"
-                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-900",
+                    : "text-foreground hover:bg-slate-50",
                   opt.disabled && "opacity-40 cursor-not-allowed",
                 )}
               >

@@ -13,6 +13,8 @@ interface DiscussionDetailPageProps {
   onBack: () => void
   isModerator?: boolean
   currentUserId?: string
+  initialIsLiked?: boolean
+  initialLikeInteractionId?: string
   onPin?: (postId: string) => void
   onDelete?: (postId: string) => void
 }
@@ -32,17 +34,19 @@ export default function DiscussionDetailPage({
   onBack,
   isModerator = false,
   currentUserId,
+  initialIsLiked = false,
+  initialLikeInteractionId,
   onPin,
   onDelete
 }: DiscussionDetailPageProps) {
-  const [isLiked, setIsLiked] = useState(false)
+  const [isLiked, setIsLiked] = useState(initialIsLiked)
   const [isSaved, setIsSaved] = useState(post.isSaved ?? false)
   const [likeCount, setLikeCount] = useState(post.likes)
   const [showPosterProfile, setShowPosterProfile] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [replies, setReplies] = useState<Reply[]>(post.repliesList || [])
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
-  const likeInteractionId = useRef<string | null>(null)
+  const likeInteractionId = useRef<string | null>(initialLikeInteractionId ?? null)
 
   const handleLike = async () => {
     const nowLiked = !isLiked
@@ -97,24 +101,31 @@ export default function DiscussionDetailPage({
     if (!replyText.trim() || isSubmittingReply) return
     setIsSubmittingReply(true)
     try {
-      const interaction = await communityService.createInteraction(post.id, {
+      await communityService.createInteraction(post.id, {
         type: 'comment',
         content: replyText,
       })
-      const newReply: Reply = {
-        id: interaction.id,
-        postId: post.id,
-        userId: currentUserId || 'current-user',
-        userName: 'Current User',
-        userAvatar: '👤',
-        userTitle: 'Member',
-        content: replyText,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        likes: 0,
-      }
-      setReplies(prev => [...prev, newReply])
       setReplyText('')
+      // Re-fetch to get real-time reply state (catches concurrent replies too)
+      const fresh = await communityService.getDiscussionById(post.id)
+      const freshReplies = fresh.interactions
+        .filter((i) => i.type === 'comment')
+        .map((i) => ({
+          id: i.id,
+          postId: post.id,
+          userId: i.user?.id ?? '',
+          userName:
+            [i.user?.firstName, i.user?.lastName].filter(Boolean).join(' ') ||
+            'Member',
+          userAvatar: i.user?.profilePhotoUrl ?? '👤',
+          userTitle: i.user?.role ?? 'Member',
+          content: i.content ?? '',
+          createdAt: i.createdAt ? new Date(i.createdAt) : new Date(),
+          updatedAt: new Date(),
+          likes: 0,
+          isAuthor: i.user?.id === currentUserId,
+        }))
+      setReplies(freshReplies)
     } catch {
       // silent fail — keep text so user can retry
     } finally {
@@ -209,8 +220,10 @@ export default function DiscussionDetailPage({
                 onClick={() => setShowPosterProfile(true)}
                 className="flex-shrink-0 hover:opacity-80 transition-opacity"
               >
-                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-3xl shadow-md cursor-pointer">
-                  {post.posterDetails.displayPicture}
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-3xl shadow-md cursor-pointer overflow-hidden">
+                  {post.posterDetails.displayPicture?.startsWith('http')
+                    ? <img src={post.posterDetails.displayPicture} alt={post.poster} className="h-full w-full object-cover" />
+                    : <span>{post.posterDetails.displayPicture || '👤'}</span>}
                 </div>
               </button>
               <div className="flex-1 min-w-0">
@@ -380,8 +393,10 @@ export default function DiscussionDetailPage({
                 <Card className="hover:shadow-lg transition-all">
                   <CardContent className="p-6">
                     <div className="flex gap-4">
-                      <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xl flex-shrink-0">
-                        {reply.userAvatar}
+                      <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
+                        {reply.userAvatar?.startsWith('http')
+                          ? <img src={reply.userAvatar} alt={reply.userName} className="h-full w-full object-cover" />
+                          : <span>{reply.userAvatar || '👤'}</span>}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
