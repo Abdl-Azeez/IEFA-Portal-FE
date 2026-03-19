@@ -3,9 +3,10 @@ import { ArrowLeft, Heart, Share2, Bookmark, Flag, MessageSquare, Eye, ThumbsUp,
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { DetailedDiscussionPost, Reply } from '@/types/community'
 import PosterProfilePopup from './PosterProfilePopup'
+import { communityService } from '@/lib/communityService'
 
 interface DiscussionDetailPageProps {
   post: DetailedDiscussionPost
@@ -35,15 +36,41 @@ export default function DiscussionDetailPage({
   onDelete
 }: DiscussionDetailPageProps) {
   const [isLiked, setIsLiked] = useState(false)
-  const [isSaved, setIsSaved] = useState(false)
+  const [isSaved, setIsSaved] = useState(post.isSaved ?? false)
   const [likeCount, setLikeCount] = useState(post.likes)
   const [showPosterProfile, setShowPosterProfile] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [replies, setReplies] = useState<Reply[]>(post.repliesList || [])
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const likeInteractionId = useRef<string | null>(null)
 
-  const handleLike = () => {
-    setIsLiked(!isLiked)
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1)
+  const handleLike = async () => {
+    const nowLiked = !isLiked
+    setIsLiked(nowLiked)
+    setLikeCount(prev => nowLiked ? prev + 1 : prev - 1)
+    try {
+      if (nowLiked) {
+        const interaction = await communityService.createInteraction(post.id, { type: 'like' })
+        likeInteractionId.current = interaction.id
+      } else if (likeInteractionId.current) {
+        await communityService.deleteInteraction(likeInteractionId.current)
+        likeInteractionId.current = null
+      }
+    } catch {
+      // revert on error
+      setIsLiked(!nowLiked)
+      setLikeCount(prev => nowLiked ? prev - 1 : prev + 1)
+    }
+  }
+
+  const handleSave = async () => {
+    const nowSaved = !isSaved
+    setIsSaved(nowSaved)
+    try {
+      await communityService.toggleBookmark(post.id)
+    } catch {
+      setIsSaved(!nowSaved)
+    }
   }
 
   const handleShare = async () => {
@@ -66,24 +93,33 @@ export default function DiscussionDetailPage({
     }
   }
 
-  const handleAddReply = () => {
-    if (!replyText.trim()) return
-
-    const newReply: Reply = {
-      id: `reply-${Date.now()}`,
-      postId: post.id,
-      userId: currentUserId || 'current-user',
-      userName: 'Current User',
-      userAvatar: '👤',
-      userTitle: 'Member',
-      content: replyText,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      likes: 0
+  const handleAddReply = async () => {
+    if (!replyText.trim() || isSubmittingReply) return
+    setIsSubmittingReply(true)
+    try {
+      const interaction = await communityService.createInteraction(post.id, {
+        type: 'comment',
+        content: replyText,
+      })
+      const newReply: Reply = {
+        id: interaction.id,
+        postId: post.id,
+        userId: currentUserId || 'current-user',
+        userName: 'Current User',
+        userAvatar: '👤',
+        userTitle: 'Member',
+        content: replyText,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        likes: 0,
+      }
+      setReplies(prev => [...prev, newReply])
+      setReplyText('')
+    } catch {
+      // silent fail — keep text so user can retry
+    } finally {
+      setIsSubmittingReply(false)
     }
-
-    setReplies([...replies, newReply])
-    setReplyText('')
   }
 
   const formatDate = (date: Date) => {
@@ -283,11 +319,11 @@ export default function DiscussionDetailPage({
               </Button>
               <Button
                 variant={isSaved ? 'default' : 'outline'}
-                onClick={() => setIsSaved(!isSaved)}
+                onClick={handleSave}
                 className={`flex items-center gap-2 ${isSaved ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'border-gray-200'}`}
               >
                 <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
-                Save
+                {isSaved ? 'Saved' : 'Save'}
               </Button>
               <Button
                 variant="outline"
@@ -321,10 +357,10 @@ export default function DiscussionDetailPage({
               <div className="flex justify-end">
                 <Button
                   onClick={handleAddReply}
-                  disabled={!replyText.trim()}
+                  disabled={!replyText.trim() || isSubmittingReply}
                   className="bg-[#D52B1E] hover:bg-[#B8241B] text-white disabled:opacity-50"
                 >
-                  Post Reply
+                  {isSubmittingReply ? 'Posting…' : 'Post Reply'}
                 </Button>
               </div>
             </div>

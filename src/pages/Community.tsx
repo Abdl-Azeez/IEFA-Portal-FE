@@ -17,7 +17,15 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import {
+  communityService,
+  apiSortToUiSort,
+  type DiscussionAPI,
+  type CommunityGroupAPI,
+  type CommunityEventAPI,
+  type CommunityCategoryAPI,
+} from "@/lib/communityService";
 import type {
   CommunityCategory,
   DiscussionPost,
@@ -49,6 +57,37 @@ const categoryColors: Record<CommunityCategory, string> = {
   "Q&A": "bg-yellow-600",
   Resources: "bg-indigo-600",
 };
+
+/* -- API â†’ UI mapping helpers ---------------------------------------------- */
+function apiDiscussionToPost(
+  d: DiscussionAPI,
+  apiCategories: CommunityCategoryAPI[],
+): DiscussionPost {
+  const catName =
+    d.category?.name ??
+    apiCategories.find((c) => c.id === d.categoryId)?.name ??
+    "General Discussion";
+  return {
+    id: d.id,
+    title: d.title,
+    description: d.description ?? d.content ?? "",
+    category: catName as CommunityCategory,
+    poster:
+      d.author?.name ?? d.authorName ?? "Unknown",
+    posterAvatar: d.author?.avatar ?? d.authorAvatar ?? "ðŸ‘¤",
+    posterId: d.author?.id ?? d.authorId ?? "",
+    createdAt: new Date(d.createdAt),
+    updatedAt: new Date(d.updatedAt),
+    replies: d.repliesCount ?? 0,
+    views: d.viewsCount ?? 0,
+    likes: d.likesCount ?? 0,
+    shares: d.sharesCount ?? 0,
+    isAnswered: d.isAnswered ?? false,
+    isPinned: d.isPinned ?? false,
+    isSaved: d.isBookmarked ?? false,
+    tags: d.tags,
+  };
+}
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -118,132 +157,83 @@ export default function Community() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [selectedPost]);
 
-  const [discussionPosts, setDiscussionPosts] = useState<DiscussionPost[]>([
-    {
-      id: "1",
-      title: "Understanding Shariah Compliance in Murabaha Transactions",
-      description:
-        "Can Someone clarify how late payment penalties are treated under AAOIFI standards?",
-      category: "Markets & Investing",
-      poster: "A. Musa",
-      posterId: "user-1",
-      posterAvatar: "👨‍💼",
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      replies: 12,
-      views: 145,
-      likes: 8,
-      shares: 3,
-      isAnswered: true,
-    },
-    {
-      id: "2",
-      title: "The Role of Risk Sharing in Islamic Finance",
-      description:
-        "What measures are in place to ensure risk is fairly distributed among parties?",
-      category: "General Discussion",
-      poster: "S. Khan",
-      posterId: "user-2",
-      posterAvatar: "👩‍💼",
-      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-      updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-      replies: 5,
-      views: 98,
-      likes: 6,
-      shares: 1,
-    },
-    {
-      id: "3",
-      title: "Islamic Banking vs Conventional Banking",
-      description:
-        "How do profit-sharing models differ from interest-based lending?",
-      category: "Q&A",
-      poster: "L. Ahmed",
-      posterId: "user-3",
-      posterAvatar: "👨‍💼",
-      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-      updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
-      replies: 8,
-      views: 234,
-      likes: 15,
-      shares: 5,
-      isAnswered: true,
-    },
-    {
-      id: "4",
-      title: "The Impact of Zakat on Economic Development",
-      description:
-        "Can we discuss how zakat contributes to societal welfare and community development?",
-      category: "Zakat",
-      poster: "F. Rahman",
-      posterId: "user-4",
-      posterAvatar: "👨‍💼",
-      createdAt: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-      updatedAt: new Date(Date.now() - 15 * 60 * 1000),
-      replies: 2,
-      views: 45,
-      likes: 3,
-      shares: 0,
-    },
-    {
-      id: "5",
-      title: "Daily Islamic Finance Habits",
-      description:
-        "What simple habits can we adopt daily to integrate Islamic finance principles in our lives?",
-      category: "Every day islamic finance",
-      poster: "M. Hassan",
-      posterId: "user-5",
-      posterAvatar: "👨‍💼",
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-      updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      replies: 18,
-      views: 267,
-      likes: 22,
-      shares: 8,
-      tags: ["habits", "personal-finance"],
-    },
-    {
-      id: "6",
-      title: "Savings Strategies in Islamic Finance",
-      description:
-        "Looking for practical savings strategies that comply with Islamic principles",
-      category: "Savings",
-      poster: "N. Ali",
-      posterId: "user-6",
-      posterAvatar: "👩‍💼",
-      createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
-      updatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      replies: 9,
-      views: 156,
-      likes: 11,
-      shares: 2,
-    },
-    {
-      id: "7",
-      title: "Best Resources for Learning Islamic Finance",
-      description:
-        "Can anyone recommend quality resources, books, or courses for deepening Islamic finance knowledge?",
-      category: "Resources",
-      poster: "Z. Khan",
-      posterId: "user-7",
-      posterAvatar: "👨‍💼",
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      replies: 24,
-      views: 412,
-      likes: 34,
-      shares: 12,
-      tags: ["resources", "learning"],
-      isPinned: true,
-    },
-  ]);
+  /* -- API state -- */
+  const [apiCategories, setApiCategories] = useState<CommunityCategoryAPI[]>([]);
+  const [discussionPosts, setDiscussionPosts] = useState<DiscussionPost[]>([]);
+  const [groups, setGroups] = useState<CommunityGroupAPI[]>([]);
+  const [events, setEvents] = useState<CommunityEventAPI[]>([]);
+  const [discussionsLoading, setDiscussionsLoading] = useState(true);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  /** Maps discussionId â†’ likeInteractionId (so we can delete the like later) */
+  const likeInteractionIds = useRef<Map<string, string>>(new Map());
+
+  /* -- Load community categories (needed to map categoryId â†’ name) -- */
+  useEffect(() => {
+    communityService
+      .getCategories()
+      .then(setApiCategories)
+      .catch((err) => console.error("Failed to load community categories:", err));
+  }, []);
+
+  /* -- Load discussions (re-fetches when filters change) -- */
+  useEffect(() => {
+    setDiscussionsLoading(true);
+    const apiSort = filters.sortBy
+      ? apiSortToUiSort(filters.sortBy as "latest" | "earliest" | "mostPopular" | "unanswered")
+      : "latest";
+    const catId = filters.category
+      ? apiCategories.find((c) => c.name === filters.category)?.id
+      : undefined;
+    communityService
+      .getDiscussions({
+        categoryId: catId,
+        sortBy: apiSort,
+        timeRange: filters.timeRange as "day" | "week" | "month" | "all" | undefined,
+        search: searchQuery || undefined,
+        showBookmarkedOnly: filters.savedOnly,
+      })
+      .then((data) => {
+        setDiscussionPosts(data.map((d) => apiDiscussionToPost(d, apiCategories)));
+        setApiError(null);
+      })
+      .catch((err) => {
+        console.error("Failed to load discussions:", err);
+        setApiError("Failed to load discussions.");
+      })
+      .finally(() => setDiscussionsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, searchQuery, apiCategories]);
+
+  /* -- Load groups when tab is selected -- */
+  useEffect(() => {
+    if (selectedTab !== "study-groups") return;
+    setGroupsLoading(true);
+    communityService
+      .getGroups()
+      .then(setGroups)
+      .catch((err) => console.error("Failed to load groups:", err))
+      .finally(() => setGroupsLoading(false));
+  }, [selectedTab]);
+
+  /* -- Load events when tab is selected -- */
+  useEffect(() => {
+    if (selectedTab !== "events") return;
+    setEventsLoading(true);
+    communityService
+      .getEvents()
+      .then(setEvents)
+      .catch((err) => console.error("Failed to load events:", err))
+      .finally(() => setEventsLoading(false));
+  }, [selectedTab]);
 
   const mentors = [
     {
       name: "Dr. Salman Al-Farsi",
       role: "Senior Portfolio Manager",
       organization: "ESG",
-      image: "👨‍💼",
+      image: "ðŸ‘¨â€ðŸ’¼",
       available: true,
       expertise: ["Shari'ah Audit", "Career Advice"],
     },
@@ -251,7 +241,7 @@ export default function Community() {
       name: "Dr. Fatima Al-Farruq",
       role: "Senior Portfolio Manager",
       organization: "ESG",
-      image: "👩‍💼",
+      image: "ðŸ‘©â€ðŸ’¼",
       available: true,
       expertise: ["Career Advice"],
     },
@@ -259,7 +249,7 @@ export default function Community() {
       name: "Dr. Ali Badar",
       role: "Senior Portfolio Manager",
       organization: "ESG",
-      image: "👨‍💼",
+      image: "ðŸ‘¨â€ðŸ’¼",
       available: true,
       expertise: ["Shari'ah Audit", "Career Advice"],
     },
@@ -371,21 +361,54 @@ export default function Community() {
   const formatJoinDate = (date: Date) =>
     date.toLocaleString("default", { month: "long", year: "numeric" });
 
-  const toggleSavePost = (postId: string) => {
-    setSavedPosts((prev) =>
-      prev.includes(postId)
-        ? prev.filter((id) => id !== postId)
-        : [...prev, postId],
-    );
-  };
+  const toggleSavePost = useCallback(async (postId: string) => {
+    try {
+      const isNowSaved = await communityService.toggleBookmark(postId);
+      setSavedPosts((prev) =>
+        isNowSaved
+          ? [...prev, postId]
+          : prev.filter((id) => id !== postId),
+      );
+      setDiscussionPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, isSaved: isNowSaved } : p)),
+      );
+    } catch (err) {
+      console.error("Failed to toggle bookmark:", err);
+      // Optimistic local fallback
+      setSavedPosts((prev) =>
+        prev.includes(postId)
+          ? prev.filter((id) => id !== postId)
+          : [...prev, postId],
+      );
+    }
+  }, []);
 
-  const toggleLikePost = (postId: string) => {
-    setLikedPosts((prev) =>
-      prev.includes(postId)
-        ? prev.filter((id) => id !== postId)
-        : [...prev, postId],
-    );
-  };
+  const toggleLikePost = useCallback(async (postId: string) => {
+    const alreadyLiked = likedPosts.includes(postId);
+    if (alreadyLiked) {
+      const interactionId = likeInteractionIds.current.get(postId);
+      if (interactionId) {
+        try {
+          await communityService.deleteInteraction(interactionId);
+          likeInteractionIds.current.delete(postId);
+        } catch (err) {
+          console.error("Failed to unlike:", err);
+          return;
+        }
+      }
+      setLikedPosts((prev) => prev.filter((id) => id !== postId));
+    } else {
+      try {
+        const interaction = await communityService.createInteraction(postId, {
+          type: "like",
+        });
+        likeInteractionIds.current.set(postId, interaction.id);
+        setLikedPosts((prev) => [...prev, postId]);
+      } catch (err) {
+        console.error("Failed to like:", err);
+      }
+    }
+  }, [likedPosts]);
 
   const handleShare = async (post: DiscussionPost) => {
     const url = `${window.location.origin}/community/${post.id}`;
@@ -415,31 +438,53 @@ export default function Community() {
     alert("Thank you. The post has been reported to moderators.");
   };
 
-  const handlePostClick = (post: DiscussionPost) => {
-    // Mock user profile - in real app, fetch from backend
+  const handlePostClick = async (post: DiscussionPost) => {
+    let fullContent = post.description;
+    let repliesList: import("@/types/community").Reply[] = [];
+    try {
+      const full = await communityService.getDiscussionById(post.id);
+      fullContent = full.content ?? full.description ?? post.description;
+      const interactions = full.interactions ?? [];
+      repliesList = interactions
+        .filter((i) => i.type === "comment")
+        .map((i) => ({
+          id: i.id,
+          postId: post.id,
+          userId: "",
+          userName: "Member",
+          userAvatar: "👤",
+          userTitle: "Member",
+          content: i.content ?? "",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          likes: 0,
+        }));
+    } catch {
+      // fall back to list-level data
+    }
+
     const posterProfile: UserProfile = {
       id: post.posterId,
       name: post.poster,
       title: "Islamic Finance Professional",
       displayPicture: post.posterAvatar || "👤",
       bio: "Passionate about Islamic finance education",
-      joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000), // 6 months ago
+      joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
       totalPosts: 25,
       totalViews: 1200,
       totalReplies: 85,
       totalLikes: 340,
-      isVerified: Math.random() > 0.5,
-      isModerator: Math.random() > 0.8,
+      isVerified: false,
+      isModerator: false,
       rating: 4.5,
     };
 
     const detailedPost: DetailedDiscussionPost = {
       ...post,
-      content:
-        "This is the full discussion content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      content: fullContent,
       posterDetails: posterProfile,
       attachments: [],
-      repliesList: [],
+      repliesList,
       mentions: [],
     };
 
@@ -456,7 +501,7 @@ export default function Community() {
       id: post.posterId,
       name: post.poster,
       title: "Islamic Finance Professional",
-      displayPicture: post.posterAvatar || "👤",
+      displayPicture: post.posterAvatar || "ðŸ‘¤",
       bio: "Passionate about Islamic finance education",
       joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
       totalPosts: 25,
@@ -472,23 +517,52 @@ export default function Community() {
     setShowPosterProfile(true);
   };
 
-  const handlePinPost = (postId: string) => {
-    // toggle pin state in local data (would call backend in real app)
-    setDiscussionPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, isPinned: !p.isPinned } : p)),
-    );
-  };
-
-  const handleDeletePost = (postId: string) => {
-    if (window.confirm("Are you sure you want to delete this post?")) {
-      alert(`Post ${postId} deleted!`);
+  const handlePinPost = useCallback(async (postId: string) => {
+    const post = discussionPosts.find((p) => p.id === postId);
+    if (!post) return;
+    try {
+      await communityService.updateDiscussion(postId, { isPinned: !post.isPinned });
+      setDiscussionPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, isPinned: !p.isPinned } : p)),
+      );
+    } catch (err) {
+      console.error("Failed to pin/unpin post:", err);
     }
-  };
+  }, [discussionPosts]);
 
-  const handleCreateDiscussion = (data: any) => {
-    alert(`Discussion created: "${data.title}" in ${data.category}`);
-    // In real app, send to backend and add to discussionPosts
-  };
+  const handleDeletePost = useCallback(async (postId: string) => {
+    if (!window.confirm("Are you sure you want to delete this post?")) return;
+    try {
+      await communityService.deleteDiscussion(postId);
+      setDiscussionPosts((prev) => prev.filter((p) => p.id !== postId));
+    } catch (err) {
+      console.error("Failed to delete post:", err);
+      alert("Failed to delete post.");
+    }
+  }, []);
+
+  const handleCreateDiscussion = useCallback(
+    async (data: any) => {
+      const catId = apiCategories.find((c) => c.name === data.category)?.id;
+      try {
+        const created = await communityService.createDiscussion({
+          title: data.title,
+          content: data.content,
+          categoryId: catId,
+          tags: data.tags,
+        });
+        setDiscussionPosts((prev) => [
+          apiDiscussionToPost(created, apiCategories),
+          ...prev,
+        ]);
+        setShowStartDiscussionModal(false);
+      } catch (err) {
+        console.error("Failed to create discussion:", err);
+        alert("Failed to create discussion. Please try again.");
+      }
+    },
+    [apiCategories],
+  );
 
   // Show detail page if post is selected
   if (selectedPost) {
@@ -765,22 +839,22 @@ export default function Community() {
                           {
                             value: "latest",
                             label: "Latest First",
-                            icon: "⏱️",
+                            icon: "â±ï¸",
                           },
                           {
                             value: "earliest",
                             label: "Oldest First",
-                            icon: "📜",
+                            icon: "ðŸ“œ",
                           },
                           {
                             value: "mostPopular",
                             label: "Most Popular",
-                            icon: "🔥",
+                            icon: "ðŸ”¥",
                           },
                           {
                             value: "unanswered",
                             label: "Unanswered",
-                            icon: "❓",
+                            icon: "â“",
                           },
                         ].map((option) => (
                           <motion.button
@@ -802,7 +876,7 @@ export default function Community() {
                             <span>{option.label}</span>
                             {filters.sortBy === option.value && (
                               <div className="ml-auto h-5 w-5 rounded-full bg-blue-400 flex items-center justify-center">
-                                <span className="text-white text-xs">✓</span>
+                                <span className="text-white text-xs">âœ“</span>
                               </div>
                             )}
                           </motion.button>
@@ -831,10 +905,10 @@ export default function Community() {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { value: "day", label: "📅 Last Day" },
-                          { value: "week", label: "📆 Last Week" },
-                          { value: "month", label: "📊 Last Month" },
-                          { value: "all", label: "🌍 All Time" },
+                          { value: "day", label: "ðŸ“… Last Day" },
+                          { value: "week", label: "ðŸ“† Last Week" },
+                          { value: "month", label: "ðŸ“Š Last Month" },
+                          { value: "all", label: "ðŸŒ All Time" },
                         ].map((option) => (
                           <motion.button
                             key={option.value}
@@ -867,7 +941,7 @@ export default function Community() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-purple-400 to-purple-500 flex items-center justify-center text-white text-lg">
-                          💾
+                          ðŸ’¾
                         </div>
                         <div>
                           <p className="font-semibold text-[#000000]">
@@ -907,11 +981,18 @@ export default function Community() {
                       }
                       className="w-full py-3 rounded-lg font-semibold text-sm border-2 border-gray-300 text-[#737692] hover:border-[#D52B1E] hover:text-[#D52B1E] transition-all bg-gray-50 hover:bg-red-50"
                     >
-                      ↺ Reset Filters
+                      â†º Reset Filters
                     </motion.button>
                   </CardContent>
                 </Card>
               </motion.div>
+            )}
+
+            {/* API error */}
+            {apiError && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                {apiError}
+              </div>
             )}
 
             {/* Results Count */}
@@ -925,7 +1006,25 @@ export default function Community() {
 
             {/* Discussions List */}
             <div className="space-y-4">
-              {filteredDiscussions.length > 0 ? (
+              {discussionsLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-white rounded-lg border p-6 animate-pulse space-y-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/2" />
+                      <div className="h-5 bg-gray-100 rounded-full w-24" />
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded" />
+                    <div className="h-3 bg-gray-100 rounded w-4/5" />
+                    <div className="flex gap-3 pt-2 border-t">
+                      <div className="h-8 w-8 rounded-full bg-gray-200" />
+                      <div className="h-3 bg-gray-100 rounded w-20 mt-2.5" />
+                    </div>
+                  </div>
+                ))
+              ) : filteredDiscussions.length > 0 ? (
                 filteredDiscussions.map((post, index) => (
                   <motion.div
                     key={post.id}
@@ -1060,7 +1159,7 @@ export default function Community() {
                               </button>
                               {post.shares > 0 && (
                                 <div className="flex items-center gap-1 text-sm">
-                                  <span>🔗</span>
+                                  <span>ðŸ”—</span>
                                   <span>{post.shares}</span>
                                 </div>
                               )}
@@ -1109,86 +1208,108 @@ export default function Community() {
 
           {/* Study Groups Tab */}
           <TabsContent value="study-groups" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              {[
-                {
-                  name: "CIFP Study Group",
-                  members: 45,
-                  topic: "Module 4 Discussion",
-                  nextSession: "Tomorrow, 3:00 PM",
-                },
-                {
-                  name: "Sukuk Investment Circle",
-                  members: 28,
-                  topic: "Market Analysis",
-                  nextSession: "Wednesday, 5:00 PM",
-                },
-                {
-                  name: "ESG Finance Enthusiasts",
-                  members: 32,
-                  topic: "Sustainable Finance",
-                  nextSession: "Friday, 2:00 PM",
-                },
-                {
-                  name: "Shariah Compliance Hub",
-                  members: 56,
-                  topic: "AAOIFI Standards",
-                  nextSession: "Thursday, 4:00 PM",
-                },
-              ].map((group, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <Card className="hover:shadow-lg transition-all">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-[#000000] mb-2">
-                            {group.name}
-                          </CardTitle>
-                          <div className="flex items-center gap-2 text-sm text-[#737692]">
-                            <Users className="h-4 w-4" />
-                            <span>{group.members} members</span>
+            {groupsLoading ? (
+              <div className="grid gap-6 md:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg border p-5 animate-pulse space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="h-3 bg-gray-100 rounded w-1/3" />
+                    <div className="h-3 bg-gray-100 rounded w-2/3" />
+                    <div className="h-9 bg-gray-100 rounded-lg mt-2" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                {groups.map((group, index) => (
+                  <motion.div
+                    key={group.id ?? index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <Card className="hover:shadow-lg transition-all">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-[#000000] mb-2">
+                              {group.name}
+                            </CardTitle>
+                            <div className="flex items-center gap-2 text-sm text-[#737692]">
+                              <Users className="h-4 w-4" />
+                              <span>{group.memberCount ?? group.members ?? 0} members</span>
+                            </div>
                           </div>
+                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                            Active
+                          </Badge>
                         </div>
-                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                          Active
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-sm text-[#737692] mb-1">
-                            Current Topic
-                          </p>
-                          <p className="font-medium text-[#000000]">
-                            {group.topic}
-                          </p>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {group.description && (
+                            <div>
+                              <p className="text-sm text-[#737692] mb-1">About</p>
+                              <p className="font-medium text-[#000000] text-sm">{group.description}</p>
+                            </div>
+                          )}
+                          {group.topic && (
+                            <div>
+                              <p className="text-sm text-[#737692] mb-1">Current Topic</p>
+                              <p className="font-medium text-[#000000]">{group.topic}</p>
+                            </div>
+                          )}
+                          {group.nextSession && (
+                            <div>
+                              <p className="text-sm text-[#737692] mb-1">Next Session</p>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-[#D52B1E]" />
+                                <p className="font-medium text-[#000000]">{group.nextSession}</p>
+                              </div>
+                            </div>
+                          )}
+                          <Button
+                            className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white"
+                            onClick={async () => {
+                              try {
+                                if (group.isMember) {
+                                  await communityService.leaveGroup(group.id);
+                                  setGroups((prev) =>
+                                    prev.map((g) =>
+                                      g.id === group.id
+                                        ? { ...g, isMember: false, memberCount: (g.memberCount ?? 0) - 1 }
+                                        : g,
+                                    ),
+                                  );
+                                } else {
+                                  await communityService.joinGroup(group.id);
+                                  setGroups((prev) =>
+                                    prev.map((g) =>
+                                      g.id === group.id
+                                        ? { ...g, isMember: true, memberCount: (g.memberCount ?? 0) + 1 }
+                                        : g,
+                                    ),
+                                  );
+                                }
+                              } catch (err) {
+                                console.error("Failed to join/leave group:", err);
+                              }
+                            }}
+                          >
+                            {group.isMember ? "Leave Group" : "Join Group"}
+                          </Button>
                         </div>
-                        <div>
-                          <p className="text-sm text-[#737692] mb-1">
-                            Next Session
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-[#D52B1E]" />
-                            <p className="font-medium text-[#000000]">
-                              {group.nextSession}
-                            </p>
-                          </div>
-                        </div>
-                        <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                          Join Group
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+                {groups.length === 0 && !groupsLoading && (
+                  <div className="col-span-2 text-center py-12 text-[#737692]">
+                    No groups available yet.
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           {/* Mentorship Tab */}
@@ -1323,8 +1444,8 @@ export default function Community() {
                               Available for Mentorship
                             </span>
                           </div>
-                          <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white text-sm">
-                            Request Session
+                          <Button disabled className="w-full bg-[#D52B1E] opacity-60 cursor-not-allowed text-white text-sm">
+                            Coming Soon
                           </Button>
                         </div>
                       </CardContent>
@@ -1338,71 +1459,106 @@ export default function Community() {
           {/* Events Tab */}
           <TabsContent value="events" className="mt-6">
             <div className="space-y-4">
-              {[
-                {
-                  title: "Islamic Finance Summit 2026",
-                  date: "March 15, 2026",
-                  time: "9:00 AM - 5:00 PM",
-                  type: "Conference",
-                  location: "Virtual",
-                  attendees: 250,
-                },
-                {
-                  title: "Sukuk Market Workshop",
-                  date: "February 20, 2026",
-                  time: "2:00 PM - 4:00 PM",
-                  type: "Workshop",
-                  location: "Dubai",
-                  attendees: 45,
-                },
-                {
-                  title: "ESG Investment Webinar",
-                  date: "February 12, 2026",
-                  time: "10:00 AM - 11:30 AM",
-                  type: "Webinar",
-                  location: "Online",
-                  attendees: 180,
-                },
-              ].map((event, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <Card className="hover:shadow-lg transition-all">
+              {eventsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="animate-pulse">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-[#000000]">
-                              {event.title}
-                            </h3>
-                            <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                              {event.type}
-                            </Badge>
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-5 w-48 bg-slate-200 rounded" />
+                            <div className="h-5 w-20 bg-slate-200 rounded-full" />
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm text-[#737692]">
-                              <Calendar className="h-4 w-4" />
-                              <span>
-                                {event.date} • {event.time}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-[#737692]">
-                              <span>📍 {event.location}</span>
-                              <span>• {event.attendees} registered</span>
-                            </div>
-                          </div>
+                          <div className="h-4 w-56 bg-slate-100 rounded" />
+                          <div className="h-4 w-40 bg-slate-100 rounded" />
                         </div>
-                        <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                          Register
-                        </Button>
+                        <div className="h-9 w-24 bg-slate-200 rounded-lg" />
                       </div>
                     </CardContent>
                   </Card>
-                </motion.div>
-              ))}
+                ))
+              ) : events.length === 0 ? (
+                <p className="text-center text-[#737692] py-8">No events found.</p>
+              ) : (
+                events.map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <Card className="hover:shadow-lg transition-all">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-semibold text-[#000000]">
+                                {event.title}
+                              </h3>
+                              {event.type && (
+                                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                                  {event.type}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              {(event.date ?? event.startDate) && (
+                                <div className="flex items-center gap-2 text-sm text-[#737692]">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>
+                                    {event.date ?? event.startDate}
+                                    {(event.time ?? event.startTime) &&
+                                      ` \u2022 ${event.time ?? event.startTime}`}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4 text-sm text-[#737692]">
+                                {event.location && <span>{"\uD83D\uDCCD"} {event.location}</span>}
+                                {(event.attendeeCount ?? event.attendees) != null && (
+                                  <span>\u2022 {event.attendeeCount ?? event.attendees} registered</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            className={
+                              event.isRegistered
+                                ? "bg-slate-200 hover:bg-slate-300 text-slate-700"
+                                : "bg-[#D52B1E] hover:bg-[#B8241B] text-white"
+                            }
+                            onClick={async () => {
+                              try {
+                                if (event.isRegistered) {
+                                  await communityService.unregisterFromEvent(event.id);
+                                } else {
+                                  await communityService.registerForEvent(event.id);
+                                }
+                                setEvents((prev) =>
+                                  prev.map((e) =>
+                                    e.id === event.id
+                                      ? {
+                                          ...e,
+                                          isRegistered: !e.isRegistered,
+                                          attendeeCount:
+                                            (e.attendeeCount ?? e.attendees ?? 0) +
+                                            (e.isRegistered ? -1 : 1),
+                                        }
+                                      : e
+                                  )
+                                );
+                              } catch {
+                                // ignore registration error
+                              }
+                            }}
+                          >
+                            {event.isRegistered ? "Unregister" : "Register"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              )}
             </div>
           </TabsContent>
         </Tabs>

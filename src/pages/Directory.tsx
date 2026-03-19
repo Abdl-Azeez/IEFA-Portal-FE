@@ -2,6 +2,11 @@
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  directoryService,
+  type DirectoryListingAPI,
+  type DirectoryCategoryAPI,
+} from "@/lib/directoryService";
+import {
   Search,
   SlidersHorizontal,
   X,
@@ -68,23 +73,48 @@ const CATEGORY_CONFIG: Record<
   "Regulatory Bodies": { color: "#dc2626", bg: "#FEF2F2", icon: Shield },
 };
 
-const FINANCIAL_CATEGORIES = [
-  "Islamic Banks",
-  "Takaful Providers",
-  "Asset Management",
-  "Capital Markets",
-  "Islamic Fintech",
-  "Shariah Advisory",
-];
-const NON_FINANCIAL_CATEGORIES = [
-  "Research Institutions",
-  "Legal Services",
-  "Education & Training",
-  "Scholars & Experts",
-  "Regulatory Bodies",
+/** Colour palette used for categories not in CATEGORY_CONFIG. */
+const DYNAMIC_PALETTE: Array<{ color: string; bg: string; icon: React.ElementType }> = [
+  { color: "#D52B1E", bg: "#FEF2F2", icon: Building2 },
+  { color: "#2563eb", bg: "#EFF6FF", icon: Shield },
+  { color: "#7c3aed", bg: "#F5F3FF", icon: TrendingUp },
+  { color: "#0891b2", bg: "#ECFEFF", icon: Landmark },
+  { color: "#059669", bg: "#ECFDF5", icon: Cpu },
+  { color: "#d97706", bg: "#FFFBEB", icon: CheckCircle },
+  { color: "#1d4ed8", bg: "#EFF6FF", icon: BookOpen },
+  { color: "#6d28d9", bg: "#F5F3FF", icon: Scale },
+  { color: "#0d9488", bg: "#F0FDFA", icon: GraduationCap },
+  { color: "#dc2626", bg: "#FEF2F2", icon: Users },
 ];
 
-/* -- Data ------------------------------------------------------------------ */
+function getCategoryConfig(name: string) {
+  if (CATEGORY_CONFIG[name]) return CATEGORY_CONFIG[name];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
+  return DYNAMIC_PALETTE[hash % DYNAMIC_PALETTE.length];
+}
+
+/* -- API mapping ----------------------------------------------------------- */
+function apiListingToEntry(a: DirectoryListingAPI): DirectoryEntry {
+  return {
+    id: a.id,
+    name: a.name,
+    sector: a.isFinancial ? "financial" : "non-financial",
+    categories: a.category ? [a.category.name] : [],
+    overview: a.description ?? "",
+    yearEstablished: a.yearFounded ?? null,
+    headquarters: a.city ?? "",
+    country: a.country ?? "",
+    keyServices: a.services ?? a.tags ?? [],
+    website: a.websiteUrl ?? "",
+    email: a.email ?? undefined,
+    phone: a.phone ?? undefined,
+    linkedinUrl: a.socialLinks?.linkedin ?? undefined,
+    twitterUrl: a.socialLinks?.twitter ?? undefined,
+  };
+}
+
+// Kept as fallback so the UI renders without an API connection during development
 const DIRECTORY_DATA: DirectoryEntry[] = [
   /* === FINANCIAL === */
   {
@@ -866,7 +896,7 @@ function CategoryChip({
   count: number;
   onClick: () => void;
 }>) {
-  const cfg = label === "All" ? null : CATEGORY_CONFIG[label];
+  const cfg = label === "All" ? null : getCategoryConfig(label);
   const Icon = cfg?.icon;
   return (
     <button
@@ -901,11 +931,7 @@ function OrgCard({
   onView,
 }: Readonly<{ entry: DirectoryEntry; onView: (e: DirectoryEntry) => void }>) {
   const primaryCat = entry.categories[0];
-  const cfg = CATEGORY_CONFIG[primaryCat] ?? {
-    color: "#D52B1E",
-    bg: "#FEF2F2",
-    icon: Building2,
-  };
+  const cfg = getCategoryConfig(primaryCat ?? "");
   const Icon = cfg.icon;
   const initials = getInitials(entry.name);
 
@@ -932,8 +958,8 @@ function OrgCard({
                     key={cat}
                     className="text-xs px-2 py-0.5 rounded-full font-medium"
                     style={{
-                      backgroundColor: CATEGORY_CONFIG[cat]?.bg ?? "#F3F4F6",
-                      color: CATEGORY_CONFIG[cat]?.color ?? "#6B7280",
+                      backgroundColor: getCategoryConfig(cat).bg,
+                      color: getCategoryConfig(cat).color,
                     }}
                   >
                     {cat}
@@ -1010,11 +1036,7 @@ function DetailModal({
   onClose,
 }: Readonly<{ entry: DirectoryEntry; onClose: () => void }>) {
   const primaryCat = entry.categories[0];
-  const cfg = CATEGORY_CONFIG[primaryCat] ?? {
-    color: "#D52B1E",
-    bg: "#FEF2F2",
-    icon: Building2,
-  };
+  const cfg = getCategoryConfig(primaryCat ?? "");
   const Icon = cfg.icon;
   const initials = getInitials(entry.name);
 
@@ -1067,8 +1089,8 @@ function DetailModal({
                     key={cat}
                     className="text-xs px-2.5 py-1 rounded-full font-medium"
                     style={{
-                      backgroundColor: CATEGORY_CONFIG[cat]?.bg ?? "#F3F4F6",
-                      color: CATEGORY_CONFIG[cat]?.color ?? "#6B7280",
+                      backgroundColor: getCategoryConfig(cat).bg,
+                      color: getCategoryConfig(cat).color,
                     }}
                   >
                     {cat}
@@ -1394,6 +1416,33 @@ export default function Directory() {
 
   const [searchParams] = useSearchParams();
 
+  /* -- API state -- */
+  const [apiEntries, setApiEntries] = useState<DirectoryEntry[] | null>(null);
+  const [apiCategories, setApiCategories] = useState<DirectoryCategoryAPI[]>([]);
+  const [apiLoading, setApiLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setApiLoading(true);
+    Promise.all([
+      directoryService.getListings(),
+      directoryService.getCategories(),
+    ])
+      .then(([listings, categories]) => {
+        setApiEntries(listings.map(apiListingToEntry));
+        setApiCategories(categories);
+        setApiError(null);
+      })
+      .catch((err) => {
+        console.error("Failed to load directory listings:", err);
+        setApiError("Failed to load directory. Showing cached data.");
+      })
+      .finally(() => setApiLoading(false));
+  }, []);
+
+  // Use API data when available, fall back to built-in data
+  const allEntries = apiEntries ?? DIRECTORY_DATA;
+
   const [sector, setSector] = useState<'financial' | 'non-financial'>(() => {
     const s = searchParams.get('sector');
     return s === 'non-financial' ? 'non-financial' : 'financial';
@@ -1439,12 +1488,18 @@ export default function Directory() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sector]);
 
-  const categories =
-    sector === "financial" ? FINANCIAL_CATEGORIES : NON_FINANCIAL_CATEGORIES;
+  const categories = useMemo(
+    () =>
+      apiCategories
+        .filter((c) => c.isFinancial === (sector === "financial"))
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((c) => c.name),
+    [apiCategories, sector],
+  );
 
   const sectorEntries = useMemo(
-    () => DIRECTORY_DATA.filter((e) => e.sector === sector),
-    [sector],
+    () => allEntries.filter((e) => e.sector === sector),
+    [allEntries, sector],
   );
 
   // Sector entries further filtered by geography — used for category counts
@@ -1554,10 +1609,10 @@ export default function Directory() {
     (yearRange[1] ? 1 : 0);
 
   const geoFilteredData = geography === 'local'
-    ? DIRECTORY_DATA.filter((e) => e.country === 'Nigeria')
+    ? allEntries.filter((e) => e.country === 'Nigeria')
     : geography === 'global'
-    ? DIRECTORY_DATA.filter((e) => e.country !== 'Nigeria')
-    : DIRECTORY_DATA;
+    ? allEntries.filter((e) => e.country !== 'Nigeria')
+    : allEntries;
   const finCount = geoFilteredData.filter(
     (e) => e.sector === "financial",
   ).length;
@@ -1573,7 +1628,12 @@ export default function Directory() {
       animate="visible"
       variants={containerVariants}
     >
-      {/* Hero */}
+      {/* API error banner */}
+      {apiError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          {apiError}
+        </div>
+      )}
       <motion.div variants={itemVariants}>
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-[#1c0505] to-gray-900 p-8 md:p-12 min-h-[220px] flex items-center">
           <div className="pointer-events-none absolute -top-16 -right-16 h-72 w-72 rounded-full bg-[#D52B1E]/20 blur-3xl" />
@@ -1815,7 +1875,26 @@ export default function Directory() {
           </p>
         </motion.div>
 
-        {filteredEntries.length > 0 ? (
+        {apiLoading ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse space-y-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gray-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  </div>
+                </div>
+                <div className="h-3 bg-gray-100 rounded" />
+                <div className="h-3 bg-gray-100 rounded w-5/6" />
+              </div>
+            ))}
+          </div>
+        ) : filteredEntries.length > 0 ? (
           <>
             <motion.div
               key={`${sector}-${selectedCategory}-${currentPage}`}

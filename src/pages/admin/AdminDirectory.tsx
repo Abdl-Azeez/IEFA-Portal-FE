@@ -1,6 +1,12 @@
 ﻿import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import {
+  directoryService,
+  type DirectoryListingAPI,
+  type DirectoryCategoryAPI,
+  type CreateDirectoryCategoryDto,
+} from "@/lib/directoryService";
 import {
   FolderOpen,
   Plus,
@@ -49,12 +55,22 @@ interface DirectoryEntry {
   yearEstablished: number | null;
   headquarters: string;
   country: string;
+  address: string;
   keyServices: string[];
+  tags: string[];
   website: string;
   email?: string;
   phone?: string;
   linkedinUrl?: string;
   twitterUrl?: string;
+  tagline: string;
+  listingType: string;
+  logoUrl: string;
+  bannerUrl: string;
+  employeeRange: string;
+  shariahCertified: boolean;
+  certifyingBody: string;
+  aumUsdMillions: number | null;
   status: "active" | "inactive" | "pending";
 }
 
@@ -80,430 +96,26 @@ const CATEGORY_CONFIG: Record<
   "Regulatory Bodies": { color: "#dc2626", bg: "#FEF2F2", icon: Shield },
 };
 
-const FINANCIAL_CATEGORIES = [
-  "Islamic Banks",
-  "Takaful Providers",
-  "Asset Management",
-  "Capital Markets",
-  "Islamic Fintech",
-  "Shariah Advisory",
-];
-const NON_FINANCIAL_CATEGORIES = [
-  "Research Institutions",
-  "Legal Services",
-  "Education & Training",
-  "Scholars & Experts",
-  "Regulatory Bodies",
-];
-const ALL_CATEGORIES = [...FINANCIAL_CATEGORIES, ...NON_FINANCIAL_CATEGORIES];
-
-/* -- Sample data ----------------------------------------------------------- */
-const INITIAL_ENTRIES: DirectoryEntry[] = [
-  {
-    id: "1",
-    name: "Dubai Islamic Bank",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "The world's first full-service Islamic bank, offering Shariah-compliant retail, corporate, and investment banking services.",
-    yearEstablished: 1975,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: [
-      "Retail Banking",
-      "Corporate Banking",
-      "Investment Banking",
-      "Sukuk",
-    ],
-    website: "dib.ae",
-    email: "info@dib.ae",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Al Rajhi Bank",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "One of the largest Islamic banks by assets. Deep retail and corporate focus across Saudi Arabia and internationally.",
-    yearEstablished: 1957,
-    headquarters: "Riyadh",
-    country: "Saudi Arabia",
-    keyServices: [
-      "Retail Banking",
-      "SME Finance",
-      "Trade Finance",
-      "Home Finance",
-    ],
-    website: "alrajhibank.com.sa",
-    email: "contactus@alrajhi-bank.com",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Maybank Islamic",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "The largest Islamic bank in Malaysia and ASEAN by assets, providing a comprehensive suite of Shariah-compliant products.",
-    yearEstablished: 2008,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Consumer Banking",
-      "Commercial Banking",
-      "Wealth Management",
-    ],
-    website: "maybank2u.com.my",
-    email: "info@maybank.com",
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "Kuwait Finance House",
-    sector: "financial",
-    categories: ["Islamic Banks", "Capital Markets"],
-    overview:
-      "One of the world leading Islamic financial institutions with a presence across the Gulf, Europe, and Asia.",
-    yearEstablished: 1977,
-    headquarters: "Kuwait City",
-    country: "Kuwait",
-    keyServices: [
-      "Corporate Finance",
-      "Investment Banking",
-      "Real Estate",
-      "Sukuk Structuring",
-    ],
-    website: "kfh.com",
-    email: "info@kfh.com",
-    status: "active",
-  },
-  {
-    id: "5",
-    name: "Meezan Bank",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "Pakistan's first and largest dedicated Islamic commercial bank committed to innovative Shariah-compliant banking solutions.",
-    yearEstablished: 2002,
-    headquarters: "Karachi",
-    country: "Pakistan",
-    keyServices: ["Consumer Banking", "Corporate Banking", "Trade Finance"],
-    website: "meezanbank.com",
-    email: "customercare@meezanbank.com",
-    status: "active",
-  },
-  {
-    id: "6",
-    name: "Takaful Malaysia Bhd",
-    sector: "financial",
-    categories: ["Takaful Providers"],
-    overview:
-      "A pioneer and market leader in the Malaysian Takaful industry offering family and general Takaful products.",
-    yearEstablished: 1984,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Family Takaful",
-      "General Takaful",
-      "Group Takaful",
-      "Medical Takaful",
-    ],
-    website: "takaful.com.my",
-    email: "customerservice@takaful.com.my",
-    status: "active",
-  },
-  {
-    id: "7",
-    name: "Salama Islamic Arab Insurance",
-    sector: "financial",
-    categories: ["Takaful Providers"],
-    overview:
-      "One of the largest Takaful operators worldwide, operating across the UAE, Egypt, Senegal, and beyond.",
-    yearEstablished: 1979,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: ["Life Takaful", "General Takaful", "Re-Takaful"],
-    website: "salama.ae",
-    email: "info@salama.ae",
-    status: "active",
-  },
-  {
-    id: "8",
-    name: "Saturna Capital",
-    sector: "financial",
-    categories: ["Asset Management"],
-    overview:
-      "A U.S.-based investment management firm specializing in ethical, Shariah-compliant investment funds (Amana Funds).",
-    yearEstablished: 1989,
-    headquarters: "Bellingham, WA",
-    country: "USA",
-    keyServices: [
-      "Equity Funds",
-      "Income Funds",
-      "ESG Investing",
-      "Shariah Screening",
-    ],
-    website: "saturna.com",
-    email: "info@saturna.com",
-    status: "active",
-  },
-  {
-    id: "9",
-    name: "Amundi Islamic",
-    sector: "financial",
-    categories: ["Asset Management"],
-    overview:
-      "Part of the global Amundi Group, offering Shariah-compliant fund management for institutional investors.",
-    yearEstablished: 2008,
-    headquarters: "Paris",
-    country: "France",
-    keyServices: ["Sukuk Funds", "Equity Portfolios", "Money Market"],
-    website: "amundi.com",
-    status: "active",
-  },
-  {
-    id: "10",
-    name: "Nasdaq Dubai",
-    sector: "financial",
-    categories: ["Capital Markets"],
-    overview:
-      "The international financial exchange in the Middle East, providing a platform for Sukuk listings and equities.",
-    yearEstablished: 2005,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: ["Sukuk Listing", "Equity Market", "Derivatives"],
-    website: "nasdaqdubai.com",
-    email: "info@nasdaqdubai.com",
-    status: "active",
-  },
-  {
-    id: "11",
-    name: "Wahed Invest",
-    sector: "financial",
-    categories: ["Islamic Fintech"],
-    overview:
-      "A New York-based halal robo-advisory platform offering automated, Shariah-compliant portfolio management globally.",
-    yearEstablished: 2015,
-    headquarters: "New York",
-    country: "USA",
-    keyServices: ["Robo-Advisory", "Portfolio Management", "Shariah Screening"],
-    website: "wahedinvest.com",
-    email: "support@wahedinvest.com",
-    status: "active",
-  },
-  {
-    id: "12",
-    name: "Ethis Group",
-    sector: "financial",
-    categories: ["Islamic Fintech"],
-    overview:
-      "A Singapore-based Islamic crowdfunding platform specializing in property and social impact investments.",
-    yearEstablished: 2014,
-    headquarters: "Singapore",
-    country: "Singapore",
-    keyServices: ["Crowdfunding", "Real Estate Finance", "SME Financing"],
-    website: "ethis.co",
-    email: "hello@ethis.co",
-    status: "active",
-  },
-  {
-    id: "13",
-    name: "Amanie Advisors",
-    sector: "financial",
-    categories: ["Shariah Advisory"],
-    overview:
-      "A globally respected Shariah advisory firm providing structuring, audit, and compliance services worldwide.",
-    yearEstablished: 2008,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: ["Shariah Structuring", "Shariah Audit", "Compliance Review"],
-    website: "amanieadvisors.com",
-    email: "info@amanieadvisors.com",
-    status: "active",
-  },
-  {
-    id: "14",
-    name: "Dar Al Shariah",
-    sector: "financial",
-    categories: ["Shariah Advisory"],
-    overview:
-      "A leading Islamic finance consultancy in the UAE providing Shariah advisory and product structuring services.",
-    yearEstablished: 2009,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: ["Shariah Advisory", "Fatwa Issuance", "Product Structuring"],
-    website: "daralshariah.com",
-    email: "info@daralshariah.com",
-    status: "pending",
-  },
-  {
-    id: "15",
-    name: "Shariyah Review Bureau",
-    sector: "financial",
-    categories: ["Shariah Advisory"],
-    overview:
-      "A Bahrain-based Shariah advisory and audit firm delivering technology-driven compliance solutions.",
-    yearEstablished: 2012,
-    headquarters: "Manama",
-    country: "Bahrain",
-    keyServices: ["Shariah Audit", "Compliance SaaS", "Training"],
-    website: "shariyah.com",
-    email: "info@shariyah.com",
-    status: "active",
-  },
-  {
-    id: "16",
-    name: "ISRA (International Shariah Research Academy)",
-    sector: "non-financial",
-    categories: ["Research Institutions"],
-    overview:
-      "Malaysia's premier institution for Shariah research in Islamic finance, with a global fatwa repository.",
-    yearEstablished: 2008,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Shariah Research",
-      "Fatwa Repository",
-      "Academic Publishing",
-    ],
-    website: "isra.my",
-    email: "info@isra.my",
-    status: "active",
-  },
-  {
-    id: "17",
-    name: "AAOIFI",
-    sector: "non-financial",
-    categories: ["Regulatory Bodies", "Research Institutions"],
-    overview:
-      "The leading international standard-setting body for accounting, auditing, and Shariah standards for Islamic FIs.",
-    yearEstablished: 1991,
-    headquarters: "Manama",
-    country: "Bahrain",
-    keyServices: ["Standard Setting", "Certifications", "Conferences"],
-    website: "aaoifi.com",
-    email: "secretariat@aaoifi.com",
-    status: "active",
-  },
-  {
-    id: "18",
-    name: "IFSB (Islamic Financial Services Board)",
-    sector: "non-financial",
-    categories: ["Regulatory Bodies"],
-    overview:
-      "An international standard-setting organisation promoting the soundness and stability of the Islamic financial industry.",
-    yearEstablished: 2002,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: ["Prudential Standards", "Regulatory Guidelines", "Research"],
-    website: "ifsb.org",
-    email: "ifsb_sec@ifsb.org",
-    status: "active",
-  },
-  {
-    id: "19",
-    name: "INCEIF: The Global University of Islamic Finance",
-    sector: "non-financial",
-    categories: ["Education & Training", "Research Institutions"],
-    overview:
-      "Malaysia's leading graduate university for Islamic finance offering internationally recognized programs.",
-    yearEstablished: 2006,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Graduate Programs",
-      "Professional Certifications",
-      "Executive Training",
-    ],
-    website: "inceif.org",
-    email: "info@inceif.org",
-    status: "active",
-  },
-  {
-    id: "20",
-    name: "Ethica Institute of Islamic Finance",
-    sector: "non-financial",
-    categories: ["Education & Training"],
-    overview:
-      "The world's largest Islamic finance education provider, offering the CIFP certification and e-learning modules.",
-    yearEstablished: 2001,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: ["CIFP Certification", "E-Learning", "Corporate Training"],
-    website: "ethicainstitute.com",
-    email: "info@ethicainstitute.com",
-    status: "inactive",
-  },
-  {
-    id: "21",
-    name: "Zaid Ibrahim & Co",
-    sector: "non-financial",
-    categories: ["Legal Services"],
-    overview:
-      "One of the largest law firms in Malaysia with a specialist Islamic finance practice covering Sukuk and Takaful.",
-    yearEstablished: 1969,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Sukuk Structuring",
-      "Regulatory Advisory",
-      "Dispute Resolution",
-    ],
-    website: "zaidibrahim.com",
-    email: "enquiries@zaidibrahim.com",
-    status: "active",
-  },
-  {
-    id: "22",
-    name: "Al Tamimi & Company",
-    sector: "non-financial",
-    categories: ["Legal Services"],
-    overview:
-      "The largest full-service law firm in the Middle East with a specialist Islamic finance team.",
-    yearEstablished: 1989,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: ["Islamic Finance Law", "Sukuk Issuance", "Project Finance"],
-    website: "tamimi.com",
-    email: "dubai@tamimi.com",
-    status: "active",
-  },
-  {
-    id: "23",
-    name: "Dr. Daud Bakar",
-    sector: "non-financial",
-    categories: ["Scholars & Experts"],
-    overview:
-      "A renowned Shariah scholar serving on multiple international Shariah supervisory boards and prolific author.",
-    yearEstablished: null,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: ["Shariah Advisory", "Training & Education", "Research"],
-    website: "amanie.com",
-    status: "active",
-  },
-  {
-    id: "24",
-    name: "Bank Negara Malaysia (BNM)",
-    sector: "non-financial",
-    categories: ["Regulatory Bodies"],
-    overview:
-      "Malaysia's central bank and primary regulator of Islamic finance institutions.",
-    yearEstablished: 1959,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Monetary Policy",
-      "Financial Regulation",
-      "Islamic Finance Development",
-    ],
-    website: "bnm.gov.my",
-    email: "info@bnm.gov.my",
-    status: "active",
-  },
+const DYNAMIC_PALETTE: Array<{ color: string; bg: string; icon: React.ElementType }> = [
+  { color: "#D52B1E", bg: "#FEF2F2", icon: Building2 },
+  { color: "#2563eb", bg: "#EFF6FF", icon: Shield },
+  { color: "#7c3aed", bg: "#F5F3FF", icon: TrendingUp },
+  { color: "#0891b2", bg: "#ECFEFF", icon: Landmark },
+  { color: "#059669", bg: "#ECFDF5", icon: Cpu },
+  { color: "#d97706", bg: "#FFFBEB", icon: CheckCircle },
+  { color: "#1d4ed8", bg: "#EFF6FF", icon: BookOpen },
+  { color: "#6d28d9", bg: "#F5F3FF", icon: Scale },
+  { color: "#0d9488", bg: "#F0FDFA", icon: GraduationCap },
+  { color: "#dc2626", bg: "#FEF2F2", icon: Users },
 ];
 
+function getCategoryConfig(name: string) {
+  if (CATEGORY_CONFIG[name]) return CATEGORY_CONFIG[name];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
+  return DYNAMIC_PALETTE[hash % DYNAMIC_PALETTE.length];
+}
+// INITIAL_ENTRIES removed – data is loaded from API on mount
 /* -- Empty form defaults --------------------------------------------------- */
 const EMPTY_FORM: Omit<DirectoryEntry, "id"> = {
   name: "",
@@ -513,12 +125,22 @@ const EMPTY_FORM: Omit<DirectoryEntry, "id"> = {
   yearEstablished: null,
   headquarters: "",
   country: "",
+  address: "",
   keyServices: [],
+  tags: [],
   website: "",
   email: "",
   phone: "",
   linkedinUrl: "",
   twitterUrl: "",
+  tagline: "",
+  listingType: "institution",
+  logoUrl: "",
+  bannerUrl: "",
+  employeeRange: "",
+  shariahCertified: false,
+  certifyingBody: "",
+  aumUsdMillions: null,
   status: "active",
 };
 
@@ -570,10 +192,14 @@ function EntryFormModal({
   initial,
   onSave,
   onClose,
+  financialCats,
+  nonFinancialCats,
 }: {
   initial: Omit<DirectoryEntry, "id"> | (DirectoryEntry & { id: string });
   onSave: (data: Omit<DirectoryEntry, "id">) => void;
   onClose: () => void;
+  financialCats: string[];
+  nonFinancialCats: string[];
 }) {
   const [form, setForm] = useState<Omit<DirectoryEntry, "id">>({
     name: initial.name,
@@ -583,21 +209,30 @@ function EntryFormModal({
     yearEstablished: initial.yearEstablished,
     headquarters: initial.headquarters,
     country: initial.country,
+    address: initial.address,
     keyServices: [...initial.keyServices],
+    tags: [...initial.tags],
     website: initial.website,
     email: initial.email ?? "",
     phone: initial.phone ?? "",
     linkedinUrl: initial.linkedinUrl ?? "",
     twitterUrl: initial.twitterUrl ?? "",
+    tagline: initial.tagline,
+    listingType: initial.listingType,
+    logoUrl: initial.logoUrl,
+    bannerUrl: initial.bannerUrl,
+    employeeRange: initial.employeeRange,
+    shariahCertified: initial.shariahCertified,
+    certifyingBody: initial.certifyingBody,
+    aumUsdMillions: initial.aumUsdMillions,
     status: initial.status,
   });
   const [serviceInput, setServiceInput] = useState("");
+  const [tagInput, setTagInput] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const cats =
-    form.sector === "financial"
-      ? FINANCIAL_CATEGORIES
-      : NON_FINANCIAL_CATEGORIES;
+    form.sector === "financial" ? financialCats : nonFinancialCats;
 
   function toggleCategory(cat: string) {
     setForm((p) => ({
@@ -620,6 +255,21 @@ function EntryFormModal({
     setForm((p) => ({
       ...p,
       keyServices: p.keyServices.filter((x) => x !== s),
+    }));
+  }
+
+  function addTag() {
+    const t = tagInput.trim();
+    if (t && !form.tags.includes(t)) {
+      setForm((p) => ({ ...p, tags: [...p.tags, t] }));
+      setTagInput("");
+    }
+  }
+
+  function removeTag(tag: string) {
+    setForm((p) => ({
+      ...p,
+      tags: p.tags.filter((x) => x !== tag),
     }));
   }
 
@@ -675,7 +325,7 @@ function EntryFormModal({
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Name */}
+          {/* Name + Tagline */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Organization / Person Name *
@@ -689,6 +339,40 @@ function EntryFormModal({
             {errors.name && (
               <p className="text-xs text-red-500 mt-1">{errors.name}</p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Tagline
+            </label>
+            <Input
+              value={form.tagline}
+              onChange={(e) => setForm((p) => ({ ...p, tagline: e.target.value }))}
+              placeholder="e.g. World class Islamic bank"
+              className="h-10 text-sm"
+            />
+          </div>
+
+          {/* Listing Type */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Listing Type
+            </label>
+            <div className="flex gap-2">
+              {["institution", "individual", "organization"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setForm((p) => ({ ...p, listingType: t }))}
+                  className={`px-4 py-2 rounded-xl border text-sm font-medium capitalize transition-all ${
+                    form.listingType === t
+                      ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+                      : "bg-white text-slate-600 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Sector */}
@@ -724,7 +408,7 @@ function EntryFormModal({
             </label>
             <div className="flex flex-wrap gap-2">
               {cats.map((cat) => {
-                const cfg = CATEGORY_CONFIG[cat];
+                const cfg = getCategoryConfig(cat);
                 const isSelected = form.categories.includes(cat);
                 return (
                   <button
@@ -794,7 +478,7 @@ function EntryFormModal({
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Headquarters
+                City
               </label>
               <Input
                 value={form.headquarters}
@@ -821,6 +505,19 @@ function EntryFormModal({
                 <p className="text-xs text-red-500 mt-1">{errors.country}</p>
               )}
             </div>
+          </div>
+
+          {/* Address */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Address
+            </label>
+            <Input
+              value={form.address}
+              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+              placeholder="Full street address"
+              className="h-10 text-sm"
+            />
           </div>
 
           {/* Key Services */}
@@ -859,6 +556,51 @@ function EntryFormModal({
                   {s}
                   <button
                     onClick={() => removeService(s)}
+                    className="hover:text-red-500"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Tags
+            </label>
+            <div className="flex gap-2 mb-2">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addTag();
+                  }
+                }}
+                placeholder="Type a tag and press Enter"
+                className="h-9 text-sm flex-1"
+              />
+              <Button
+                onClick={addTag}
+                size="sm"
+                variant="outline"
+                className="rounded-lg h-9 px-3"
+              >
+                Add
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {form.tags.map((t) => (
+                <span
+                  key={t}
+                  className="flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full"
+                >
+                  {t}
+                  <button
+                    onClick={() => removeTag(t)}
                     className="hover:text-red-500"
                   >
                     <X className="h-3 w-3" />
@@ -939,6 +681,108 @@ function EntryFormModal({
             </div>
           </div>
 
+          {/* Logo & Banner URLs */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Logo URL
+              </label>
+              <Input
+                value={form.logoUrl}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, logoUrl: e.target.value }))
+                }
+                placeholder="https://…/logo.png"
+                className="h-10 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Banner URL
+              </label>
+              <Input
+                value={form.bannerUrl}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, bannerUrl: e.target.value }))
+                }
+                placeholder="https://…/banner.png"
+                className="h-10 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Shariah & Financial details */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Employee Range
+              </label>
+              <Input
+                value={form.employeeRange}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, employeeRange: e.target.value }))
+                }
+                placeholder="e.g. 1000-5000"
+                className="h-10 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                AUM (USD Millions)
+              </label>
+              <Input
+                type="number"
+                value={form.aumUsdMillions ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    aumUsdMillions: e.target.value
+                      ? parseFloat(e.target.value)
+                      : null,
+                  }))
+                }
+                placeholder="e.g. 500"
+                className="h-10 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-semibold text-slate-700">
+                Shariah Certified
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((p) => ({ ...p, shariahCertified: !p.shariahCertified }))
+                }
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  form.shariahCertified ? "bg-green-500" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    form.shariahCertified ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Certifying Body
+              </label>
+              <Input
+                value={form.certifyingBody}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, certifyingBody: e.target.value }))
+                }
+                placeholder="e.g. AAOIFI"
+                className="h-10 text-sm"
+              />
+            </div>
+          </div>
+
           {/* Status */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -993,11 +837,7 @@ function ViewModal({
   onClose: () => void;
 }) {
   const primaryCat = entry.categories[0];
-  const cfg = CATEGORY_CONFIG[primaryCat] ?? {
-    color: "#D52B1E",
-    bg: "#FEF2F2",
-    icon: Building2,
-  };
+  const cfg = getCategoryConfig(primaryCat ?? "");
   const initials = entry.name
     .split(" ")
     .filter((w) => w.length > 2)
@@ -1052,8 +892,8 @@ function ViewModal({
                     key={cat}
                     className="text-xs px-2.5 py-0.5 rounded-full font-medium"
                     style={{
-                      backgroundColor: CATEGORY_CONFIG[cat]?.bg ?? "#F3F4F6",
-                      color: CATEGORY_CONFIG[cat]?.color ?? "#6B7280",
+                      backgroundColor: getCategoryConfig(cat).bg,
+                      color: getCategoryConfig(cat).color,
                     }}
                   >
                     {cat}
@@ -1195,8 +1035,195 @@ function DeleteConfirm({
 }
 
 /* -- Main component -------------------------------------------------------- */
+/* -- API mapping helper (module-level so it's stable) ────────────────── */
+function apiToEntry(a: DirectoryListingAPI): DirectoryEntry {
+  const statusMap: Record<string, "active" | "inactive" | "pending"> = {
+    published: "active",
+    draft: "inactive",
+    pending: "pending",
+  };
+  return {
+    id: a.id,
+    name: a.name,
+    sector: a.isFinancial ? "financial" : "non-financial",
+    categories: a.category ? [a.category.name] : [],
+    overview: a.description ?? "",
+    yearEstablished: a.yearFounded ?? null,
+    headquarters: a.city ?? "",
+    country: a.country ?? "",
+    address: a.address ?? "",
+    keyServices: a.services ?? [],
+    tags: a.tags ?? [],
+    website: a.websiteUrl ?? "",
+    email: a.email ?? undefined,
+    phone: a.phone ?? undefined,
+    linkedinUrl: a.socialLinks?.linkedin ?? undefined,
+    twitterUrl: a.socialLinks?.twitter ?? undefined,
+    tagline: a.tagline ?? "",
+    listingType: a.listingType ?? "institution",
+    logoUrl: a.logoUrl ?? "",
+    bannerUrl: a.bannerUrl ?? "",
+    employeeRange: a.employeeRange ?? "",
+    shariahCertified: a.shariahCertified ?? false,
+    certifyingBody: a.certifyingBody ?? "",
+    aumUsdMillions: a.aumUsdMillions ?? null,
+    status: statusMap[a.status] ?? "active",
+  };
+}
+
+/* -- CategoryFormModal ----------------------------------------------------- */
+function CategoryFormModal({
+  initial,
+  onSave,
+  onClose,
+}: {
+  initial?: DirectoryCategoryAPI;
+  onSave: (dto: CreateDirectoryCategoryDto) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [isFinancial, setIsFinancial] = useState(initial?.isFinancial ?? true);
+  const [sortOrder, setSortOrder] = useState(initial?.sortOrder ?? 0);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) { setErr('Name is required'); return; }
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave({
+        name: name.trim(),
+        slug,
+        description: description.trim() || undefined,
+        isFinancial,
+        sortOrder,
+      });
+    } catch (ex: unknown) {
+      setErr(ex instanceof Error ? ex.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-800">{initial ? 'Edit Category' : 'New Category'}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Islamic Banks" className="rounded-xl" autoFocus />
+            {slug && <p className="text-xs text-slate-400 mt-1">Slug: <span className="font-mono">{slug}</span></p>}
+            {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Brief description of this category"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
+            <div className="flex gap-3">
+              {([true, false] as const).map((val) => (
+                <button
+                  type="button"
+                  key={String(val)}
+                  onClick={() => setIsFinancial(val)}
+                  className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-all ${
+                    isFinancial === val
+                      ? 'bg-[#D52B1E] text-white border-[#D52B1E]'
+                      : 'bg-white text-slate-600 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {val ? 'Financial' : 'Non-Financial'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Sort Order</label>
+            <Input
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
+              className="rounded-xl w-28"
+              min={0}
+            />
+          </div>
+          <div className="flex gap-3 justify-end pt-1">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+            <Button type="submit" disabled={saving} className="bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl">
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </form>
+      </motion.div>
+    </div>,
+    document.body,
+  );
+}
+
+/* -- DeleteCategoryConfirm ------------------------------------------------- */
+function DeleteCategoryConfirm({
+  name,
+  onConfirm,
+  onClose,
+}: {
+  name: string;
+  onConfirm: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"
+      >
+        <h2 className="text-lg font-bold text-slate-800">Delete Category</h2>
+        <p className="text-sm text-slate-600">Are you sure you want to delete <strong>{name}</strong>? This cannot be undone.</p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+          <Button
+            disabled={deleting}
+            onClick={async () => { setDeleting(true); await onConfirm(); setDeleting(false); }}
+            className="bg-red-600 hover:bg-red-700 text-white rounded-xl"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </Button>
+        </div>
+      </motion.div>
+    </div>,
+    document.body,
+  );
+}
+
 export default function AdminDirectory() {
-  const [entries, setEntries] = useState<DirectoryEntry[]>(INITIAL_ENTRIES);
+  const [entries, setEntries] = useState<DirectoryEntry[]>([]);
+  const [apiCategories, setApiCategories] = useState<DirectoryCategoryAPI[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState<"all" | "financial" | "non-financial">(
     "all",
@@ -1211,6 +1238,50 @@ export default function AdminDirectory() {
     | null
   >(null);
 
+  const [catModal, setCatModal] = useState<
+    | { type: "create" }
+    | { type: "edit"; cat: DirectoryCategoryAPI }
+    | { type: "delete"; cat: DirectoryCategoryAPI }
+    | null
+  >(null);
+
+  /* -- Fetch data on mount -- */
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      directoryService.getListings(),
+      directoryService.getCategories(),
+    ])
+      .then(([listings, categories]) => {
+        setEntries(listings.map(apiToEntry));
+        setApiCategories(categories);
+        setApiError(null);
+      })
+      .catch((err) => {
+        console.error("Failed to load directory data:", err);
+        setApiError("Failed to load data from server. Please refresh.");
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  /* -- Category name → ID lookup for form submission -- */
+  const categoryNameToId = useMemo(() => {
+    const map = new Map<string, string>();
+    apiCategories.forEach((c) => map.set(c.name, c.id));
+    return map;
+  }, [apiCategories]);
+
+  /* -- Category lists for the entry form -- */
+  const financialCats = useMemo(
+    () => apiCategories.filter((c) => c.isFinancial).sort((a, b) => a.sortOrder - b.sortOrder).map((c) => c.name),
+    [apiCategories],
+  );
+
+  const nonFinancialCats = useMemo(
+    () => apiCategories.filter((c) => !c.isFinancial).sort((a, b) => a.sortOrder - b.sortOrder).map((c) => c.name),
+    [apiCategories],
+  );
+
   // Reset category filter when sector changes
   const handleSectorChange = (s: "all" | "financial" | "non-financial") => {
     setSector(s);
@@ -1218,10 +1289,11 @@ export default function AdminDirectory() {
   };
 
   const availableCategories = useMemo(() => {
-    if (sector === "financial") return FINANCIAL_CATEGORIES;
-    if (sector === "non-financial") return NON_FINANCIAL_CATEGORIES;
-    return ALL_CATEGORIES;
-  }, [sector]);
+    const sorted = [...apiCategories].sort((a, b) => a.sortOrder - b.sortOrder);
+    if (sector === "financial") return sorted.filter((c) => c.isFinancial).map((c) => c.name);
+    if (sector === "non-financial") return sorted.filter((c) => !c.isFinancial).map((c) => c.name);
+    return sorted.map((c) => c.name);
+  }, [apiCategories, sector]);
 
   const categoryCounts = useMemo(() => {
     const base =
@@ -1258,36 +1330,100 @@ export default function AdminDirectory() {
 
   const stats = buildStats(entries);
 
-  function handleSave(data: Omit<DirectoryEntry, "id">) {
-    if (modalState?.type === "edit") {
-      setEntries((p) =>
-        p.map((e) =>
-          e.id === modalState.entry.id ? { ...data, id: e.id } : e,
-        ),
-      );
-    } else {
-      const newId = String(Date.now());
-      setEntries((p) => [{ ...data, id: newId }, ...p]);
-    }
-    setModalState(null);
-  }
+  const handleSave = useCallback(
+    async (data: Omit<DirectoryEntry, "id">) => {
+      const statusMap: Record<string, string> = {
+        active: "published",
+        inactive: "draft",
+        pending: "pending",
+      };
+      const socialLinks: Record<string, string> = {};
+      if (data.linkedinUrl) socialLinks.linkedin = data.linkedinUrl;
+      if (data.twitterUrl) socialLinks.twitter = data.twitterUrl;
+      const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const dto = {
+        name: data.name,
+        slug,
+        description: data.overview,
+        isFinancial: data.sector === "financial",
+        listingType: data.listingType || "institution",
+        tagline: data.tagline || undefined,
+        country: data.country,
+        city: data.headquarters,
+        address: data.address || undefined,
+        yearFounded: data.yearEstablished,
+        employeeRange: data.employeeRange || undefined,
+        shariahCertified: data.shariahCertified,
+        certifyingBody: data.certifyingBody || undefined,
+        aumUsdMillions: data.aumUsdMillions,
+        services: data.keyServices.length ? data.keyServices : undefined,
+        tags: data.tags.length ? data.tags : undefined,
+        websiteUrl: data.website,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        logoUrl: data.logoUrl || undefined,
+        bannerUrl: data.bannerUrl || undefined,
+        socialLinks: Object.keys(socialLinks).length ? socialLinks : undefined,
+        status: statusMap[data.status] ?? data.status,
+        categoryId: data.categories
+          .map((name) => categoryNameToId.get(name))
+          .find((id): id is string => Boolean(id)),
+      };
+      try {
+        if (modalState?.type === "edit") {
+          const updated = await directoryService.updateListing(
+            modalState.entry.id,
+            dto,
+          );
+          setEntries((p) =>
+            p.map((e) =>
+              e.id === (modalState as { type: "edit"; entry: DirectoryEntry }).entry.id
+                ? apiToEntry(updated)
+                : e,
+            ),
+          );
+        } else {
+          const created = await directoryService.createListing(dto);
+          setEntries((p) => [apiToEntry(created), ...p]);
+        }
+        setModalState(null);
+      } catch (err) {
+        console.error("Failed to save listing:", err);
+        alert("Failed to save entry. Please try again.");
+      }
+    },
+    [modalState, categoryNameToId],
+  );
 
-  function handleDelete() {
-    if (modalState?.type === "delete") {
-      setEntries((p) => p.filter((e) => e.id !== modalState.entry.id));
+  const handleDelete = useCallback(async () => {
+    if (modalState?.type !== "delete") return;
+    const entryId = modalState.entry.id;
+    try {
+      await directoryService.deleteListing(entryId);
+      setEntries((p) => p.filter((e) => e.id !== entryId));
       setModalState(null);
+    } catch (err) {
+      console.error("Failed to delete listing:", err);
+      alert("Failed to delete entry. Please try again.");
     }
-  }
+  }, [modalState]);
 
-  function toggleStatus(id: string) {
-    setEntries((p) =>
-      p.map((e) =>
-        e.id === id
-          ? { ...e, status: e.status === "active" ? "inactive" : "active" }
-          : e,
-      ),
-    );
-  }
+  const toggleStatus = useCallback(
+    async (id: string) => {
+      const entry = entries.find((e) => e.id === id);
+      if (!entry) return;
+      const newStatus = entry.status === "active" ? "inactive" : "active";
+      try {
+        await directoryService.updateListing(id, { status: newStatus });
+        setEntries((p) =>
+          p.map((e) => (e.id === id ? { ...e, status: newStatus } : e)),
+        );
+      } catch (err) {
+        console.error("Failed to update status:", err);
+      }
+    },
+    [entries],
+  );
 
   return (
     <motion.div
@@ -1296,6 +1432,13 @@ export default function AdminDirectory() {
       animate="show"
       className="space-y-6"
     >
+      {/* API error banner */}
+      {apiError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          {apiError}
+        </div>
+      )}
+
       {/* Header */}
       <motion.div
         variants={item}
@@ -1314,6 +1457,7 @@ export default function AdminDirectory() {
           size="sm"
           onClick={() => setModalState({ type: "create" })}
           className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-xl gap-1.5"
+          disabled={loading}
         >
           <Plus className="h-3.5 w-3.5" /> Add Entry
         </Button>
@@ -1398,7 +1542,7 @@ export default function AdminDirectory() {
           </div>
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-0.5">
             {["All", ...availableCategories].map((cat) => {
-              const cfg = cat === "All" ? null : CATEGORY_CONFIG[cat];
+              const cfg = cat === "All" ? null : getCategoryConfig(cat);
               const isActive = selectedCategory === cat;
               const count = categoryCounts[cat] ?? 0;
               return (
@@ -1454,7 +1598,37 @@ export default function AdminDirectory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.length === 0 ? (
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-gray-200" />
+                        <div className="space-y-1.5">
+                          <div className="h-3 bg-gray-200 rounded w-32" />
+                          <div className="h-2.5 bg-gray-100 rounded w-20" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <div className="h-5 bg-gray-100 rounded-full w-24" />
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <div className="h-3 bg-gray-100 rounded w-28" />
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <div className="h-3 bg-gray-100 rounded w-24" />
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      <div className="h-3 bg-gray-100 rounded w-12" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-5 bg-gray-100 rounded-full w-16" />
+                    </td>
+                    <td className="px-4 py-3" />
+                  </tr>
+                ))
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
@@ -1466,11 +1640,7 @@ export default function AdminDirectory() {
               ) : (
                 filtered.map((e) => {
                   const primaryCat = e.categories[0];
-                  const cfg = CATEGORY_CONFIG[primaryCat] ?? {
-                    color: "#D52B1E",
-                    bg: "#FEF2F2",
-                    icon: Building2,
-                  };
+                  const cfg = getCategoryConfig(primaryCat ?? "");
                   const initials = e.name
                     .split(" ")
                     .filter((w) => w.length > 2)
@@ -1513,9 +1683,8 @@ export default function AdminDirectory() {
                               key={cat}
                               className="text-xs px-2 py-0.5 rounded-full font-medium"
                               style={{
-                                backgroundColor:
-                                  CATEGORY_CONFIG[cat]?.bg ?? "#F3F4F6",
-                                color: CATEGORY_CONFIG[cat]?.color ?? "#6B7280",
+                                backgroundColor: getCategoryConfig(cat).bg,
+                                color: getCategoryConfig(cat).color,
                               }}
                             >
                               {cat}
@@ -1635,6 +1804,99 @@ export default function AdminDirectory() {
         </div>
       </motion.div>
 
+
+      {/* ── Category Management ─────────────────────────────────────────── */}
+      <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">Category Management</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Create and manage classification categories</p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setCatModal({ type: 'create' })}
+            className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-xl gap-1.5 text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Category
+          </Button>
+        </div>
+
+        {apiCategories.length === 0 && !loading ? (
+          <p className="text-center text-slate-400 text-sm py-8">No categories found.</p>
+        ) : (
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {loading
+              ? Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="animate-pulse h-10 bg-slate-100 rounded-xl" />
+                ))
+              : apiCategories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2"
+                  >
+                    <span className="text-sm text-slate-700 truncate">{cat.name}</span>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => setCatModal({ type: 'edit', cat })}
+                        className="p-1 rounded hover:bg-slate-200 text-slate-500"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setCatModal({ type: 'delete', cat })}
+                        className="p-1 rounded hover:bg-red-100 text-red-500"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Category Modals */}
+      <AnimatePresence>
+        {catModal?.type === 'create' && (
+          <CategoryFormModal
+            onSave={async (dto) => {
+              try {
+                const created = await directoryService.createCategory(dto);
+                setApiCategories((prev) => [...prev, created]);
+                setCatModal(null);
+              } catch { alert('Failed to create category.'); }
+            }}
+            onClose={() => setCatModal(null)}
+          />
+        )}
+        {catModal?.type === 'edit' && (
+          <CategoryFormModal
+            initial={catModal.cat}
+            onSave={async (dto) => {
+              try {
+                const updated = await directoryService.updateCategory(catModal.cat.id, dto);
+                setApiCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+                setCatModal(null);
+              } catch { alert('Failed to update category.'); }
+            }}
+            onClose={() => setCatModal(null)}
+          />
+        )}
+        {catModal?.type === 'delete' && (
+          <DeleteCategoryConfirm
+            name={catModal.cat.name}
+            onConfirm={async () => {
+              try {
+                await directoryService.deleteCategory(catModal.cat.id);
+                setApiCategories((prev) => prev.filter((c) => c.id !== catModal.cat.id));
+                setCatModal(null);
+              } catch { alert('Failed to delete category.'); }
+            }}
+            onClose={() => setCatModal(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Modals */}
       <AnimatePresence>
         {modalState?.type === "create" && (
@@ -1642,6 +1904,8 @@ export default function AdminDirectory() {
             initial={EMPTY_FORM}
             onSave={handleSave}
             onClose={() => setModalState(null)}
+            financialCats={financialCats}
+            nonFinancialCats={nonFinancialCats}
           />
         )}
         {modalState?.type === "edit" && (
@@ -1649,6 +1913,8 @@ export default function AdminDirectory() {
             initial={modalState.entry}
             onSave={handleSave}
             onClose={() => setModalState(null)}
+            financialCats={financialCats}
+            nonFinancialCats={nonFinancialCats}
           />
         )}
         {modalState?.type === "view" && (
