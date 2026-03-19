@@ -517,7 +517,7 @@ export function Dashboard() {
               animate={{
                 x: isMobile
                   ? `calc(-${currentNewsIndex * 100}% - ${currentNewsIndex * 16}px)`
-                  : `calc(-${currentNewsIndex * 50}% - ${currentNewsIndex * 24}px)`,
+                  : `calc(-${currentNewsIndex * 50}% - ${currentNewsIndex * 12}px)`,
               }}
               transition={
                 isTransitioning
