@@ -343,11 +343,18 @@ function NewsCard({ news }: NewsCardProps) {
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { data: externalNews = [], isLoading: externalNewsLoading } = useExternalNews(DASHBOARD_NEWS_QUERY)
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+
+  const userDisplayName = useMemo(() => {
+    const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim()
+    if (fullName) return fullName
+    if (user?.email) return user.email.split('@')[0]
+    return 'there'
+  }, [user?.email, user?.firstName, user?.lastName])
 
   const liveNews = useMemo(
     () => externalNews.slice(0, 6).map(mapExternalArticleToDashboardNews),
@@ -416,7 +423,7 @@ export function Dashboard() {
       >
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#000000]">
-            Hello, <span className="text-primary">Ibrahim Shenshen!</span>
+            Hello, <span className="text-primary">{userDisplayName}!</span>
           </h1>
           <p className="mt-1 text-sm sm:text-base text-[#737692]">
             Track your learning progress and see assets and trends
