@@ -842,6 +842,277 @@ export const useAdminDeleteReportCategory = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Resources
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type AdminResourceType = "guide" | "research" | "standard" | "tool";
+
+export interface AdminResourceCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface AdminResource {
+  id: string;
+  title: string;
+  resourceType: AdminResourceType;
+  authorName: string | null;
+  authorType: "individual" | "organization" | null;
+  topic: string | null;
+  briefIntro: string | null;
+  coverImageUrl: string | null;
+  fileUrl: string | null;
+  previewUrl: string | null;
+  categoryId: string | null;
+  category: AdminResourceCategory | null;
+  isPremium: boolean;
+  isFeatured: boolean;
+  status: "draft" | "published" | "archived";
+  tags: string[];
+  viewCount: number;
+  downloadCount: number;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminGlossaryTerm {
+  id: string;
+  term: string;
+  definition: string;
+  letter?: string;
+  status: "draft" | "published";
+  relatedTerms?: string[];
+  createdAt: string;
+}
+
+export interface CreateResourceDto {
+  title: string;
+  resourceType: AdminResourceType;
+  authorName?: string;
+  authorType?: "individual" | "organization";
+  topic?: string;
+  briefIntro?: string;
+  coverImageUrl?: string;
+  fileUrl?: string;
+  previewUrl?: string;
+  categoryId?: string;
+  isPremium?: boolean;
+  isFeatured?: boolean;
+  status?: "draft" | "published" | "archived";
+  tags?: string[];
+}
+
+export interface CreateGlossaryTermDto {
+  term: string;
+  definition: string;
+  letter?: string;
+  status?: "draft" | "published";
+  relatedTerms?: string[];
+}
+
+export interface ResourceListParams extends ListParams {
+  status?: "draft" | "published" | "archived";
+  resourceType?: AdminResourceType;
+  categoryId?: string;
+  isPremium?: boolean;
+}
+
+export interface GlossaryListParams {
+  letter?: string;
+  status?: "draft" | "published";
+  search?: string;
+}
+
+const GLOSSARY_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+export const useAdminResources = (params: ResourceListParams = {}) =>
+  useQuery({
+    queryKey: ["admin", "resources", params],
+    queryFn: async () => {
+      const { data } = await api.get<Page<AdminResource>>("/resources", {
+        params: { page: 1, perPage: 50, order: "DESC", ...params },
+      });
+      return data;
+    },
+  });
+
+export const useAdminResourceCategories = () =>
+  useQuery({
+    queryKey: ["admin", "resources", "categories"],
+    queryFn: async () => {
+      const { data } = await api.get<AdminResourceCategory[]>(
+        "/resources/categories",
+      );
+      return data;
+    },
+  });
+
+export const useAdminGlossaryTerms = (params: GlossaryListParams = {}) =>
+  useQuery({
+    queryKey: ["admin", "resources", "glossary", params],
+    queryFn: async () => {
+      const letters = params.letter
+        ? [params.letter.toUpperCase()]
+        : GLOSSARY_LETTERS;
+      const responses = await Promise.all(
+        letters.map((letter) =>
+          api.get<AdminGlossaryTerm[]>("/resources/glossary", {
+            params: { letter },
+          }),
+        ),
+      );
+      let terms = responses.flatMap((response) => response.data);
+      if (params.search) {
+        const q = params.search.toLowerCase();
+        terms = terms.filter(
+          (term) =>
+            term.term.toLowerCase().includes(q) ||
+            term.definition.toLowerCase().includes(q),
+        );
+      }
+      if (params.status) {
+        terms = terms.filter((term) => term.status === params.status);
+      }
+      return terms;
+    },
+  });
+
+export const useAdminCreateResource = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: CreateResourceDto) => {
+      const { data } = await api.post<AdminResource>("/resources", dto);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources"] });
+      toast({ title: "Resource created" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Create failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminUpdateResource = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: Partial<CreateResourceDto>;
+    }) => {
+      const { data } = await api.patch<AdminResource>(`/resources/${id}`, dto);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources"] });
+      toast({ title: "Resource updated" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Update failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminDeleteResource = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => api.delete(`/resources/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources"] });
+      toast({ title: "Resource deleted" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Delete failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminCreateGlossaryTerm = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: CreateGlossaryTermDto) => {
+      const { data } = await api.post<AdminGlossaryTerm>(
+        "/resources/glossary",
+        dto,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources", "glossary"] });
+      toast({ title: "Term created" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Create failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminUpdateGlossaryTerm = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: Partial<CreateGlossaryTermDto>;
+    }) => {
+      const { data } = await api.patch<AdminGlossaryTerm>(
+        `/resources/glossary/${id}`,
+        dto,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources", "glossary"] });
+      toast({ title: "Term updated" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Update failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminDeleteGlossaryTerm = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      api.delete(`/resources/glossary/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources", "glossary"] });
+      toast({ title: "Term deleted" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Delete failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Datasets
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -932,6 +1203,16 @@ export const useAdminDataCategories = () =>
       );
       return data;
     },
+  });
+
+export const useAdminDataCategory = (id: string) =>
+  useQuery({
+    queryKey: ["admin", "datasets", "categories", id],
+    queryFn: async () => {
+      const { data } = await api.get<DataCategory>(`/datasets/categories/${id}`);
+      return data;
+    },
+    enabled: !!id,
   });
 
 export const useAdminCreateDataset = () => {

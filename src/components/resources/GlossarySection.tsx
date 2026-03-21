@@ -26,18 +26,23 @@ const GLOSSARY_DATA: GlossaryTerm[] = [
   { id: '18', term: 'Maysir', definition: 'Gambling or speculation that is prohibited in Islamic finance. Transactions that involve excessive uncertainty or speculation, where one party gains at the expense of another through chance, are considered maysir.' },
   { id: '19', term: 'Fatwa', definition: 'A formal ruling or interpretation on Islamic law issued by a qualified Islamic scholar or Shariah board. In Islamic finance, fatwas provide guidance on whether specific products or transactions comply with Shariah principles.' },
   { id: '20', term: 'AAOIFI', definition: 'The Accounting and Auditing Organization for Islamic Financial Institutions. An international body that sets Shariah standards, accounting, auditing, and governance standards for the Islamic finance industry.' },
-]
+].map((term) => ({ ...term, status: 'published' as const, createdAt: '' }))
 
-export function GlossarySection() {
+interface GlossarySectionProps {
+  readonly terms?: GlossaryTerm[]
+}
+
+export function GlossarySection({ terms }: GlossarySectionProps) {
   const [search, setSearch] = useState('')
+  const glossaryData = terms && terms.length > 0 ? terms : GLOSSARY_DATA
 
   const filteredTerms = useMemo(() => {
     const q = search.toLowerCase()
-    if (!q) return GLOSSARY_DATA
-    return GLOSSARY_DATA.filter(
+    if (!q) return glossaryData
+    return glossaryData.filter(
       t => t.term.toLowerCase().includes(q) || t.definition.toLowerCase().includes(q)
     )
-  }, [search])
+  }, [search, glossaryData])
 
   // Group terms by first letter
   const grouped = useMemo(() => {

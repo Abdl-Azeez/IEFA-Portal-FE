@@ -21,9 +21,9 @@ export function ResourceCard({ resource, onPreview, onDownload, index = 0 }: Res
     >
       {/* Cover Image */}
       <div className="relative h-44 bg-gradient-to-br from-[#D52B1E]/10 via-[#D52B1E]/5 to-gray-50 overflow-hidden">
-        {resource.displayImage ? (
+        {resource.coverImageUrl ? (
           <img
-            src={resource.displayImage}
+            src={resource.coverImageUrl}
             alt={resource.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
@@ -36,7 +36,7 @@ export function ResourceCard({ resource, onPreview, onDownload, index = 0 }: Res
         )}
         <div className="absolute top-3 left-3">
           <Badge className="bg-[#D52B1E] text-white text-xs shadow-md">
-            {resource.topic}
+            {resource.topic ?? 'Resource'}
           </Badge>
         </div>
       </div>
@@ -48,7 +48,7 @@ export function ResourceCard({ resource, onPreview, onDownload, index = 0 }: Res
           <div className="w-6 h-6 rounded-full bg-[#D52B1E]/10 flex items-center justify-center">
             <User className="h-3 w-3 text-[#D52B1E]" />
           </div>
-          <span className="text-xs font-medium text-[#737692]">{resource.authorName}</span>
+          <span className="text-xs font-medium text-[#737692]">{resource.authorName ?? 'Unknown author'}</span>
         </div>
 
         {/* Title */}
@@ -58,14 +58,18 @@ export function ResourceCard({ resource, onPreview, onDownload, index = 0 }: Res
 
         {/* Brief Intro */}
         <p className="text-xs text-[#737692] line-clamp-2 mb-3 flex-1">
-          {resource.briefIntro}
+          {resource.briefIntro ?? 'No summary available.'}
         </p>
 
         {/* Date & Stats */}
         <div className="flex items-center justify-between text-xs text-[#737692] mb-3 border-t border-gray-50 pt-3">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {resource.datePublished}
+            {new Date(resource.publishedAt ?? resource.createdAt).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
           </span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">

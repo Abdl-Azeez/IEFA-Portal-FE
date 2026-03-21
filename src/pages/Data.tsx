@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useDatasets, useDatasetCategories, type Dataset } from "@/hooks/useDatasets";
 
 /* ── Animation variants ─────────────────────────────────────────────────── */
 const containerVariants = {
@@ -34,31 +35,16 @@ const itemVariants = {
 };
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
-type Geography = "Nigeria" | "Africa" | "Global";
-type VisualizationType =
-  | "KPI card"
-  | "Line chart"
-  | "Bar chart"
-  | "Stacked bar"
-  | "Pie chart"
-  | "Gauge"
-  | "Map"
-  | "Bubble chart"
-  | "Heat map"
-  | "Ranking table"
-  | "Trend line"
-  | "Leaderboard"
-  | "Area chart"
-  | "Timeline chart"
-  | "Table";
+type Geography = string;
+type VisualizationType = string;
 
 interface MetricRow {
   name: string;
-  geography: Geography;
+  geography: string;
   value: string;
   year: string;
   sourceType: string;
-  visualization: VisualizationType;
+  visualization: string;
   premium: boolean;
 }
 
@@ -192,7 +178,7 @@ const SECTIONS: SectionDef[] = [
 ];
 
 /* ── Geography badge styles ──────────────────────────────────────────────── */
-const GEO_STYLES: Record<Geography, { bg: string; text: string; dot: string; flag: string }> = {
+const GEO_STYLES: Record<string, { bg: string; text: string; dot: string; flag: string }> = {
   Nigeria: { bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", dot: "bg-emerald-400", flag: "🇳🇬" },
   Africa:  { bg: "bg-blue-50 border-blue-200",    text: "text-blue-700",    dot: "bg-blue-400",    flag: "🌍" },
   Global:  { bg: "bg-violet-50 border-violet-200",  text: "text-violet-700",  dot: "bg-violet-400",  flag: "🌐" },
@@ -427,7 +413,7 @@ function MetricPreviewModal({
   onClose,
 }: Readonly<{ metric: MetricRow | null; open: boolean; onClose: () => void }>) {
   if (!metric) return null;
-  const geo = GEO_STYLES[metric.geography];
+  const geo = GEO_STYLES[metric.geography] ?? GEO_STYLES.Global;
 
   return (
     <Dialog open={open} onClose={onClose} title="" maxWidth="max-w-2xl">
@@ -649,7 +635,7 @@ function SectionSummary({ metrics }: Readonly<{ metrics: MetricRow[] }>) {
       )}
       <span className="w-px h-3.5 bg-gray-200" />
       {geos.map((g) => {
-        const style = GEO_STYLES[g];
+        const style = GEO_STYLES[g] ?? GEO_STYLES.Global;
         return (
           <span key={g} className="inline-flex items-center gap-1 text-xs text-gray-500">
             <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
@@ -821,22 +807,86 @@ function DataTable({
 }
 
 /* ── Main page ───────────────────────────────────────────────────────────── */
+function getCategoryIcon(name: string, iconKey?: string | null): React.ElementType {
+  const key = `${iconKey ?? ""} ${name}`.toLowerCase();
+  if (key.includes("bank")) return Database;
+  if (key.includes("sukuk") || key.includes("market")) return TrendingUp;
+  if (key.includes("takaful") || key.includes("insurance")) return Shield;
+  if (key.includes("fund") || key.includes("asset")) return Coins;
+  if (key.includes("equity") || key.includes("stock")) return PieChart;
+  if (key.includes("consumer") || key.includes("retail")) return ShoppingBag;
+  if (key.includes("credit") || key.includes("financ")) return CreditCard;
+  if (key.includes("govern") || key.includes("standard") || key.includes("shariah")) return BookOpen;
+  return Globe;
+}
+
+function mapDatasetToMetric(dataset: Dataset): MetricRow {
+  const from = dataset.timePeriodFrom ?? "";
+  const to = dataset.timePeriodTo ?? "";
+  const legacyYear = from && to
+    ? from === to
+      ? from
+      : `${from}-${to}`
+    : from || to || "N/A";
+
+  return {
+    name: dataset.title,
+    geography: dataset.geography ?? "Global",
+    value: dataset.value ?? "--",
+    year: dataset.year ?? legacyYear,
+    sourceType: dataset.source ?? "Unknown",
+    visualization: dataset.visualizationType ?? "KPI card",
+    premium: dataset.isPremium,
+  };
+}
+
 export default function Data() {
-  const [activeTab, setActiveTab] = useState(SECTIONS[0].id);
+  const { data: categoriesData } = useDatasetCategories();
+  const { data: datasetsData, isLoading: datasetsLoading } = useDatasets({
+    page: 1,
+    perPage: 100,
+    status: "published",
+    order: "DESC",
+  });
+
+  const sections = useMemo<SectionDef[]>(() => {
+    const categories = categoriesData ?? [];
+    const datasets = datasetsData?.data ?? [];
+    if (categories.length === 0 && datasets.length === 0) return SECTIONS;
+
+    return categories.map((category) => ({
+      id: category.slug || category.id,
+      title: category.name,
+      icon: getCategoryIcon(category.name, category.icon),
+      description: category.description || `Explore metrics and datasets for ${category.name}.`,
+      metrics: datasets
+        .filter((dataset) => dataset.category?.id === category.id)
+        .map(mapDatasetToMetric),
+    }));
+  }, [categoriesData, datasetsData?.data]);
+
+  const [activeTab, setActiveTab] = useState((SECTIONS[0]?.id ?? ""));
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!sections.length) return;
+    if (!sections.some((section) => section.id === activeTab)) {
+      setActiveTab(sections[0].id);
+    }
+  }, [sections, activeTab]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const totalMetrics = SECTIONS.reduce((sum, s) => sum + s.metrics.length, 0);
-  const totalFree = SECTIONS.reduce((sum, s) => sum + s.metrics.filter((m) => !m.premium).length, 0);
+  const totalMetrics = sections.reduce((sum, s) => sum + s.metrics.length, 0);
+  const totalFree = sections.reduce((sum, s) => sum + s.metrics.filter((m) => !m.premium).length, 0);
 
   // Global search across all sections
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return null;
-    return SECTIONS.map((section) => ({
+    return sections.map((section) => ({
       section,
       matches: section.metrics.filter(
         (m) =>
@@ -847,7 +897,7 @@ export default function Data() {
           m.visualization.toLowerCase().includes(q),
       ),
     })).filter((r) => r.matches.length > 0);
-  }, [search]);
+  }, [search, sections]);
 
   const totalMatches = searchResults
     ? searchResults.reduce((sum, r) => sum + r.matches.length, 0)
@@ -904,7 +954,7 @@ export default function Data() {
             {/* Stats */}
             <div className="flex md:flex-col gap-3 shrink-0">
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-white">{SECTIONS.length}</p>
+                <p className="text-2xl font-bold text-white">{sections.length}</p>
                 <p className="text-xs text-gray-500">Sections</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
@@ -948,7 +998,11 @@ export default function Data() {
       </motion.div>
 
       {/* ── Search Results (cross-section tables) ────────────────────── */}
-      {searchResults ? (
+      {datasetsLoading ? (
+        <motion.div variants={itemVariants} className="py-16 text-center">
+          <p className="text-[#737692] text-sm">Loading datasets...</p>
+        </motion.div>
+      ) : searchResults ? (
         <motion.div
           variants={itemVariants}
           initial={{ opacity: 0, y: 10 }}
@@ -1016,7 +1070,7 @@ export default function Data() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             {/* Arrow-shaped tabs */}
             <TabsList className="flex flex-nowrap overflow-x-auto scrollbar-hide w-full justify-start bg-transparent border-0 rounded-none p-0 h-auto shadow-none">
-              {SECTIONS.map((section, idx) => {
+              {sections.map((section, idx) => {
                 const Icon = section.icon;
                 return (
                   <TabsTrigger
@@ -1029,7 +1083,7 @@ export default function Data() {
                         idx === 0
                           ? "polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%)"
                           : "polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%, 18px 50%)",
-                      zIndex: SECTIONS.length - idx,
+                      zIndex: sections.length - idx,
                     }}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -1043,7 +1097,7 @@ export default function Data() {
             </TabsList>
 
             {/* ── Tab Content ──────────────────────────────────────────── */}
-            {SECTIONS.map((section) => (
+            {sections.map((section) => (
               <TabsContent key={section.id} value={section.id} className="mt-6">
                 <AnimatePresence mode="wait">
                   <motion.div

@@ -17,12 +17,31 @@ import {
   MoreVertical,
   Library,
   Upload,
+  Loader2,
+  Lock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
+import {
+  useAdminResources,
+  useAdminResourceCategories,
+  useAdminGlossaryTerms,
+  useAdminCreateResource,
+  useAdminUpdateResource,
+  useAdminDeleteResource,
+  useAdminCreateGlossaryTerm,
+  useAdminUpdateGlossaryTerm,
+  useAdminDeleteGlossaryTerm,
+  type AdminResource,
+  type AdminGlossaryTerm,
+  type AdminResourceType,
+  type CreateResourceDto,
+  type CreateGlossaryTermDto,
+} from '@/hooks/useAdmin'
+import api from '@/lib/api'
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
 const item = { hidden: { y: 14, opacity: 0 }, show: { y: 0, opacity: 1 } }
@@ -30,116 +49,53 @@ const item = { hidden: { y: 14, opacity: 0 }, show: { y: 0, opacity: 1 } }
 /* ── Section config ─────────────────────────────────────────────────────── */
 type SectionKey = 'educational' | 'research' | 'standards' | 'tools' | 'glossary'
 
-interface Section {
+interface SectionConfig {
   key: SectionKey
   label: string
   icon: React.ElementType
   description: string
-  categories: string[]
-  sampleItems: ResourceEntry[]
 }
 
-interface ResourceEntry {
-  id: string
-  title: string
-  author: string
-  category: string
-  topic: string
-  date: string
-  status: 'published' | 'draft'
-  views: number
-  downloads: number
-}
-
-interface GlossaryEntry {
-  id: string
-  term: string
-  definition: string
-  status: 'published' | 'draft'
-}
-
-/* ── Sample / placeholder data ──────────────────────────────────────────── */
-const SECTIONS: Section[] = [
-  {
-    key: 'educational',
-    label: 'Educational Guides',
-    icon: BookOpen,
-    description: 'Introductory and explanatory guides on Islamic finance fundamentals.',
-    categories: ['Introduction', 'Banking', 'Investment', 'Fixed Income'],
-    sampleItems: [
-      { id: 'e1', title: 'What is Islamic Finance?', author: 'IEFA Academy', category: 'Introduction', topic: 'Fundamentals', date: 'Mar 5, 2026', status: 'published', views: 1240, downloads: 856 },
-      { id: 'e2', title: 'Islamic Banking Basics', author: 'Dr. Ahmed Hassan', category: 'Banking', topic: 'Banking', date: 'Feb 20, 2026', status: 'published', views: 980, downloads: 620 },
-      { id: 'e3', title: 'Halal Investing Guide', author: 'Halal Wealth Advisory', category: 'Investment', topic: 'Investing', date: 'Feb 10, 2026', status: 'draft', views: 0, downloads: 0 },
-    ],
-  },
-  {
-    key: 'research',
-    label: 'Research & Publications',
-    icon: FileText,
-    description: 'Academic and industry research, whitepapers, case studies and journal articles.',
-    categories: ['Industry Reports', 'White Papers', 'Academic Journals', 'Case Studies', 'Conference Papers'],
-    sampleItems: [
-      { id: 'r1', title: 'Global Islamic Finance Industry Report 2026', author: 'IEFA Research Institute', category: 'Industry Reports', topic: 'Industry Report', date: 'Mar 1, 2026', status: 'published', views: 2100, downloads: 1450 },
-      { id: 'r2', title: 'Fintech and Islamic Finance', author: 'Prof. Fatima Al-Rashid', category: 'White Papers', topic: 'White Paper', date: 'Feb 15, 2026', status: 'published', views: 1560, downloads: 890 },
-      { id: 'r3', title: 'Al Rajhi Bank Digital Transformation', author: 'Cambridge IF Institute', category: 'Case Studies', topic: 'Case Study', date: 'Jan 30, 2026', status: 'draft', views: 0, downloads: 0 },
-    ],
-  },
-  {
-    key: 'standards',
-    label: 'Standards & Governance',
-    icon: Shield,
-    description: 'Shariah standards, regulatory frameworks, policy documents and compliance manuals.',
-    categories: ['Shariah Standards', 'Regulatory Frameworks', 'Policy Documents', 'Compliance Manuals'],
-    sampleItems: [
-      { id: 's1', title: 'AAOIFI Shariah Standards 2026', author: 'AAOIFI', category: 'Shariah Standards', topic: 'Standards', date: 'Mar 8, 2026', status: 'published', views: 3200, downloads: 2100 },
-      { id: 's2', title: 'Regulatory Framework for Islamic Digital Banks', author: 'IFSB', category: 'Regulatory Frameworks', topic: 'Regulatory', date: 'Feb 25, 2026', status: 'published', views: 1800, downloads: 1050 },
-      { id: 's3', title: 'Policy Document on Shariah Governance', author: 'Malaysian Central Bank', category: 'Policy Documents', topic: 'Policy', date: 'Feb 5, 2026', status: 'draft', views: 0, downloads: 0 },
-    ],
-  },
-  {
-    key: 'tools',
-    label: 'Tools & Practical Resources',
-    icon: Wrench,
-    description: 'Financial planning templates, contract templates and downloadable worksheets.',
-    categories: ['Financial Planning Templates', 'Contract Templates', 'Downloadable Guides', 'Worksheets'],
-    sampleItems: [
-      { id: 't1', title: 'Islamic Financial Planning Template Kit', author: 'IEFA Tools Team', category: 'Financial Planning Templates', topic: 'Template', date: 'Mar 10, 2026', status: 'published', views: 1650, downloads: 1200 },
-      { id: 't2', title: 'Islamic Finance Contract Templates Collection', author: 'Shariah Contracts Hub', category: 'Contract Templates', topic: 'Template', date: 'Mar 3, 2026', status: 'published', views: 1300, downloads: 980 },
-      { id: 't3', title: 'Due Diligence Worksheet', author: 'Dr. Sarah Khan', category: 'Worksheets', topic: 'Worksheet', date: 'Feb 18, 2026', status: 'draft', views: 0, downloads: 0 },
-    ],
-  },
+const SECTIONS: SectionConfig[] = [
+  { key: 'educational', label: 'Educational Guides',          icon: BookOpen, description: 'Introductory and explanatory guides on Islamic finance fundamentals.' },
+  { key: 'research',    label: 'Research & Publications',     icon: FileText, description: 'Academic and industry research, whitepapers, case studies and journal articles.' },
+  { key: 'standards',   label: 'Standards & Governance',      icon: Shield,   description: 'Shariah standards, regulatory frameworks, policy documents and compliance manuals.' },
+  { key: 'tools',       label: 'Tools & Practical Resources', icon: Wrench,   description: 'Financial planning templates, contract templates and downloadable worksheets.' },
 ]
 
-const INITIAL_GLOSSARY: GlossaryEntry[] = [
-  { id: 'g1', term: 'Murabaha', definition: 'A cost-plus financing structure where the seller discloses cost and profit margin to the buyer.', status: 'published' },
-  { id: 'g2', term: 'Sukuk', definition: 'Islamic financial certificates representing proportional ownership in an underlying asset.', status: 'published' },
-  { id: 'g3', term: 'Ijarah', definition: 'An Islamic leasing arrangement where the lessor purchases and leases an asset to the lessee.', status: 'published' },
-  { id: 'g4', term: 'Takaful', definition: 'Islamic insurance based on mutual cooperation and shared responsibility.', status: 'draft' },
-]
+const SECTION_TO_TYPE: Record<Exclude<SectionKey, 'glossary'>, AdminResourceType> = {
+  educational: 'guide',
+  research: 'research',
+  standards: 'standard',
+  tools: 'tool',
+}
 
 const STATUS_STYLE: Record<string, string> = {
   published: 'bg-green-50 text-green-700',
   draft: 'bg-slate-100 text-slate-500',
+  archived: 'bg-orange-50 text-orange-700',
 }
 
-/* ── Empty form ─────────────────────────────────────────────────────────── */
+/* ── Form types ─────────────────────────────────────────────────────────── */
 interface ResourceForm {
   title: string
-  author: string
-  category: string
+  authorName: string
+  authorType: 'individual' | 'organization'
   topic: string
   briefIntro: string
-  displayImage: string
+  categoryId: string
+  coverImageUrl: string
   fileUrl: string
-  status: 'published' | 'draft'
+  status: 'draft' | 'published' | 'archived'
+  isPremium: boolean
 }
 
 const EMPTY_FORM: ResourceForm = {
-  title: '', author: '', category: '', topic: '', briefIntro: '',
-  displayImage: '', fileUrl: '', status: 'draft',
+  title: '', authorName: '', authorType: 'organization', topic: '', briefIntro: '',
+  categoryId: '', coverImageUrl: '', fileUrl: '', status: 'draft', isPremium: false,
 }
 
-interface GlossaryForm { term: string; definition: string; status: 'published' | 'draft' }
+interface GlossaryForm { term: string; definition: string; status: 'draft' | 'published' }
 const EMPTY_GLOSSARY_FORM: GlossaryForm = { term: '', definition: '', status: 'draft' }
 
 /* ── Component ──────────────────────────────────────────────────────────── */
@@ -153,166 +109,231 @@ export default function AdminResources() {
     validKeys.includes(tabFromUrl) ? tabFromUrl : 'educational'
   )
 
-  // Keep URL in sync when tab changes
   const handleSetSection = (key: SectionKey) => {
     setActiveSection(key)
     navigate(`?tab=${key}`, { replace: true })
+    setSearch('')
+    setOpenMenu(null)
   }
-  const [search, setSearch] = useState('')
+
+  const currentType = activeSection !== 'glossary'
+    ? SECTION_TO_TYPE[activeSection as Exclude<SectionKey, 'glossary'>]
+    : undefined
+
+  /* ── API hooks ──────────────────────────────────────────────────────── */
+  const { data: resourcesData, isLoading: resourcesLoading } = useAdminResources(
+    currentType ? { resourceType: currentType, perPage: 100 } : { perPage: 1 }
+  )
+  const { data: glossaryData, isLoading: glossaryLoading } = useAdminGlossaryTerms(
+    activeSection === 'glossary' ? {} : { letter: 'A' }
+  )
+  const { data: categories } = useAdminResourceCategories()
+
+  const { data: allResStats }   = useAdminResources({ perPage: 1 })
+  const { data: allGlossStats } = useAdminGlossaryTerms()
+
+  const createResource  = useAdminCreateResource()
+  const updateResource  = useAdminUpdateResource()
+  const deleteResource  = useAdminDeleteResource()
+  const createGlossTerm = useAdminCreateGlossaryTerm()
+  const updateGlossTerm = useAdminUpdateGlossaryTerm()
+  const deleteGlossTerm = useAdminDeleteGlossaryTerm()
+
+  /* ── Local UI state ─────────────────────────────────────────────────── */
+  const [search, setSearch]     = useState('')
   const [openMenu, setOpenMenu] = useState<string | null>(null)
 
-  /* Resource modal */
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [form, setForm] = useState<ResourceForm>(EMPTY_FORM)
+  const [modalOpen, setModalOpen]           = useState(false)
+  const [editId, setEditId]                 = useState<string | null>(null)
+  const [form, setForm]                     = useState<ResourceForm>(EMPTY_FORM)
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null)
-  const [documentFile, setDocumentFile] = useState<File | null>(null)
+  const [documentFile, setDocumentFile]     = useState<File | null>(null)
+  const [uploading, setUploading]           = useState(false)
 
-  /* Local data store keyed by section */
-  const [sectionData, setSectionData] = useState<Record<SectionKey, ResourceEntry[]>>({
-    educational: SECTIONS[0].sampleItems,
-    research: SECTIONS[1].sampleItems,
-    standards: SECTIONS[2].sampleItems,
-    tools: SECTIONS[3].sampleItems,
-    glossary: [],
-  })
-
-  /* Glossary modal */
   const [glossaryModalOpen, setGlossaryModalOpen] = useState(false)
-  const [editGlossaryId, setEditGlossaryId] = useState<string | null>(null)
-  const [glossaryForm, setGlossaryForm] = useState<GlossaryForm>(EMPTY_GLOSSARY_FORM)
-  const [glossaryData, setGlossaryData] = useState<GlossaryEntry[]>(INITIAL_GLOSSARY)
+  const [editGlossaryId, setEditGlossaryId]        = useState<string | null>(null)
+  const [glossaryForm, setGlossaryForm]             = useState<GlossaryForm>(EMPTY_GLOSSARY_FORM)
 
-  /* Glossary bulk import */
   const [bulkImportOpen, setBulkImportOpen] = useState(false)
-  const [bulkPreview, setBulkPreview] = useState<GlossaryEntry[]>([])
-  const [bulkError, setBulkError] = useState<string | null>(null)
+  const [bulkPreview, setBulkPreview]       = useState<{ term: string; definition: string; status: 'draft' | 'published' }[]>([])
+  const [bulkError, setBulkError]           = useState<string | null>(null)
+  const [bulkImporting, setBulkImporting]   = useState(false)
 
+  /* ── Derived lists ──────────────────────────────────────────────────── */
+  const lc = search.toLowerCase()
+  const items = (resourcesData?.data ?? []).filter(r =>
+    !search || r.title.toLowerCase().includes(lc) || (r.authorName ?? '').toLowerCase().includes(lc)
+  )
+  const filteredGlossary = (glossaryData ?? []).filter(g =>
+    !search || g.term.toLowerCase().includes(lc)
+  )
+
+  /* ── Header stats ───────────────────────────────────────────────────── */
+  const totalContent = (allResStats?.meta?.itemCount ?? 0) + (allGlossStats?.length ?? 0)
+  const tabPublished = items.filter(r => r.status === 'published').length
+  const tabDrafts    = items.filter(r => r.status === 'draft').length
+  const tabDownloads = items.reduce((s, r) => s + r.downloadCount, 0)
+
+  /* ── File upload helper ─────────────────────────────────────────────── */
+  async function uploadFile(file: File): Promise<string> {
+    const fd = new FormData()
+    fd.append('file', file)
+    const { data } = await api.post<{ url: string }>('/file-upload/test', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data.url
+  }
+
+  /* ── Resource CRUD ──────────────────────────────────────────────────── */
+  function openCreate() {
+    setEditId(null); setForm({ ...EMPTY_FORM }); setCoverImageFile(null); setDocumentFile(null); setModalOpen(true)
+  }
+
+  function openEdit(r: AdminResource) {
+    setEditId(r.id)
+    setForm({
+      title: r.title,
+      authorName: r.authorName ?? '',
+      authorType: r.authorType ?? 'organization',
+      topic: r.topic ?? '',
+      briefIntro: r.briefIntro ?? '',
+      categoryId: r.categoryId ?? '',
+      coverImageUrl: r.coverImageUrl ?? '',
+      fileUrl: r.fileUrl ?? '',
+      status: r.status,
+      isPremium: r.isPremium,
+    })
+    setCoverImageFile(null); setDocumentFile(null); setOpenMenu(null); setModalOpen(true)
+  }
+
+  async function saveResource() {
+    if (!form.title.trim() || !currentType) return
+    try {
+      setUploading(true)
+      let coverImageUrl = form.coverImageUrl
+      let fileUrl = form.fileUrl
+      if (coverImageFile) coverImageUrl = await uploadFile(coverImageFile)
+      if (documentFile)   fileUrl       = await uploadFile(documentFile)
+
+      const dto: CreateResourceDto = {
+        title: form.title.trim(),
+        resourceType: currentType,
+        status: form.status,
+        isPremium: form.isPremium,
+        ...(form.authorName && { authorName: form.authorName }),
+        ...(form.authorType && { authorType: form.authorType }),
+        ...(form.topic      && { topic: form.topic }),
+        ...(form.briefIntro && { briefIntro: form.briefIntro }),
+        ...(form.categoryId && { categoryId: form.categoryId }),
+        ...(coverImageUrl   && { coverImageUrl }),
+        ...(fileUrl         && { fileUrl }),
+      }
+      if (editId) {
+        await updateResource.mutateAsync({ id: editId, dto })
+      } else {
+        await createResource.mutateAsync(dto)
+      }
+      setModalOpen(false)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleDeleteResource(id: string) {
+    await deleteResource.mutateAsync(id); setOpenMenu(null)
+  }
+
+  async function togglePublish(r: AdminResource) {
+    const newStatus: 'draft' | 'published' = r.status === 'published' ? 'draft' : 'published'
+    await updateResource.mutateAsync({ id: r.id, dto: { status: newStatus } }); setOpenMenu(null)
+  }
+
+  /* ── Glossary CRUD ──────────────────────────────────────────────────── */
+  function openCreateGlossary() {
+    setEditGlossaryId(null); setGlossaryForm(EMPTY_GLOSSARY_FORM); setGlossaryModalOpen(true)
+  }
+
+  function openEditGlossary(g: AdminGlossaryTerm) {
+    setEditGlossaryId(g.id)
+    setGlossaryForm({ term: g.term, definition: g.definition, status: g.status })
+    setOpenMenu(null); setGlossaryModalOpen(true)
+  }
+
+  async function saveGlossary() {
+    if (!glossaryForm.term.trim()) return
+    const dto: CreateGlossaryTermDto = {
+      term: glossaryForm.term.trim(),
+      definition: glossaryForm.definition.trim(),
+      status: glossaryForm.status,
+    }
+    if (editGlossaryId) {
+      await updateGlossTerm.mutateAsync({ id: editGlossaryId, dto })
+    } else {
+      await createGlossTerm.mutateAsync(dto)
+    }
+    setGlossaryModalOpen(false)
+  }
+
+  async function handleDeleteGlossary(id: string) {
+    await deleteGlossTerm.mutateAsync(id); setOpenMenu(null)
+  }
+
+  async function toggleGlossaryPublish(g: AdminGlossaryTerm) {
+    const newStatus: 'draft' | 'published' = g.status === 'published' ? 'draft' : 'published'
+    await updateGlossTerm.mutateAsync({ id: g.id, dto: { status: newStatus } }); setOpenMenu(null)
+  }
+
+  /* ── Bulk CSV import ────────────────────────────────────────────────── */
   function handleBulkFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setBulkError(null)
-    setBulkPreview([])
+    setBulkError(null); setBulkPreview([])
     const reader = new FileReader()
     reader.onload = (ev) => {
       const text = ev.target?.result as string
       if (!text) { setBulkError('Could not read file.'); return }
       const lines = text.split(/\r?\n/).filter(l => l.trim())
       if (lines.length < 2) { setBulkError('File must have a header row and at least one data row.'); return }
-      // Auto-detect delimiter: comma or semicolon or tab
       const header = lines[0]
       const delim = header.includes('\t') ? '\t' : header.includes(';') ? ';' : ','
       const cols = header.split(delim).map(c => c.replace(/^"|"$/g, '').trim().toLowerCase())
-      const termIdx = cols.findIndex(c => c === 'term' || c === 'word' || c === 'title')
-      const defIdx = cols.findIndex(c => c === 'definition' || c === 'description' || c === 'meaning' || c === 'desc')
+      const termIdx   = cols.findIndex(c => ['term', 'word', 'title'].includes(c))
+      const defIdx    = cols.findIndex(c => ['definition', 'description', 'meaning', 'desc'].includes(c))
       const statusIdx = cols.findIndex(c => c === 'status')
       if (termIdx === -1 || defIdx === -1) {
         setBulkError(`Could not find 'term' and 'definition' columns. Found: ${cols.join(', ')}`)
         return
       }
-      const parsed: GlossaryEntry[] = []
+      const parsed: { term: string; definition: string; status: 'draft' | 'published' }[] = []
       for (let i = 1; i < lines.length; i++) {
         const row = lines[i].split(delim).map(c => c.replace(/^"|"$/g, '').trim())
-        const term = row[termIdx]
-        const definition = row[defIdx]
+        const term = row[termIdx]; const definition = row[defIdx]
         if (!term || !definition) continue
         const rawStatus = (row[statusIdx] ?? '').toLowerCase()
-        const status: 'published' | 'draft' = rawStatus === 'published' ? 'published' : 'draft'
-        parsed.push({ id: `bulk-${Date.now()}-${i}`, term, definition, status })
+        parsed.push({ term, definition, status: rawStatus === 'published' ? 'published' : 'draft' })
       }
       if (parsed.length === 0) { setBulkError('No valid rows found in the file.'); return }
       setBulkPreview(parsed)
     }
     reader.readAsText(file)
-    // reset input so same file can be re-selected
     e.target.value = ''
   }
 
-  function confirmBulkImport() {
-    setGlossaryData(prev => [...bulkPreview, ...prev])
-    setBulkPreview([])
-    setBulkImportOpen(false)
-    setBulkError(null)
-  }
-
-  const section = SECTIONS.find(s => s.key === activeSection)
-  const items = (sectionData[activeSection] ?? []).filter(r =>
-    !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.author.toLowerCase().includes(search.toLowerCase())
-  )
-
-  /* ── Resource CRUD ────────────────────────────────────────────────────── */
-  function openCreate() {
-    setEditId(null)
-    setForm({ ...EMPTY_FORM, category: section?.categories[0] ?? '' })
-    setCoverImageFile(null)
-    setDocumentFile(null)
-    setModalOpen(true)
-  }
-
-  function openEdit(r: ResourceEntry) {
-    setEditId(r.id)
-    setForm({ title: r.title, author: r.author, category: r.category, topic: r.topic, briefIntro: '', displayImage: '', fileUrl: '', status: r.status })
-    setCoverImageFile(null)
-    setDocumentFile(null)
-    setOpenMenu(null)
-    setModalOpen(true)
-  }
-
-  function saveResource() {
-    if (!form.title.trim()) return
-    setSectionData(prev => {
-      const current = prev[activeSection]
-      if (editId) {
-        return { ...prev, [activeSection]: current.map(r => r.id === editId ? { ...r, title: form.title, author: form.author, category: form.category, topic: form.topic, status: form.status } : r) }
+  async function confirmBulkImport() {
+    setBulkImporting(true)
+    try {
+      for (const row of bulkPreview) {
+        await createGlossTerm.mutateAsync({ term: row.term, definition: row.definition, status: row.status })
       }
-      const newEntry: ResourceEntry = {
-        id: `new-${Date.now()}`, title: form.title, author: form.author,
-        category: form.category, topic: form.topic,
-        date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-        status: form.status, views: 0, downloads: 0,
-      }
-      return { ...prev, [activeSection]: [newEntry, ...current] }
-    })
-    setModalOpen(false)
-  }
-
-  function deleteResource(id: string) {
-    setSectionData(prev => ({ ...prev, [activeSection]: prev[activeSection].filter(r => r.id !== id) }))
-    setOpenMenu(null)
-  }
-
-  function togglePublish(id: string) {
-    setSectionData(prev => ({
-      ...prev,
-      [activeSection]: prev[activeSection].map(r => r.id === id ? { ...r, status: r.status === 'published' ? 'draft' : 'published' } : r),
-    }))
-    setOpenMenu(null)
-  }
-
-  /* ── Glossary CRUD ────────────────────────────────────────────────────── */
-  const filteredGlossary = glossaryData.filter(g =>
-    !search || g.term.toLowerCase().includes(search.toLowerCase())
-  )
-
-  function openCreateGlossary() { setEditGlossaryId(null); setGlossaryForm(EMPTY_GLOSSARY_FORM); setGlossaryModalOpen(true) }
-  function openEditGlossary(g: GlossaryEntry) { setEditGlossaryId(g.id); setGlossaryForm({ term: g.term, definition: g.definition, status: g.status }); setOpenMenu(null); setGlossaryModalOpen(true) }
-
-  function saveGlossary() {
-    if (!glossaryForm.term.trim()) return
-    if (editGlossaryId) {
-      setGlossaryData(prev => prev.map(g => g.id === editGlossaryId ? { ...g, ...glossaryForm } : g))
-    } else {
-      setGlossaryData(prev => [{ id: `g-${Date.now()}`, ...glossaryForm }, ...prev])
+      setBulkPreview([]); setBulkImportOpen(false); setBulkError(null)
+    } finally {
+      setBulkImporting(false)
     }
-    setGlossaryModalOpen(false)
   }
 
-  function deleteGlossary(id: string) { setGlossaryData(prev => prev.filter(g => g.id !== id)); setOpenMenu(null) }
-
-  /* ── Total stats ──────────────────────────────────────────────────────── */
-  const totalItems = Object.values(sectionData).reduce((s, arr) => s + arr.length, 0) + glossaryData.length
-  const totalPublished = Object.values(sectionData).reduce((s, arr) => s + arr.filter(r => r.status === 'published').length, 0) + glossaryData.filter(g => g.status === 'published').length
-  const totalDownloads = Object.values(sectionData).reduce((s, arr) => s + arr.reduce((d, r) => d + r.downloads, 0), 0)
+  const isSaving        = uploading || createResource.isPending || updateResource.isPending
+  const isGlossarySaving = createGlossTerm.isPending || updateGlossTerm.isPending
+  const isCurrentLoading = activeSection === 'glossary' ? glossaryLoading : resourcesLoading
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -329,21 +350,13 @@ export default function AdminResources() {
         </div>
         <div className="flex items-center gap-2">
           {activeSection === 'glossary' && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-lg gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
-              onClick={() => { setBulkImportOpen(true); setBulkPreview([]); setBulkError(null) }}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Bulk Import
+            <Button size="sm" variant="outline" className="rounded-lg gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
+              onClick={() => { setBulkImportOpen(true); setBulkPreview([]); setBulkError(null) }}>
+              <Upload className="h-3.5 w-3.5" /> Bulk Import
             </Button>
           )}
-          <Button
-            size="sm"
-            className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
-            onClick={activeSection === 'glossary' ? openCreateGlossary : openCreate}
-          >
+          <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
+            onClick={activeSection === 'glossary' ? openCreateGlossary : openCreate}>
             <Plus className="h-3.5 w-3.5" />
             {activeSection === 'glossary' ? 'Add Term' : 'Upload Resource'}
           </Button>
@@ -353,10 +366,10 @@ export default function AdminResources() {
       {/* Stats */}
       <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Resources', value: totalItems, color: '#D52B1E' },
-          { label: 'Published', value: totalPublished, color: '#10b981' },
-          { label: 'Drafts', value: totalItems - totalPublished, color: '#6b7280' },
-          { label: 'Total Downloads', value: totalDownloads.toLocaleString(), color: '#3b82f6' },
+          { label: 'Total Content',   value: totalContent,                color: '#D52B1E' },
+          { label: 'Published',       value: tabPublished,                color: '#10b981' },
+          { label: 'Drafts',          value: tabDrafts,                   color: '#6b7280' },
+          { label: 'Downloads (tab)', value: tabDownloads.toLocaleString(), color: '#3b82f6' },
         ].map((s) => (
           <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
@@ -365,62 +378,46 @@ export default function AdminResources() {
         ))}
       </motion.div>
 
-      {/* Section Tabs */}
+      {/* Section Tabs + Table */}
       <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Tab bar */}
         <div className="flex overflow-x-auto border-b border-gray-100 scrollbar-hide">
-          {[...SECTIONS, { key: 'glossary' as SectionKey, label: 'Glossary', icon: BookA, description: '', categories: [], sampleItems: [] }].map(s => (
-            <button
-              key={s.key}
-              onClick={() => { handleSetSection(s.key); setSearch('') }}
+          {[...SECTIONS, { key: 'glossary' as SectionKey, label: 'Glossary', icon: BookA, description: '' }].map(s => (
+            <button key={s.key} onClick={() => handleSetSection(s.key)}
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeSection === s.key
                   ? 'border-[#D52B1E] text-[#D52B1E] bg-[#FFEFEF]/40'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <s.icon className="h-4 w-4" />
-              {s.label}
+              <s.icon className="h-4 w-4" />{s.label}
             </button>
           ))}
         </div>
 
-        {/* Search */}
         <div className="p-4 border-b border-gray-50">
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder={activeSection === 'glossary' ? 'Search terms…' : 'Search resources…'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 text-sm rounded-lg"
-            />
+            <Input placeholder={activeSection === 'glossary' ? 'Search terms\u2026' : 'Search resources\u2026'}
+              value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm rounded-lg" />
           </div>
         </div>
 
-        {/* Table */}
-        {activeSection === 'glossary' ? (
-          <GlossaryTable
-            entries={filteredGlossary}
-            openMenu={openMenu}
-            setOpenMenu={setOpenMenu}
-            onEdit={openEditGlossary}
-            onDelete={deleteGlossary}
-            onTogglePublish={(id) => { setGlossaryData(prev => prev.map(g => g.id === id ? { ...g, status: g.status === 'published' ? 'draft' : 'published' } : g)); setOpenMenu(null) }}
-          />
+        {isCurrentLoading ? (
+          <div className="py-16 flex items-center justify-center gap-2 text-slate-400">
+            <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Loading\u2026</span>
+          </div>
+        ) : activeSection === 'glossary' ? (
+          <GlossaryTable entries={filteredGlossary} openMenu={openMenu} setOpenMenu={setOpenMenu}
+            onEdit={openEditGlossary} onDelete={handleDeleteGlossary} onTogglePublish={toggleGlossaryPublish}
+            deleting={deleteGlossTerm.isPending} />
         ) : (
-          <ResourceTable
-            items={items}
-            openMenu={openMenu}
-            setOpenMenu={setOpenMenu}
-            onEdit={openEdit}
-            onDelete={deleteResource}
-            onTogglePublish={togglePublish}
-          />
+          <ResourceTable items={items} categories={categories ?? []} openMenu={openMenu} setOpenMenu={setOpenMenu}
+            onEdit={openEdit} onDelete={handleDeleteResource} onTogglePublish={togglePublish}
+            deleting={deleteResource.isPending} />
         )}
       </motion.div>
 
-      {/* Resource Upload / Edit Modal */}
+      {/* Resource Modal */}
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? 'Edit Resource' : 'Upload Resource'} maxWidth="max-w-xl">
         <div className="space-y-4">
           <div>
@@ -430,75 +427,73 @@ export default function AdminResources() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="res-author" className="block text-xs font-medium text-slate-600 mb-1">Author / Source</label>
-              <Input id="res-author" value={form.author} onChange={e => setForm(f => ({ ...f, author: e.target.value }))} placeholder="Author or organisation" className="h-9 text-sm" />
+              <Input id="res-author" value={form.authorName} onChange={e => setForm(f => ({ ...f, authorName: e.target.value }))} placeholder="Author or organisation" className="h-9 text-sm" />
             </div>
             <div>
-              <label htmlFor="res-topic" className="block text-xs font-medium text-slate-600 mb-1">Topic</label>
-              <Input id="res-topic" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Fundamentals" className="h-9 text-sm" />
+              <label htmlFor="res-atype" className="block text-xs font-medium text-slate-600 mb-1">Author Type</label>
+              <Select id="res-atype" value={form.authorType} onChange={e => setForm(f => ({ ...f, authorType: e.target.value as 'individual' | 'organization' }))}>
+                <option value="organization">Organisation</option>
+                <option value="individual">Individual</option>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="res-category" className="block text-xs font-medium text-slate-600 mb-1">Category</label>
-              <Select
-                id="res-category"
-                value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-              >
-                {(section?.categories ?? []).map(c => <option key={c} value={c}>{c}</option>)}
-              </Select>
+              <label htmlFor="res-topic" className="block text-xs font-medium text-slate-600 mb-1">Topic</label>
+              <Input id="res-topic" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Fundamentals" className="h-9 text-sm" />
             </div>
             <div>
-              <label htmlFor="res-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <Select
-                id="res-status"
-                value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value as 'published' | 'draft' }))}
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
+              <label htmlFor="res-category" className="block text-xs font-medium text-slate-600 mb-1">Category</label>
+              <Select id="res-category" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
+                <option value="">— Select category —</option>
+                {(categories ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </div>
           </div>
           <div>
             <label htmlFor="res-intro" className="block text-xs font-medium text-slate-600 mb-1">Brief Introduction</label>
-            <textarea
-              id="res-intro"
-              value={form.briefIntro}
-              onChange={e => setForm(f => ({ ...f, briefIntro: e.target.value }))}
-              placeholder="Short description shown on the resource card…"
-              rows={3}
-              className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E]"
-            />
+            <textarea id="res-intro" value={form.briefIntro} onChange={e => setForm(f => ({ ...f, briefIntro: e.target.value }))}
+              placeholder="Short description shown on the resource card\u2026" rows={3}
+              className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E]" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                <Upload className="h-3 w-3 inline mr-1" />Cover Image
-              </label>
+              <label className="block text-xs font-medium text-slate-600 mb-1"><Upload className="h-3 w-3 inline mr-1" />Cover Image</label>
               <label className="flex items-center gap-2 cursor-pointer w-full h-9 text-sm border border-gray-200 rounded-lg px-3 hover:bg-gray-50 transition-colors">
                 <input type="file" accept="image/*" className="sr-only" onChange={e => setCoverImageFile(e.target.files?.[0] ?? null)} />
                 <Upload className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                <span className="truncate text-gray-500">{coverImageFile ? coverImageFile.name : 'Choose image…'}</span>
+                <span className="truncate text-gray-500">{coverImageFile ? coverImageFile.name : form.coverImageUrl ? 'Replace image\u2026' : 'Choose image\u2026'}</span>
               </label>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                <Upload className="h-3 w-3 inline mr-1" />Document / PDF
-              </label>
+              <label className="block text-xs font-medium text-slate-600 mb-1"><Upload className="h-3 w-3 inline mr-1" />Document / PDF</label>
               <label className="flex items-center gap-2 cursor-pointer w-full h-9 text-sm border border-gray-200 rounded-lg px-3 hover:bg-gray-50 transition-colors">
                 <input type="file" accept=".pdf,.doc,.docx" className="sr-only" onChange={e => setDocumentFile(e.target.files?.[0] ?? null)} />
                 <Upload className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                <span className="truncate text-gray-500">{documentFile ? documentFile.name : 'Choose file…'}</span>
+                <span className="truncate text-gray-500">{documentFile ? documentFile.name : form.fileUrl ? 'Replace file\u2026' : 'Choose file\u2026'}</span>
               </label>
             </div>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-700">
-            <strong>Note:</strong> Resource APIs are under development. Changes are stored locally and will not persist on refresh.
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="res-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
+              <Select id="res-status" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ResourceForm['status'] }))}>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="archived">Archived</option>
+              </Select>
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600">
+                <input type="checkbox" checked={form.isPremium} onChange={e => setForm(f => ({ ...f, isPremium: e.target.checked }))} className="h-4 w-4 rounded border-gray-300 accent-[#D52B1E]" />
+                <Lock className="h-3.5 w-3.5 text-amber-500" /> Premium content
+              </label>
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-1">
-            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg" disabled={!form.title.trim()} onClick={saveResource}>
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setModalOpen(false)} disabled={isSaving}>Cancel</Button>
+            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" disabled={!form.title.trim() || isSaving} onClick={saveResource}>
+              {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {editId ? 'Save Changes' : 'Upload Resource'}
             </Button>
           </div>
@@ -514,32 +509,21 @@ export default function AdminResources() {
           </div>
           <div>
             <label htmlFor="gl-def" className="block text-xs font-medium text-slate-600 mb-1">Definition</label>
-            <textarea
-              id="gl-def"
-              value={glossaryForm.definition}
-              onChange={e => setGlossaryForm(f => ({ ...f, definition: e.target.value }))}
-              placeholder="Clear definition of the term…"
-              rows={4}
-              className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E]"
-            />
+            <textarea id="gl-def" value={glossaryForm.definition} onChange={e => setGlossaryForm(f => ({ ...f, definition: e.target.value }))}
+              placeholder="Clear definition of the term\u2026" rows={4}
+              className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E]" />
           </div>
           <div>
             <label htmlFor="gl-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-            <Select
-              id="gl-status"
-              value={glossaryForm.status}
-              onChange={e => setGlossaryForm(f => ({ ...f, status: e.target.value as 'published' | 'draft' }))}
-            >
+            <Select id="gl-status" value={glossaryForm.status} onChange={e => setGlossaryForm(f => ({ ...f, status: e.target.value as 'published' | 'draft' }))}>
               <option value="draft">Draft</option>
               <option value="published">Published</option>
             </Select>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-700">
-            <strong>Note:</strong> Glossary APIs are under development. Changes are stored locally.
-          </div>
           <div className="flex justify-end gap-3 pt-1">
-            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setGlossaryModalOpen(false)}>Cancel</Button>
-            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg" disabled={!glossaryForm.term.trim()} onClick={saveGlossary}>
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setGlossaryModalOpen(false)} disabled={isGlossarySaving}>Cancel</Button>
+            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" disabled={!glossaryForm.term.trim() || isGlossarySaving} onClick={saveGlossary}>
+              {isGlossarySaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {editGlossaryId ? 'Save Changes' : 'Add Term'}
             </Button>
           </div>
@@ -550,9 +534,8 @@ export default function AdminResources() {
       <Dialog open={bulkImportOpen} onClose={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }} title="Bulk Import Glossary Terms" maxWidth="max-w-2xl">
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
-            <strong>Accepted formats:</strong> CSV or Excel (exported as CSV). The file must have a header row with at least two columns named <strong>term</strong> and <strong>definition</strong>. An optional <strong>status</strong> column (published/draft) is also supported. Delimiters: comma, semicolon, or tab.
+            <strong>Accepted formats:</strong> CSV or Excel (exported as CSV). Header must include <strong>term</strong> and <strong>definition</strong> columns. Optional <strong>status</strong> column. Delimiters: comma, semicolon, or tab.
           </div>
-
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-2">Choose CSV / Excel file</label>
             <label className="flex items-center gap-3 cursor-pointer w-full h-24 border-2 border-dashed border-gray-200 rounded-xl px-4 hover:bg-gray-50 transition-colors">
@@ -564,18 +547,14 @@ export default function AdminResources() {
               </div>
             </label>
           </div>
-
           {bulkError && (
             <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
               <strong>Error:</strong> {bulkError}
             </div>
           )}
-
           {bulkPreview.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-slate-700">Preview — {bulkPreview.length} term{bulkPreview.length !== 1 ? 's' : ''} found</p>
-              </div>
+              <p className="text-sm font-semibold text-slate-700 mb-2">Preview \u2014 {bulkPreview.length} term{bulkPreview.length !== 1 ? 's' : ''} found</p>
               <div className="rounded-xl border border-gray-100 overflow-hidden max-h-64 overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
@@ -588,16 +567,12 @@ export default function AdminResources() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {bulkPreview.map((g, i) => (
-                      <tr key={g.id} className="hover:bg-slate-50/50">
+                      <tr key={`${g.term}-${i}`} className="hover:bg-slate-50/50">
                         <td className="px-3 py-2 text-slate-400">{i + 1}</td>
                         <td className="px-3 py-2 font-semibold text-slate-800">{g.term}</td>
-                        <td className="px-3 py-2 text-slate-500 max-w-xs">
-                          <p className="line-clamp-2">{g.definition}</p>
-                        </td>
+                        <td className="px-3 py-2 text-slate-500 max-w-xs"><p className="line-clamp-2">{g.definition}</p></td>
                         <td className="px-3 py-2">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${g.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                            {g.status}
-                          </span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status] ?? ''}`}>{g.status}</span>
                         </td>
                       </tr>
                     ))}
@@ -606,22 +581,10 @@ export default function AdminResources() {
               </div>
             </div>
           )}
-
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-700">
-            <strong>Note:</strong> Imported terms will be added to the local glossary list. Glossary APIs are under development — data will not persist on refresh.
-          </div>
-
           <div className="flex justify-end gap-3 pt-1">
-            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
-              disabled={bulkPreview.length === 0}
-              onClick={confirmBulkImport}
-            >
-              <Upload className="h-3.5 w-3.5" />
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }} disabled={bulkImporting}>Cancel</Button>
+            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" disabled={bulkPreview.length === 0 || bulkImporting} onClick={confirmBulkImport}>
+              {bulkImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Import {bulkPreview.length > 0 ? `${bulkPreview.length} Terms` : 'Terms'}
             </Button>
           </div>
@@ -633,15 +596,17 @@ export default function AdminResources() {
 
 /* ── Resource Table sub-component ───────────────────────────────────────── */
 interface ResourceTableProps {
-  readonly items: ResourceEntry[]
+  readonly items: AdminResource[]
+  readonly categories: { id: string; name: string }[]
   readonly openMenu: string | null
   readonly setOpenMenu: (id: string | null) => void
-  readonly onEdit: (r: ResourceEntry) => void
-  readonly onDelete: (id: string) => void
-  readonly onTogglePublish: (id: string) => void
+  readonly onEdit: (r: AdminResource) => void
+  readonly onDelete: (id: string) => Promise<void>
+  readonly onTogglePublish: (r: AdminResource) => Promise<void>
+  readonly deleting: boolean
 }
 
-function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onTogglePublish }: ResourceTableProps) {
+function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onTogglePublish, deleting }: ResourceTableProps) {
   if (items.length === 0) {
     return (
       <div className="py-16 text-center text-slate-400">
@@ -650,7 +615,6 @@ function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onToggl
       </div>
     )
   }
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -673,24 +637,30 @@ function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onToggl
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-[#D52B1E] shrink-0" />
                   <p className="font-medium text-slate-800 line-clamp-1">{r.title}</p>
+                  {r.isPremium && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5 ml-6">{r.topic}</p>
+                {r.topic && <p className="text-xs text-slate-400 mt-0.5 ml-6">{r.topic}</p>}
               </td>
               <td className="px-4 py-3 hidden md:table-cell">
-                <Badge variant="outline" className="text-xs border-gray-200 text-slate-500">{r.category}</Badge>
+                {r.category
+                  ? <Badge variant="outline" className="text-xs border-gray-200 text-slate-500">{r.category.name}</Badge>
+                  : <span className="text-xs text-slate-300">\u2014</span>}
               </td>
-              <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">{r.author}</td>
+              <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">{r.authorName ?? '\u2014'}</td>
               <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">
-                <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{r.views > 0 ? r.views.toLocaleString() : '—'}</span>
+                <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{r.viewCount.toLocaleString()}</span>
               </td>
               <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">
-                <span className="flex items-center gap-1"><Download className="h-3 w-3" />{r.downloads > 0 ? r.downloads.toLocaleString() : '—'}</span>
+                <span className="flex items-center gap-1"><Download className="h-3 w-3" />{r.downloadCount.toLocaleString()}</span>
               </td>
               <td className="px-4 py-3">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[r.status]}`}>{r.status}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[r.status] ?? ''}`}>{r.status}</span>
               </td>
               <td className="px-4 py-3 text-slate-400 text-xs hidden md:table-cell">
-                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{r.date}</span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(r.publishedAt ?? r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
               </td>
               <td className="px-4 py-3 text-right">
                 <div className="relative inline-block">
@@ -700,11 +670,13 @@ function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onToggl
                   {openMenu === r.id && (
                     <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-100 rounded-xl shadow-xl z-10 py-1 text-sm">
                       <button onClick={() => onEdit(r)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700"><Edit className="h-3.5 w-3.5 text-blue-600" /> Edit</button>
-                      <button onClick={() => onTogglePublish(r.id)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
+                      <button onClick={() => onTogglePublish(r)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
                         <Eye className="h-3.5 w-3.5 text-green-600" /> {r.status === 'published' ? 'Unpublish' : 'Publish'}
                       </button>
                       <hr className="my-1 border-gray-100" />
-                      <button onClick={() => onDelete(r.id)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
+                      <button onClick={() => onDelete(r.id)} disabled={deleting} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600 disabled:opacity-50">
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
                     </div>
                   )}
                 </div>
@@ -719,15 +691,16 @@ function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onToggl
 
 /* ── Glossary Table sub-component ───────────────────────────────────────── */
 interface GlossaryTableProps {
-  readonly entries: GlossaryEntry[]
+  readonly entries: AdminGlossaryTerm[]
   readonly openMenu: string | null
   readonly setOpenMenu: (id: string | null) => void
-  readonly onEdit: (g: GlossaryEntry) => void
-  readonly onDelete: (id: string) => void
-  readonly onTogglePublish: (id: string) => void
+  readonly onEdit: (g: AdminGlossaryTerm) => void
+  readonly onDelete: (id: string) => Promise<void>
+  readonly onTogglePublish: (g: AdminGlossaryTerm) => Promise<void>
+  readonly deleting: boolean
 }
 
-function GlossaryTable({ entries, openMenu, setOpenMenu, onEdit, onDelete, onTogglePublish }: GlossaryTableProps) {
+function GlossaryTable({ entries, openMenu, setOpenMenu, onEdit, onDelete, onTogglePublish, deleting }: GlossaryTableProps) {
   if (entries.length === 0) {
     return (
       <div className="py-16 text-center text-slate-400">
@@ -736,7 +709,6 @@ function GlossaryTable({ entries, openMenu, setOpenMenu, onEdit, onDelete, onTog
       </div>
     )
   }
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -756,7 +728,7 @@ function GlossaryTable({ entries, openMenu, setOpenMenu, onEdit, onDelete, onTog
                 <p className="line-clamp-2">{g.definition}</p>
               </td>
               <td className="px-4 py-3">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status]}`}>{g.status}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status] ?? ''}`}>{g.status}</span>
               </td>
               <td className="px-4 py-3 text-right">
                 <div className="relative inline-block">
@@ -766,11 +738,13 @@ function GlossaryTable({ entries, openMenu, setOpenMenu, onEdit, onDelete, onTog
                   {openMenu === g.id && (
                     <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-100 rounded-xl shadow-xl z-10 py-1 text-sm">
                       <button onClick={() => onEdit(g)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700"><Edit className="h-3.5 w-3.5 text-blue-600" /> Edit</button>
-                      <button onClick={() => onTogglePublish(g.id)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
+                      <button onClick={() => onTogglePublish(g)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
                         <Eye className="h-3.5 w-3.5 text-green-600" /> {g.status === 'published' ? 'Unpublish' : 'Publish'}
                       </button>
                       <hr className="my-1 border-gray-100" />
-                      <button onClick={() => onDelete(g.id)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
+                      <button onClick={() => onDelete(g.id)} disabled={deleting} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600 disabled:opacity-50">
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
                     </div>
                   )}
                 </div>
