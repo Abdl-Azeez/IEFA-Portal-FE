@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
 /* -- Animation variants ---------------------------------------------------- */
 const container = {
@@ -1389,7 +1390,7 @@ export default function AdminDirectory() {
         setModalState(null);
       } catch (err) {
         console.error("Failed to save listing:", err);
-        alert("Failed to save entry. Please try again.");
+        toast.error("Failed to save entry. Please try again.");
       }
     },
     [modalState, categoryNameToId],
@@ -1404,7 +1405,7 @@ export default function AdminDirectory() {
       setModalState(null);
     } catch (err) {
       console.error("Failed to delete listing:", err);
-      alert("Failed to delete entry. Please try again.");
+      toast.error("Failed to delete entry. Please try again.");
     }
   }, [modalState]);
 
@@ -1864,7 +1865,7 @@ export default function AdminDirectory() {
                 const created = await directoryService.createCategory(dto);
                 setApiCategories((prev) => [...prev, created]);
                 setCatModal(null);
-              } catch { alert('Failed to create category.'); }
+              } catch { toast.error('Failed to create category.'); }
             }}
             onClose={() => setCatModal(null)}
           />
@@ -1877,7 +1878,7 @@ export default function AdminDirectory() {
                 const updated = await directoryService.updateCategory(catModal.cat.id, dto);
                 setApiCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
                 setCatModal(null);
-              } catch { alert('Failed to update category.'); }
+              } catch { toast.error('Failed to update category.'); }
             }}
             onClose={() => setCatModal(null)}
           />
@@ -1890,7 +1891,7 @@ export default function AdminDirectory() {
                 await directoryService.deleteCategory(catModal.cat.id);
                 setApiCategories((prev) => prev.filter((c) => c.id !== catModal.cat.id));
                 setCatModal(null);
-              } catch { alert('Failed to delete category.'); }
+              } catch { toast.error('Failed to delete category.'); }
             }}
             onClose={() => setCatModal(null)}
           />

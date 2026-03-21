@@ -26,6 +26,7 @@ import {
   type CommunityGroupAPI,
   type CommunityEventAPI,
   type CommunityCategoryAPI,
+  type GroupJoinRequestAPI,
 } from "@/lib/communityService";
 import type {
   Attachment,
@@ -39,6 +40,8 @@ import DiscussionDetailPage from "@/components/community/DiscussionDetailPage";
 import StartDiscussionModal from "@/components/community/StartDiscussionModal";
 import PosterProfilePopup from "@/components/community/PosterProfilePopup";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
+import { Dialog } from "@/components/ui/dialog";
 
 
 const CATEGORY_PALETTE = [
@@ -80,6 +83,7 @@ function apiDiscussionToPost(
     isAnswered: false,
     isPinned: d.isPinned ?? false,
     isSaved: d.isBookmarked ?? false,
+    isReported: !!(d.flaggedAt || d.flagged),
     tags: undefined,
   };
 }
@@ -113,6 +117,7 @@ export default function Community() {
   const [reportedPosts, setReportedPosts] = useState<string[]>([]);
   const [showStartDiscussionModal, setShowStartDiscussionModal] =
     useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [selectedPost, setSelectedPost] =
     useState<DetailedDiscussionPost | null>(null);
   const [showPosterProfile, setShowPosterProfile] = useState(false);
@@ -170,6 +175,18 @@ export default function Community() {
   const [initialLikeIdForDetail, setInitialLikeIdForDetail] = useState<
     string | undefined
   >(undefined);
+  /** Bookmarked discussions for Bookmarks tab */
+  const [bookmarkedDiscussions, setBookmarkedDiscussions] = useState<DiscussionPost[]>([]);
+  const [bookmarksLoading, setBookmarksLoading] = useState(false);
+  /** Flagged discussions for Flagged tab (moderators only) — derived from discussionPosts */
+  const [flaggedDiscussions, setFlaggedDiscussions] = useState<DiscussionPost[]>([]);
+  const [flaggedLoading, setFlaggedLoading] = useState(false);
+  /** Moderator join-request management in Groups tab */
+  const [joinRequestsById, setJoinRequestsById] = useState<Record<string, GroupJoinRequestAPI[]>>({});
+  const [expandedRequestGroupId, setExpandedRequestGroupId] = useState<string | null>(null);
+  const [joinRequestsLoadingGroupId, setJoinRequestsLoadingGroupId] = useState<string | null>(null);
+  /** Moderator-only: show only flagged posts */
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
 
   /* -- Load community categories (needed to map categoryId â†’ name) -- */
   useEffect(() => {
@@ -233,6 +250,33 @@ export default function Community() {
       )
       .finally(() => setGroupsLoading(false));
   }, [showStartDiscussionModal, groups.length]);
+
+  /* -- Load bookmarked discussions when tab is selected -- */
+  useEffect(() => {
+    if (selectedTab !== "bookmarks") return;
+    setBookmarksLoading(true);
+    communityService
+      .getBookmarkedDiscussions()
+      .then((data) => setBookmarkedDiscussions(data.map((d) => apiDiscussionToPost(d, apiCategories))))
+      .catch((err) => console.error("Failed to load bookmarks:", err))
+      .finally(() => setBookmarksLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTab]);
+
+  /* -- Load flagged discussions when moderator opens flagged tab -- */
+  useEffect(() => {
+    if (selectedTab !== "flagged" || !isModerator) return;
+    setFlaggedLoading(true);
+    communityService
+      .getDiscussions()
+      .then((data) => {
+        const mapped = data.map((d) => apiDiscussionToPost(d, apiCategories));
+        setFlaggedDiscussions(mapped.filter((p) => p.isReported));
+      })
+      .catch((err) => console.error("Failed to load flagged discussions:", err))
+      .finally(() => setFlaggedLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTab, isModerator]);
 
   /* -- Load events when tab is selected -- */
   useEffect(() => {
@@ -349,8 +393,13 @@ export default function Community() {
       return 0;
     });
 
+    // Moderator: show only flagged posts when filter is active
+    if (showFlaggedOnly) {
+      filtered = filtered.filter((post) => post.isReported);
+    }
+
     return filtered;
-  }, [discussionPosts, searchQuery, filters, savedPosts]);
+  }, [discussionPosts, searchQuery, filters, savedPosts, showFlaggedOnly]);
 
   const joinedGroupsForModal = useMemo(
     () => groups.filter((g) => g.isMember),
@@ -446,13 +495,13 @@ export default function Community() {
       }
     } else {
       navigator.clipboard.writeText(url);
-      alert("Link copied to clipboard!");
+      toast.success("Link copied to clipboard!");
     }
   };
 
   const handleReport = async (postId: string) => {
     if (reportedPosts.includes(postId)) {
-      alert("You've already reported this post.");
+      toast({ title: "Already Reported", description: "You've already reported this post." });
       return;
     }
     try {
@@ -461,10 +510,10 @@ export default function Community() {
       setDiscussionPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isReported: true } : p)),
       );
-      alert("Thank you. The post has been reported to moderators.");
+      toast.success("Post reported. Thank you for helping keep the community safe.");
     } catch (err) {
       console.error("Failed to report post:", err);
-      alert("Could not submit report right now. Please try again.");
+      toast.error("Could not submit report. Please try again.");
     }
   };
 
@@ -531,7 +580,13 @@ export default function Community() {
       replies: freshReplyCount,
       views: full?.viewCount ?? post.views,
       posterDetails: posterProfile,
-      attachments: [],
+      attachments: (full?.attachments ?? []).map((url, idx) => ({
+        id: `attachment-${idx}`,
+        type: /\.(png|jpe?g|gif|webp|svg)$/i.test(url) ? 'image' : 'file',
+        url,
+        name: url.split('/').pop() ?? `attachment-${idx + 1}`,
+        size: 0,
+      })),
       repliesList,
       mentions: [],
     };
@@ -577,15 +632,19 @@ export default function Community() {
     }
   }, [discussionPosts]);
 
-  const handleDeletePost = useCallback(async (postId: string) => {
-    if (!window.confirm("Are you sure you want to delete this post?")) return;
-    try {
-      await communityService.deleteDiscussion(postId);
-      setDiscussionPosts((prev) => prev.filter((p) => p.id !== postId));
-    } catch (err) {
-      console.error("Failed to delete post:", err);
-      alert("Failed to delete post.");
-    }
+  const handleDeletePost = useCallback((postId: string) => {
+    setConfirmDialog({
+      message: "Are you sure you want to delete this post? This cannot be undone.",
+      onConfirm: async () => {
+        try {
+          await communityService.deleteDiscussion(postId);
+          setDiscussionPosts((prev) => prev.filter((p) => p.id !== postId));
+        } catch (err) {
+          console.error("Failed to delete post:", err);
+          toast.error("Failed to delete post.");
+        }
+      },
+    });
   }, []);
 
   const handleCreateDiscussion = useCallback(
@@ -595,6 +654,7 @@ export default function Community() {
       categoryId: string;
       groupId?: string;
       attachments: Attachment[];
+      attachmentUrls: string[];
       mentions: string[];
     }) => {
       try {
@@ -603,6 +663,7 @@ export default function Community() {
           content: data.content,
           categoryId: data.categoryId,
           groupId: data.groupId,
+          attachments: data.attachmentUrls.filter((u) => u.trim()),
         });
         setDiscussionPosts((prev) => [
           apiDiscussionToPost(created, apiCategories),
@@ -611,11 +672,73 @@ export default function Community() {
         setShowStartDiscussionModal(false);
       } catch (err) {
         console.error("Failed to create discussion:", err);
-        alert("Failed to create discussion. Please try again.");
+        toast.error("Failed to create discussion. Please try again.");
       }
     },
     [apiCategories],
   );
+
+  const handleFlagToggle = useCallback(async (postId: string, currentlyFlagged: boolean) => {
+    try {
+      if (currentlyFlagged) {
+        await communityService.updateDiscussion(postId, { flagged: false });
+      } else {
+        await communityService.flagDiscussion(postId);
+      }
+      setDiscussionPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, isReported: !currentlyFlagged } : p)),
+      );
+      // Also update selectedPost if open in detail view
+    } catch (err) {
+      console.error("Failed to flag/unflag discussion:", err);
+    }
+  }, []);
+
+  const handleToggleJoinRequests = useCallback(async (group: CommunityGroupAPI) => {
+    if (expandedRequestGroupId === group.id) {
+      setExpandedRequestGroupId(null);
+      return;
+    }
+    setExpandedRequestGroupId(group.id);
+    if (joinRequestsById[group.id]) return; // already loaded
+    setJoinRequestsLoadingGroupId(group.id);
+    try {
+      const requests = await communityService.getJoinRequests(group.id);
+      setJoinRequestsById((prev) => ({ ...prev, [group.id]: requests }));
+    } catch (err) {
+      console.error("Failed to load join requests:", err);
+    } finally {
+      setJoinRequestsLoadingGroupId(null);
+    }
+  }, [expandedRequestGroupId, joinRequestsById]);
+
+  const handleApproveRequest = useCallback(async (groupId: string, requestId: string) => {
+    try {
+      await communityService.approveJoinRequest(requestId);
+      setJoinRequestsById((prev) => ({
+        ...prev,
+        [groupId]: (prev[groupId] ?? []).map((r) =>
+          r.id === requestId ? { ...r, status: 'approved' as const } : r,
+        ),
+      }));
+    } catch (err) {
+      console.error("Failed to approve join request:", err);
+    }
+  }, []);
+
+  const handleRejectRequest = useCallback(async (groupId: string, requestId: string) => {
+    try {
+      await communityService.rejectJoinRequest(requestId);
+      setJoinRequestsById((prev) => ({
+        ...prev,
+        [groupId]: (prev[groupId] ?? []).map((r) =>
+          r.id === requestId ? { ...r, status: 'rejected' as const } : r,
+        ),
+      }));
+    } catch (err) {
+      console.error("Failed to reject join request:", err);
+    }
+  }, []);
 
   // Show detail page if post is selected
   const handleBack = useCallback(() => {
@@ -632,9 +755,11 @@ export default function Community() {
         currentUserId={user?.id}
         initialIsLiked={initialLikeForDetail}
         initialLikeInteractionId={initialLikeIdForDetail}
+        initialIsFlagged={!!selectedPost.isReported}
         onPin={handlePinPost}
         onDelete={handleDeletePost}
         onReport={handleReport}
+        onFlagToggle={isModerator ? handleFlagToggle : undefined}
       />
     );
   }
@@ -792,6 +917,22 @@ export default function Community() {
             >
               Events
             </TabsTrigger>
+            <TabsTrigger
+              value="bookmarks"
+              className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-[#D52B1E] shrink-0 flex items-center gap-1.5"
+            >
+              <Bookmark className="h-3.5 w-3.5" />
+              Saved
+            </TabsTrigger>
+            {isModerator && (
+              <TabsTrigger
+                value="flagged"
+                className="bg-white px-6 py-2 text-sm font-medium data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-full text-[#000000] border border-gray-200 data-[state=active]:border-orange-500 shrink-0 flex items-center gap-1.5"
+              >
+                <Flag className="h-3.5 w-3.5" />
+                Flagged
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Discussions Tab */}
@@ -1036,16 +1177,48 @@ export default function Community() {
                       </label>
                     </motion.div>
 
+                    {/* Flagged Posts Filter - Moderators only */}
+                    {isModerator && (
+                      <motion.div
+                        whileHover={{ x: 2 }}
+                        className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-transparent rounded-lg border border-orange-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center text-white">
+                            <Flag className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-[#000000]">Flagged Posts</p>
+                            <p className="text-xs text-[#737692]">Show only flagged</p>
+                          </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={showFlaggedOnly}
+                            onChange={(e) => setShowFlaggedOnly(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div
+                            className={`w-11 h-6 rounded-full peer transition-all ${
+                              showFlaggedOnly ? "bg-orange-500" : "bg-gray-300"
+                            } peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all`}
+                          ></div>
+                        </label>
+                      </motion.div>
+                    )}
+
                     {/* Clear Filters Button */}
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() =>
-                        setFilters({ sortBy: "latest", timeRange: "all" })
-                      }
+                      onClick={() => {
+                        setFilters({ sortBy: "latest", timeRange: "all" });
+                        setShowFlaggedOnly(false);
+                      }}
                       className="w-full py-3 rounded-lg font-semibold text-sm border-2 border-gray-300 text-[#737692] hover:border-[#D52B1E] hover:text-[#D52B1E] transition-all bg-gray-50 hover:bg-red-50"
                     >
-                      â†º Reset Filters
+                      ↺ Reset Filters
                     </motion.button>
                   </CardContent>
                 </Card>
@@ -1121,6 +1294,12 @@ export default function Community() {
                               {post.isPinned && (
                                 <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
                                   Pinned
+                                </Badge>
+                              )}
+                              {isModerator && post.isReported && (
+                                <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 flex items-center gap-1">
+                                  <Flag className="h-3 w-3" />
+                                  Flagged
                                 </Badge>
                               )}
                             </div>
@@ -1232,25 +1411,38 @@ export default function Community() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleReport(post.id);
+                                  if (isModerator) {
+                                    handleFlagToggle(post.id, !!post.isReported);
+                                  } else if (!post.isReported) {
+                                    handleReport(post.id);
+                                  }
                                 }}
-                                className={`p-1 rounded transition-colors ${reportedPosts.includes(post.id) ? "text-red-600" : "text-[#737692] hover:text-red-600"}`}
+                                disabled={!isModerator && !!post.isReported}
+                                title={isModerator
+                                  ? (post.isReported ? 'Unflag this post' : 'Flag this post')
+                                  : (post.isReported ? 'Already reported' : 'Report this post')}
+                                className={`p-1 rounded transition-colors ${
+                                  post.isReported
+                                    ? 'text-orange-600'
+                                    : 'text-[#737692] hover:text-red-600'
+                                } ${!isModerator && post.isReported ? 'cursor-default' : ''}`}
                               >
-                                <Flag className="h-4 w-4" />
+                                <Flag className={`h-4 w-4 ${post.isReported ? 'fill-current' : ''}`} />
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleSavePost(post.id);
                                 }}
+                                title={post.isSaved ? 'Remove bookmark' : 'Save post'}
                                 className={`p-1 rounded transition-colors ${
-                                  savedPosts.includes(post.id)
-                                    ? "text-[#D52B1E]"
-                                    : "text-[#737692] hover:text-[#D52B1E]"
+                                  post.isSaved
+                                    ? 'text-[#D52B1E]'
+                                    : 'text-[#737692] hover:text-[#D52B1E]'
                                 }`}
                               >
                                 <Bookmark
-                                  className={`h-4 w-4 ${savedPosts.includes(post.id) ? "fill-current" : ""}`}
+                                  className={`h-4 w-4 ${post.isSaved ? 'fill-current' : ''}`}
                                 />
                               </button>
                             </div>
@@ -1271,6 +1463,188 @@ export default function Community() {
               )}
             </div>
           </TabsContent>
+
+          {/* Bookmarks Tab */}
+          <TabsContent value="bookmarks" className="mt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-[#000000]">Saved Posts</h2>
+                <p className="text-sm text-[#737692] mt-0.5">Discussions you&apos;ve bookmarked for later</p>
+              </div>
+              {!bookmarksLoading && (
+                <span className="text-xs font-semibold bg-red-50 text-[#D52B1E] px-3 py-1 rounded-full border border-[#D52B1E]/20">
+                  {bookmarkedDiscussions.length} saved
+                </span>
+              )}
+            </div>
+            {bookmarksLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-lg border p-6 animate-pulse space-y-3">
+                  <div className="h-4 bg-gray-200 rounded w-1/2" />
+                  <div className="h-3 bg-gray-100 rounded" />
+                  <div className="h-3 bg-gray-100 rounded w-4/5" />
+                </div>
+              ))
+            ) : bookmarkedDiscussions.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Bookmark className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="font-semibold text-[#000000]">No saved posts yet</p>
+                  <p className="text-sm text-[#737692] mt-1">Bookmark discussions to find them here quickly.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              bookmarkedDiscussions.map((post, index) => (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.06 }}
+                >
+                  <Card
+                    onClick={() => handlePostClick(post)}
+                    className="hover:shadow-lg transition-all cursor-pointer border-l-4 border-l-[#D52B1E]"
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-semibold text-[#000000]">{post.title}</h3>
+                          <Badge className={`${getCategoryColor(post.category)} text-white hover:${getCategoryColor(post.category)}`}>
+                            {post.category}
+                          </Badge>
+                          {post.isPinned && (
+                            <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pinned</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-[#737692] line-clamp-2">{post.description}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-sm shadow-sm overflow-hidden">
+                              {post.posterAvatar?.startsWith('http')
+                                ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
+                                : <span>{post.posterAvatar || '👤'}</span>}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-[#000000]">{post.poster}</p>
+                              <p className="text-xs text-[#737692]">{formatTime(post.createdAt)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-[#737692]">
+                            <div className="flex items-center gap-1 text-sm"><Eye className="h-4 w-4" /><span>{post.views}</span></div>
+                            <div className="flex items-center gap-1 text-sm"><Heart className="h-4 w-4" /><span>{post.likes}</span></div>
+                            <div className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /><span>{post.replies}</span></div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleSavePost(post.id); setBookmarkedDiscussions((prev) => prev.filter((p) => p.id !== post.id)); }}
+                              className="p-1 rounded text-[#D52B1E] hover:text-red-700 transition-colors"
+                              title="Remove bookmark"
+                            >
+                              <Bookmark className="h-4 w-4 fill-current" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))
+            )}
+          </TabsContent>
+
+          {/* Flagged Tab — moderators only */}
+          {isModerator && (
+            <TabsContent value="flagged" className="mt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[#000000]">Flagged Posts</h2>
+                  <p className="text-sm text-[#737692] mt-0.5">Discussions reported or flagged for review</p>
+                </div>
+                {!flaggedLoading && (
+                  <span className="text-xs font-semibold bg-orange-50 text-orange-700 px-3 py-1 rounded-full border border-orange-200">
+                    {flaggedDiscussions.length} flagged
+                  </span>
+                )}
+              </div>
+              {flaggedLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg border p-6 animate-pulse space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="h-3 bg-gray-100 rounded" />
+                    <div className="h-3 bg-gray-100 rounded w-4/5" />
+                  </div>
+                ))
+              ) : flaggedDiscussions.length === 0 ? (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <Flag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="font-semibold text-[#000000]">No flagged posts</p>
+                    <p className="text-sm text-[#737692] mt-1">Flagged discussions will appear here for review.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                flaggedDiscussions.map((post, index) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: index * 0.06 }}
+                  >
+                    <Card
+                      onClick={() => handlePostClick(post)}
+                      className="hover:shadow-lg transition-all cursor-pointer border-l-4 border-l-orange-400"
+                    >
+                      <CardContent className="p-6">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-semibold text-[#000000]">{post.title}</h3>
+                            <Badge className={`${getCategoryColor(post.category)} text-white hover:${getCategoryColor(post.category)}`}>
+                              {post.category}
+                            </Badge>
+                            <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 flex items-center gap-1">
+                              <Flag className="h-3 w-3" />
+                              Flagged
+                            </Badge>
+                            {post.isPinned && (
+                              <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pinned</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-[#737692] line-clamp-2">{post.description}</p>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-sm shadow-sm overflow-hidden">
+                                {post.posterAvatar?.startsWith('http')
+                                  ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
+                                  : <span>{post.posterAvatar || '👤'}</span>}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-[#000000]">{post.poster}</p>
+                                <p className="text-xs text-[#737692]">{formatTime(post.createdAt)}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-[#737692]">
+                              <div className="flex items-center gap-1 text-sm"><Eye className="h-4 w-4" /><span>{post.views}</span></div>
+                              <div className="flex items-center gap-1 text-sm"><Heart className="h-4 w-4" /><span>{post.likes}</span></div>
+                              <div className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /><span>{post.replies}</span></div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFlagToggle(post.id, true);
+                                  setFlaggedDiscussions((prev) => prev.filter((p) => p.id !== post.id));
+                                }}
+                                className="p-1 rounded text-orange-600 hover:text-orange-800 transition-colors"
+                                title="Unflag this post"
+                              >
+                                <Flag className="h-4 w-4 fill-current" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              )}
+            </TabsContent>
+          )}
 
           {/* Study Groups Tab */}
           <TabsContent value="study-groups" className="mt-6">
@@ -1354,6 +1728,9 @@ export default function Community() {
                                         : g,
                                     ),
                                   );
+                                } else if (group.isPrivate) {
+                                  await communityService.requestJoinGroup(group.id);
+                                  toast.success('Join request sent! The group moderator will review your request.');
                                 } else {
                                   await communityService.joinGroup(group.id);
                                   setGroups((prev) =>
@@ -1374,11 +1751,74 @@ export default function Community() {
                               }
                             }}
                           >
-                            {group.isMember ? "Leave Group" : "Join Group"}
+                            {group.isMember ? 'Leave Group' : group.isPrivate ? 'Request to Join' : 'Join Group'}
                           </Button>
+                          {isModerator && group.isPrivate && (
+                            <Button
+                              variant="outline"
+                              className="w-full flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                              onClick={() => handleToggleJoinRequests(group)}
+                            >
+                              <Users className="h-4 w-4" />
+                              {expandedRequestGroupId === group.id ? 'Hide Requests' : 'Join Requests'}
+                              {joinRequestsById[group.id]?.filter((r) => r.status === 'pending').length
+                                ? ` (${joinRequestsById[group.id].filter((r) => r.status === 'pending').length})`
+                                : ''}
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
+
+                    {/* Moderator: expandable join requests panel */}
+                    {isModerator && expandedRequestGroupId === group.id && (
+                      <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+                        <h4 className="font-semibold text-amber-800 text-sm">Pending Join Requests</h4>
+                        {joinRequestsLoadingGroupId === group.id ? (
+                          <p className="text-sm text-amber-700">Loading…</p>
+                        ) : (joinRequestsById[group.id] ?? []).filter((r) => r.status === 'pending').length === 0 ? (
+                          <p className="text-sm text-amber-700">No pending requests.</p>
+                        ) : (
+                          (joinRequestsById[group.id] ?? [])
+                            .filter((r) => r.status === 'pending')
+                            .map((req) => {
+                              const name = [req.user?.firstName, req.user?.lastName].filter(Boolean).join(' ') || 'Member';
+                              return (
+                                <div key={req.id} className="flex items-center justify-between gap-3 bg-white rounded-lg p-3 shadow-sm">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
+                                      {req.user?.profilePhotoUrl
+                                        ? <img src={req.user.profilePhotoUrl} alt={name} className="h-full w-full object-cover" />
+                                        : name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-[#000000] text-sm truncate">{name}</p>
+                                      <p className="text-xs text-[#737692]">{new Date(req.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 flex-shrink-0">
+                                    <Button
+                                      size="sm"
+                                      className="bg-green-600 hover:bg-green-700 text-white text-xs px-3"
+                                      onClick={() => handleApproveRequest(group.id, req.id)}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-300 text-red-600 hover:bg-red-50 text-xs px-3"
+                                      onClick={() => handleRejectRequest(group.id, req.id)}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                        )}
+                      </div>
+                    )}
                   </motion.div>
                 ))}
                 {groups.length === 0 && !groupsLoading && (
@@ -1662,6 +2102,22 @@ export default function Community() {
               setSelectedPoster(null);
             }}
           />
+        )}
+
+        {/* Confirm Dialog */}
+        {confirmDialog && (
+          <Dialog open={!!confirmDialog} onClose={() => setConfirmDialog(null)} title="Confirm Action" maxWidth="max-w-sm">
+            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}
+              >
+                Confirm
+              </Button>
+            </div>
+          </Dialog>
         )}
       </motion.div>
     </>

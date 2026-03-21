@@ -1,11 +1,17 @@
 import { motion } from 'framer-motion'
-import { X, Paperclip, AtSign, Send } from 'lucide-react'
+import { X, Paperclip, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Attachment } from '@/types/community'
+import api from '@/lib/api'
+import { useUserSearch, type UserSearchResult } from '@/hooks/useAuth'
+
+interface UploadingAttachment extends Attachment {
+  uploadStatus: 'uploading' | 'uploaded' | 'error'
+}
 
 const COMMUNITY_GUIDELINES = [
   'Be respectful and constructive in your discussions',
@@ -31,8 +37,9 @@ interface StartDiscussionModalProps {
     categoryId: string
     groupId?: string
     attachments: Attachment[]
+    attachmentUrls: string[]
     mentions: string[]
-  }) => void
+  }) => void | Promise<void>
 }
 
 export default function StartDiscussionModal({
@@ -48,10 +55,39 @@ export default function StartDiscussionModal({
   const [content, setContent] = useState('')
   const [categoryId, setCategoryId] = useState<string>('')
   const [groupId, setGroupId] = useState<string>('')
-  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [attachments, setAttachments] = useState<UploadingAttachment[]>([])
   const [mentions, setMentions] = useState<string[]>([])
   const [selectedFont, setSelectedFont] = useState('normal')
   const [agreedToGuidelines, setAgreedToGuidelines] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionStart, setMentionStart] = useState(-1)
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0)
+  const [debouncedMentionQuery, setDebouncedMentionQuery] = useState<string>('')
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { data: mentionResults = [], isLoading: mentionLoading } = useUserSearch(debouncedMentionQuery)
+
+  // Debounce: update the query that triggers the API call 300 ms after typing stops
+  useEffect(() => {
+    if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current)
+    if (mentionQuery !== null && mentionQuery.length >= 1) {
+      mentionDebounceRef.current = setTimeout(() => setDebouncedMentionQuery(mentionQuery), 300)
+    } else {
+      setDebouncedMentionQuery('')
+    }
+    return () => {
+      if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current)
+    }
+  }, [mentionQuery])
+
+  // Close dropdown whenever the modal itself is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setMentionQuery(null)
+      setMentionStart(-1)
+      setDebouncedMentionQuery('')
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (!categoryId && categories.length > 0) {
@@ -59,29 +95,112 @@ export default function StartDiscussionModal({
     }
   }, [categories, categoryId])
 
+  const closeMention = () => {
+    setMentionQuery(null)
+    setMentionStart(-1)
+    setDebouncedMentionQuery('')
+    if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current)
+  }
+
   if (!isOpen) return null
 
-  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.currentTarget.files
-    if (files) {
-      Array.from(files).forEach(file => {
-        const attachment: Attachment = {
-          id: `file-${Date.now()}-${Math.random()}`,
-          type: file.type.startsWith('image/') ? 'image' : 'file',
-          name: file.name,
-          size: file.size,
-          url: URL.createObjectURL(file)
-        }
-        setAttachments(prev => [...prev, attachment])
-      })
+  const showMentionDropdown = mentionQuery !== null && mentionQuery.length >= 1
+
+  const insertMention = (user: UserSearchResult) => {
+    const before = content.slice(0, mentionStart)
+    const after = content.slice(mentionStart + 1 + (mentionQuery?.length ?? 0))
+    const tag = `@${user.email} `
+    setContent(before + tag + after)
+    setMentions(prev => Array.from(new Set([...prev, user.id])))
+    closeMention()
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    setContent(val)
+    const cursor = e.target.selectionStart ?? val.length
+    const textBeforeCursor = val.slice(0, cursor)
+    const match = textBeforeCursor.match(/@(\S*)$/)
+    if (match) {
+      setMentionQuery(match[1])
+      setMentionStart(cursor - match[0].length)
+      setMentionSelectedIndex(0)
+    } else {
+      closeMention()
     }
+  }
+
+  const handleContentKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showMentionDropdown || !mentionResults.length) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setMentionSelectedIndex(i => Math.min(i + 1, mentionResults.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setMentionSelectedIndex(i => Math.max(i - 1, 0))
+    } else if ((e.key === 'Enter' || e.key === 'Tab') && mentionResults[mentionSelectedIndex]) {
+      e.preventDefault()
+      insertMention(mentionResults[mentionSelectedIndex])
+    } else if (e.key === 'Escape') {
+      closeMention()
+    }
+  }
+
+  const handleFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.currentTarget.files
+    if (!files) return
+    // Convert to array BEFORE resetting the input — resetting clears the live FileList
+    const fileArray = Array.from(files)
+    // Reset input so the same file can be re-selected after an error
+    e.currentTarget.value = ''
+
+    fileArray.forEach(async (file) => {
+      const id = `file-${Date.now()}-${Math.random()}`
+      const attachment: UploadingAttachment = {
+        id,
+        type: file.type.startsWith('image/') ? 'image' : 'file',
+        name: file.name,
+        size: file.size,
+        url: '',
+        uploadStatus: 'uploading',
+      }
+      setAttachments(prev => [...prev, attachment])
+
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const response = await api.post('/file-upload/test', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        const uploadedUrl: string =
+          response.data?.url ??
+          response.data?.fileUrl ??
+          response.data?.data?.url ??
+          response.data?.data?.fileUrl ??
+          ''
+        setAttachments(prev =>
+          prev.map(a =>
+            a.id === id
+              ? { ...a, url: uploadedUrl, uploadStatus: uploadedUrl ? 'uploaded' : 'error' }
+              : a
+          )
+        )
+      } catch {
+        setAttachments(prev =>
+          prev.map(a => a.id === id ? { ...a, uploadStatus: 'error' } : a)
+        )
+      }
+    })
   }
 
   const handleRemoveAttachment = (id: string) => {
     setAttachments(prev => prev.filter(att => att.id !== id))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isUploading = attachments.some(a => a.uploadStatus === 'uploading')
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!title.trim() || !content.trim() || !categoryId) {
@@ -94,12 +213,24 @@ export default function StartDiscussionModal({
       return
     }
 
-    onSubmit({
+    if (isUploading) {
+      alert('Please wait for all files to finish uploading')
+      return
+    }
+
+    const failedUploads = attachments.filter(a => a.uploadStatus === 'error')
+    if (failedUploads.length > 0) {
+      alert(`${failedUploads.length} file(s) failed to upload. Please remove them and try again.`)
+      return
+    }
+
+    await onSubmit({
       title,
       content,
       categoryId,
       groupId: groupId || undefined,
       attachments,
+      attachmentUrls: attachments.filter(a => a.uploadStatus === 'uploaded').map(a => a.url),
       mentions
     })
 
@@ -111,6 +242,7 @@ export default function StartDiscussionModal({
     setAttachments([])
     setMentions([])
     setAgreedToGuidelines(false)
+    closeMention()
     onClose()
   }
 
@@ -244,14 +376,16 @@ export default function StartDiscussionModal({
               </div>
 
               {/* Content Input */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-semibold text-[#000000] mb-2">
                   Write-up / Subject *
                 </label>
                 <textarea
+                  ref={textareaRef}
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Share your thoughts, questions, or insights here. You can mention other users with @username"
+                  onChange={handleContentChange}
+                  onKeyDown={handleContentKeyDown}
+                  placeholder="Share your thoughts, questions, or insights here. Type @email to mention a user"
                   maxLength={5000}
                   required
                   className={`w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D52B1E] resize-vertical min-h-[200px] bg-background text-foreground placeholder:text-muted-foreground ${
@@ -260,6 +394,53 @@ export default function StartDiscussionModal({
                     selectedFont === 'monospace' ? 'font-mono' : ''
                   }`}
                 />
+                {/* @mention dropdown */}
+                {showMentionDropdown && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                    {mentionLoading && (
+                      <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-[#737692]">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching users…
+                      </div>
+                    )}
+                    {!mentionLoading && mentionResults.length === 0 && (
+                      <div className="px-3 py-2.5 text-sm text-[#737692]">
+                        No users found for &ldquo;{mentionQuery}&rdquo;
+                      </div>
+                    )}
+                    <ul className="max-h-44 overflow-y-auto">
+                      {mentionResults.map((user, idx) => (
+                        <li key={user.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); insertMention(user) }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                              idx === mentionSelectedIndex ? 'bg-red-50' : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="h-7 w-7 rounded-full bg-[#D52B1E] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              {user.profilePhotoUrl ? (
+                                <img src={user.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-xs text-white font-semibold">
+                                  {(user.firstName?.[0] ?? user.email[0]).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              {(user.firstName || user.lastName) && (
+                                <p className="text-sm font-medium text-[#000000] truncate leading-tight">
+                                  {[user.firstName, user.lastName].filter(Boolean).join(' ')}
+                                </p>
+                              )}
+                              <p className="text-xs text-[#737692] truncate">{user.email}</p>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <p className="text-xs text-[#737692] mt-1">{content.length}/5000 characters</p>
               </div>
 
@@ -281,12 +462,16 @@ export default function StartDiscussionModal({
                 </div>
               </div>
 
-              {/* Attachments */}
+              {/* File Attachments */}
               <div>
                 <label className="block text-sm font-semibold text-[#000000] mb-2">
-                  Attachments
+                  File Attachments
                 </label>
-                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg p-6 cursor-pointer hover:border-[#D52B1E] hover:bg-red-50 transition-all">
+                <label className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-4 transition-all ${
+                  attachments.length >= 5
+                    ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-50'
+                    : 'border-gray-200 cursor-pointer hover:border-[#D52B1E] hover:bg-red-50'
+                }`}>
                   <Paperclip className="h-5 w-5 text-gray-400" />
                   <span className="text-sm text-[#737692]">Click to attach images or files (max 5 files)</span>
                   <input
@@ -298,37 +483,39 @@ export default function StartDiscussionModal({
                     accept="image/*,.pdf,.doc,.docx"
                   />
                 </label>
-
-                {/* Attached Files List */}
                 {attachments.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-3 space-y-2">
                     {attachments.map(att => (
-                      <div key={att.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm text-[#000000]">
-                          {att.type === 'image' ? '🖼️' : '📎'} {att.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAttachment(att.id)}
-                          className="text-gray-400 hover:text-red-600 transition-colors"
-                        >
+                      <div key={att.id} className={`flex items-center justify-between p-2.5 rounded-lg ${
+                        att.uploadStatus === 'error' ? 'bg-red-50' : 'bg-gray-50'
+                      }`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {att.uploadStatus === 'uploading' && (
+                            <Loader2 className="h-4 w-4 text-[#D52B1E] animate-spin flex-shrink-0" />
+                          )}
+                          {att.uploadStatus === 'uploaded' && (
+                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          )}
+                          {att.uploadStatus === 'error' && (
+                            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                          )}
+                          <span className="text-sm text-[#000000] truncate">
+                            {att.type === 'image' ? '🖼️' : '📎'} {att.name}
+                          </span>
+                          {att.uploadStatus === 'uploading' && (
+                            <span className="text-xs text-[#737692] flex-shrink-0">Uploading...</span>
+                          )}
+                          {att.uploadStatus === 'error' && (
+                            <span className="text-xs text-red-600 flex-shrink-0">Upload failed</span>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => handleRemoveAttachment(att.id)} className="text-gray-400 hover:text-red-600 transition-colors ml-2 flex-shrink-0">
                           <X className="h-4 w-4" />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
-
-              {/* Mentions Help */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex gap-2 items-start">
-                  <AtSign className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-blue-900">Tag Others</p>
-                    <p className="text-xs text-blue-800">Use @username to mention someone. They'll receive an email and notification.</p>
-                  </div>
-                </div>
               </div>
 
               {/* Action Buttons */}
@@ -343,11 +530,14 @@ export default function StartDiscussionModal({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!title.trim() || !content.trim() || !agreedToGuidelines}
-                  className="flex-1 bg-[#D52B1E] hover:bg-[#B8241B] text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                  disabled={!title.trim() || !content.trim() || !agreedToGuidelines || isUploading}
+                  className="flex-1 bg-[#D52B1E] hover:bg-[#B8241B] text-white disabled:opacity-50"
                 >
-                  <Send className="h-4 w-4" />
-                  Publish Discussion
+                  {isUploading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Uploading files...
+                    </span>
+                  ) : 'Publish Discussion'}
                 </Button>
               </div>
             </CardContent>

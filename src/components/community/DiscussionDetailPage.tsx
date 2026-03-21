@@ -7,6 +7,8 @@ import { useState, useRef } from 'react'
 import type { DetailedDiscussionPost, Reply } from '@/types/community'
 import PosterProfilePopup from './PosterProfilePopup'
 import { communityService } from '@/lib/communityService'
+import { toast } from '@/hooks/use-toast'
+import { Dialog } from '@/components/ui/dialog'
 
 interface DiscussionDetailPageProps {
   post: DetailedDiscussionPost
@@ -15,9 +17,11 @@ interface DiscussionDetailPageProps {
   currentUserId?: string
   initialIsLiked?: boolean
   initialLikeInteractionId?: string
+  initialIsFlagged?: boolean
   onPin?: (postId: string) => void
   onDelete?: (postId: string) => void
   onReport?: (postId: string) => void
+  onFlagToggle?: (postId: string, currentlyFlagged: boolean) => void
 }
 
 const categoryColors: Record<string, string> = {
@@ -37,17 +41,21 @@ export default function DiscussionDetailPage({
   currentUserId,
   initialIsLiked = false,
   initialLikeInteractionId,
+  initialIsFlagged = false,
   onPin,
   onDelete,
-  onReport
+  onReport,
+  onFlagToggle,
 }: DiscussionDetailPageProps) {
   const [isLiked, setIsLiked] = useState(initialIsLiked)
   const [isSaved, setIsSaved] = useState(post.isSaved ?? false)
+  const [isFlagged, setIsFlagged] = useState(initialIsFlagged)
   const [likeCount, setLikeCount] = useState(post.likes)
   const [showPosterProfile, setShowPosterProfile] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [replies, setReplies] = useState<Reply[]>(post.repliesList || [])
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null)
   const likeInteractionId = useRef<string | null>(initialLikeInteractionId ?? null)
 
   const handleLike = async () => {
@@ -95,7 +103,7 @@ export default function DiscussionDetailPage({
     } else {
       // Fallback: Copy to clipboard
       navigator.clipboard.writeText(url)
-      alert('Link copied to clipboard!')
+      toast.success('Link copied to clipboard!')
     }
   }
 
@@ -136,15 +144,19 @@ export default function DiscussionDetailPage({
   }
 
   const handleDeleteReply = async (replyId: string) => {
-    if (!window.confirm('Delete this reply?')) return
-    const previousReplies = replies
-    setReplies((prev) => prev.filter((reply) => reply.id !== replyId))
-    try {
-      await communityService.deleteInteraction(replyId)
-    } catch {
-      setReplies(previousReplies)
-      alert('Failed to delete reply.')
-    }
+    setConfirmDialog({
+      message: 'Are you sure you want to delete this reply?',
+      onConfirm: async () => {
+        const previousReplies = replies
+        setReplies((prev) => prev.filter((reply) => reply.id !== replyId))
+        try {
+          await communityService.deleteInteraction(replyId)
+        } catch {
+          setReplies(previousReplies)
+          toast.error('Failed to delete reply.')
+        }
+      },
+    })
   }
 
   const formatDate = (date: Date) => {
@@ -201,7 +213,7 @@ export default function DiscussionDetailPage({
             
             {/* Moderation Tools */}
             {isModerator && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   size="sm"
                   variant="outline"
@@ -210,6 +222,19 @@ export default function DiscussionDetailPage({
                 >
                   <Pin className="h-4 w-4" />
                   {post.isPinned ? 'Unpin' : 'Pin'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const nowFlagged = !isFlagged
+                    setIsFlagged(nowFlagged)
+                    onFlagToggle?.(post.id, isFlagged)
+                  }}
+                  className={`flex items-center gap-2 ${isFlagged ? 'text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-orange-600 hover:text-orange-700'}`}
+                >
+                  <Flag className="h-4 w-4" />
+                  {isFlagged ? 'Unflag' : 'Flag'}
                 </Button>
                 <Button
                   size="sm"
@@ -347,19 +372,37 @@ export default function DiscussionDetailPage({
               <Button
                 variant={isSaved ? 'default' : 'outline'}
                 onClick={handleSave}
-                className={`flex items-center gap-2 ${isSaved ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'border-gray-200'}`}
+                className={`flex items-center gap-2 ${isSaved ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200' : 'border-gray-200'}`}
+                title={isSaved ? 'Remove bookmark' : 'Save this post'}
               >
                 <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
                 {isSaved ? 'Saved' : 'Save'}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => onReport?.(post.id)}
-                className="flex items-center gap-2 border-gray-200 text-orange-600 hover:text-orange-700"
-              >
-                <Flag className="h-4 w-4" />
-                Report
-              </Button>
+              {/* Moderators get Flag/Unflag in the header tools; regular users get Report here */}
+              {!isModerator && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (isFlagged) return;
+                    setIsFlagged(true);
+                    try {
+                      await onReport?.(post.id);
+                    } catch {
+                      setIsFlagged(false);
+                    }
+                  }}
+                  disabled={isFlagged}
+                  title={isFlagged ? 'You have already reported this post' : 'Report this post'}
+                  className={`flex items-center gap-2 border-gray-200 ${
+                    isFlagged
+                      ? 'text-orange-600 border-orange-200 bg-orange-50 cursor-default opacity-80'
+                      : 'text-orange-600 hover:text-orange-700'
+                  }`}
+                >
+                  <Flag className={`h-4 w-4 ${isFlagged ? 'fill-current' : ''}`} />
+                  {isFlagged ? 'Reported' : 'Report'}
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -462,6 +505,22 @@ export default function DiscussionDetailPage({
         isOpen={showPosterProfile}
         onClose={() => setShowPosterProfile(false)}
       />
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <Dialog open={!!confirmDialog} onClose={() => setConfirmDialog(null)} title="Confirm Action" maxWidth="max-w-sm">
+          <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}
+            >
+              Delete
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </motion.div>
   )
 }

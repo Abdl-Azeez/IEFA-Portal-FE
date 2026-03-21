@@ -83,7 +83,11 @@ const normalizeAuthUser = (user: AuthUserPayload) => {
   const normalized = {
     ...user,
     id: user.id ?? user.userId ?? "",
-    isModerator: !!user.isModerator,
+    // Only coerce isModerator when the API payload actually includes the field.
+    // If absent, omit it so the caller's existing value is preserved via spread merge.
+    ...(Object.prototype.hasOwnProperty.call(user, "isModerator")
+      ? { isModerator: !!user.isModerator }
+      : {}),
     firstName: user.firstName ?? storedProfile?.firstName,
     lastName: user.lastName ?? storedProfile?.lastName,
     profilePhotoUrl: user.profilePhotoUrl ?? storedProfile?.profilePhotoUrl,
@@ -499,5 +503,31 @@ export const useToggleModerator = () => {
         variant: "destructive",
       });
     },
+  });
+};
+
+export interface UserSearchResult {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  profilePhotoUrl?: string;
+}
+
+export const useUserSearch = (query: string) => {
+  return useQuery({
+    queryKey: ["users", "search", query],
+    queryFn: async () => {
+      const response = await api.get("/users/search", {
+        params: { email: query },
+      });
+      const users: UserSearchResult[] =
+        response.data?.users ??
+        response.data?.data ??
+        (Array.isArray(response.data) ? response.data : []);
+      return users;
+    },
+    enabled: query.trim().length >= 1,
+    staleTime: 10_000,
   });
 };

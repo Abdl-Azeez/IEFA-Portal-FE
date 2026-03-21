@@ -88,6 +88,7 @@ export default function AdminData() {
   const [geoFilter, setGeoFilter] = useState<string>('')
   const [premiumFilter, setPremiumFilter] = useState<string>('')
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null)
 
   // Sort
   const [sortField, setSortField] = useState<string | null>(null)
@@ -357,7 +358,7 @@ export default function AdminData() {
                         <Edit className="h-3 w-3" />
                       </button>
                       <button
-                        onClick={() => { if (confirm(`Delete section "${cat.name}"?`)) deleteCatMutation.mutate(cat.id) }}
+                        onClick={() => setConfirmDialog({ message: `Delete section "${cat.name}"? This cannot be undone.`, onConfirm: () => deleteCatMutation.mutate(cat.id) })}
                         className="p-1 rounded hover:bg-red-100 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -685,6 +686,22 @@ export default function AdminData() {
           </div>
         </div>
       </Dialog>
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <Dialog open={!!confirmDialog} onClose={() => setConfirmDialog(null)} title="Confirm Action" maxWidth="max-w-sm">
+          <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}
+            >
+              Delete
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </motion.div>
   )
 }

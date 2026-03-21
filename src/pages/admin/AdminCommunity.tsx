@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom'
 import { MessageSquare, Search, MoreVertical, Trash2, Eye, CheckCircle, XCircle, Flag, Users, Calendar, Plus, Edit2, Tag, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { communityService, getCommunityGroupMemberCount, type CreateEventDto, type DiscussionAPI, type CommunityGroupAPI, type CommunityEventAPI, type CommunityCategoryAPI } from '@/lib/communityService'
+import { Dialog } from '@/components/ui/dialog'
+import { communityService, getCommunityGroupMemberCount, type CreateEventDto, type DiscussionAPI, type CommunityGroupAPI, type CommunityEventAPI, type CommunityCategoryAPI, type GroupJoinRequestAPI } from '@/lib/communityService'
 
 const slugify = (value: string) =>
   value
@@ -397,6 +398,7 @@ function GroupFormModal({
 
 export default function AdminCommunity() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('discussions')
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null)
 
   // ── Discussions ─────────────────────────────────────────────────────────
   const [discussions, setDiscussions] = useState<DiscussionAPI[]>([])
@@ -414,6 +416,9 @@ export default function AdminCommunity() {
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
   const [membersLoadingGroupId, setMembersLoadingGroupId] = useState<string | null>(null)
   const [groupMembersById, setGroupMembersById] = useState<Record<string, GroupMemberPreview[]>>({})
+  const [joinRequestsById, setJoinRequestsById] = useState<Record<string, GroupJoinRequestAPI[]>>({})
+  const [joinRequestsLoadingGroupId, setJoinRequestsLoadingGroupId] = useState<string | null>(null)
+  const [expandedRequestGroupId, setExpandedRequestGroupId] = useState<string | null>(null)
 
   // ── Events ───────────────────────────────────────────────────────────────
   const [events, setEvents] = useState<CommunityEventAPI[]>([])
@@ -513,6 +518,22 @@ export default function AdminCommunity() {
     }
   }
 
+  const handleFlagDiscussion = async (id: string, currentlyFlagged: boolean) => {
+    setOpenMenu(null)
+    try {
+      if (currentlyFlagged) {
+        // Unflag via PATCH
+        const updated = await communityService.updateDiscussion(id, { flagged: false })
+        setDiscussions((prev) => prev.map((d) => (d.id === id ? { ...d, ...updated, flagged: false, flaggedAt: null } : d)))
+      } else {
+        const updated = await communityService.flagDiscussion(id)
+        setDiscussions((prev) => prev.map((d) => (d.id === id ? { ...d, ...updated, flagged: true, flaggedAt: updated.flaggedAt ?? new Date().toISOString() } : d)))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const handleStatusChange = async (id: string, status: 'active' | 'hidden') => {
     setOpenMenu(null)
     try {
@@ -560,6 +581,48 @@ export default function AdminCommunity() {
     }
   }, [expandedGroupId, groupMembersById])
 
+  const handleToggleJoinRequests = useCallback(async (group: CommunityGroupAPI) => {
+    if (expandedRequestGroupId === group.id) {
+      setExpandedRequestGroupId(null)
+      return
+    }
+    setExpandedRequestGroupId(group.id)
+    if (joinRequestsById[group.id]) return
+    setJoinRequestsLoadingGroupId(group.id)
+    try {
+      const requests = await communityService.getJoinRequests(group.id)
+      setJoinRequestsById((prev) => ({ ...prev, [group.id]: requests }))
+    } catch {
+      setJoinRequestsById((prev) => ({ ...prev, [group.id]: [] }))
+    } finally {
+      setJoinRequestsLoadingGroupId(null)
+    }
+  }, [expandedRequestGroupId, joinRequestsById])
+
+  const handleApproveRequest = async (groupId: string, requestId: string) => {
+    try {
+      await communityService.approveJoinRequest(requestId)
+      setJoinRequestsById((prev) => ({
+        ...prev,
+        [groupId]: (prev[groupId] ?? []).filter((r) => r.id !== requestId),
+      }))
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleRejectRequest = async (groupId: string, requestId: string) => {
+    try {
+      await communityService.rejectJoinRequest(requestId)
+      setJoinRequestsById((prev) => ({
+        ...prev,
+        [groupId]: (prev[groupId] ?? []).filter((r) => r.id !== requestId),
+      }))
+    } catch {
+      // ignore
+    }
+  }
+
   const handleDeleteEvent = async (id: string) => {
     try {
       await communityService.deleteEvent(id)
@@ -577,12 +640,12 @@ export default function AdminCommunity() {
           ? d.author
           : [d.author?.firstName, d.author?.lastName].filter(Boolean).join(' ')
       ).toLowerCase().includes(search.toLowerCase())) &&
-      (!flaggedOnly || !!d.flagged),
+      (!flaggedOnly || !!(d.flagged || d.flaggedAt)),
   )
   const filteredGroups = groups.filter((g) => g.name.toLowerCase().includes(groupSearch.toLowerCase()))
   const filteredEvents = events.filter((e) => e.title.toLowerCase().includes(eventSearch.toLowerCase()))
 
-  const flaggedCount = discussions.filter((d) => d.flagged).length
+  const flaggedCount = discussions.filter((d) => !!(d.flagged || d.flaggedAt)).length
 
   const TABS: { id: ActiveTab; label: string; icon: React.ElementType }[] = [
     { id: 'discussions', label: 'Discussions', icon: MessageSquare },
@@ -688,10 +751,10 @@ export default function AdminCommunity() {
                     <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400 text-sm">No discussions found.</td></tr>
                   ) : (
                     filtered.map((d) => (
-                      <tr key={d.id} className={`hover:bg-slate-50/50 ${d.flagged ? 'bg-red-50/30' : ''}`}>
+                      <tr key={d.id} className={`hover:bg-slate-50/50 ${(d.flagged || d.flaggedAt) ? 'bg-red-50/30' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {d.flagged && <Flag className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                            {(d.flagged || d.flaggedAt) && <Flag className="h-3.5 w-3.5 text-red-500 shrink-0" />}
                             <p className="font-medium text-slate-800 line-clamp-1">{d.title}</p>
                           </div>
                         </td>
@@ -716,6 +779,7 @@ export default function AdminCommunity() {
                                 <button className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700"><Eye className="h-3.5 w-3.5 text-blue-600" /> View</button>
                                 <button onClick={() => handleStatusChange(d.id, 'active')} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700"><CheckCircle className="h-3.5 w-3.5 text-green-600" /> Approve</button>
                                 <button onClick={() => handleStatusChange(d.id, 'hidden')} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700"><XCircle className="h-3.5 w-3.5 text-yellow-600" /> Hide</button>
+                                <button onClick={() => handleFlagDiscussion(d.id, !!d.flagged)} className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 ${d.flagged ? 'text-slate-700' : 'text-orange-600'}`}><Flag className="h-3.5 w-3.5" /> {d.flagged ? 'Unflag' : 'Flag'}</button>
                                 <hr className="my-1 border-gray-100" />
                                 <button onClick={() => handleDeleteDiscussion(d.id)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
                               </div>
@@ -774,6 +838,9 @@ export default function AdminCommunity() {
                       const isExpanded = expandedGroupId === g.id
                       const members = groupMembersById[g.id] ?? []
                       const isLoadingMembers = membersLoadingGroupId === g.id
+                      const isRequestsExpanded = expandedRequestGroupId === g.id
+                      const joinRequests = joinRequestsById[g.id] ?? []
+                      const isLoadingRequests = joinRequestsLoadingGroupId === g.id
 
                       return (
                         <Fragment key={g.id}>
@@ -788,11 +855,19 @@ export default function AdminCommunity() {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
+                                {g.isPrivate && (
+                                  <button
+                                    onClick={() => handleToggleJoinRequests(g)}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${isRequestsExpanded ? 'border-amber-400 text-amber-700 bg-amber-50' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                  >
+                                    Requests
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleToggleGroupMembers(g)}
                                   className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${isExpanded ? 'border-[#D52B1E] text-[#D52B1E] bg-red-50' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 >
-                                  {isExpanded ? 'Hide Members' : 'Show Members'}
+                                  {isExpanded ? 'Hide Members' : 'Members'}
                                 </button>
                                 <button
                                   onClick={() => setGroupModal({ type: 'edit', group: g })}
@@ -801,7 +876,7 @@ export default function AdminCommunity() {
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </button>
                                 <button
-                                  onClick={() => { if (confirm(`Delete group "${g.name}"?`)) handleDeleteGroup(g.id) }}
+                                onClick={() => setConfirmDialog({ message: `Delete group "${g.name}"? This cannot be undone.`, onConfirm: () => handleDeleteGroup(g.id) })}
                                   className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -809,6 +884,54 @@ export default function AdminCommunity() {
                               </div>
                             </td>
                           </tr>
+                          {isRequestsExpanded && (
+                            <tr>
+                              <td colSpan={5} className="px-4 pb-4">
+                                <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3">
+                                  <p className="text-xs font-semibold text-amber-800 mb-2 uppercase tracking-wide">Pending Join Requests</p>
+                                  {isLoadingRequests ? (
+                                    <p className="text-xs text-slate-500">Loading requests...</p>
+                                  ) : joinRequests.length === 0 ? (
+                                    <p className="text-xs text-slate-500">No pending join requests.</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {joinRequests.filter((r) => r.status === 'pending').map((req) => {
+                                        const name = [req.user?.firstName, req.user?.lastName].filter(Boolean).join(' ') || req.user?.email || 'User'
+                                        return (
+                                          <div key={req.id} className="flex items-center gap-3 rounded-lg border border-amber-200 bg-white p-2">
+                                            <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-[11px] font-semibold text-slate-600 overflow-hidden flex-shrink-0">
+                                              {req.user?.profilePhotoUrl
+                                                ? <img src={req.user.profilePhotoUrl} alt={name} className="h-full w-full object-cover" />
+                                                : name.slice(0, 2).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                              <p className="text-xs font-medium text-slate-800 truncate">{name}</p>
+                                              <p className="text-[11px] text-slate-500 truncate">{req.user?.email ?? '—'}</p>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 hidden sm:block">{req.createdAt ? new Date(req.createdAt).toLocaleDateString() : ''}</p>
+                                            <div className="flex gap-1 flex-shrink-0">
+                                              <button
+                                                onClick={() => handleApproveRequest(g.id, req.id)}
+                                                className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                                              >
+                                                <CheckCircle className="h-3 w-3" /> Approve
+                                              </button>
+                                              <button
+                                                onClick={() => handleRejectRequest(g.id, req.id)}
+                                                className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                                              >
+                                                <XCircle className="h-3 w-3" /> Reject
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
                           {isExpanded && (
                             <tr>
                               <td colSpan={5} className="px-4 pb-4">
@@ -913,7 +1036,7 @@ export default function AdminCommunity() {
                               <Edit2 className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              onClick={() => { if (confirm(`Delete event "${e.title}"?`)) handleDeleteEvent(e.id) }}
+                              onClick={() => setConfirmDialog({ message: `Delete event "${e.title}"? This cannot be undone.`, onConfirm: () => handleDeleteEvent(e.id) })}
                               className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1015,6 +1138,22 @@ export default function AdminCommunity() {
           />
         )}
       </AnimatePresence>
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <Dialog open={!!confirmDialog} onClose={() => setConfirmDialog(null)} title="Confirm Action" maxWidth="max-w-sm">
+          <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}
+            >
+              Delete
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </motion.div>
   )
 }

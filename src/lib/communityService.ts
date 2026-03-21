@@ -57,12 +57,25 @@ export interface DiscussionAPI {
   isLocked: boolean;
   viewCount: number;
   interactions: DiscussionInteractionAPI[];
+  attachments?: string[];
+  taggedUsers?: DiscussionAuthorAPI[];
   createdAt: string;
   updatedAt: string;
   /** Populated only on detail view */
   isBookmarked?: boolean;
   status?: string;
   flagged?: boolean;
+  /** ISO timestamp set by API when flagged; null/undefined when not flagged */
+  flaggedAt?: string | null;
+}
+
+export interface GroupJoinRequestAPI {
+  id: string;
+  user: DiscussionAuthorAPI;
+  group: CommunityGroupAPI;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CommunityGroupAPI {
@@ -155,6 +168,8 @@ export interface CreateDiscussionDto {
   categoryId?: string;
   groupId?: string;
   tags?: string[];
+  attachments?: string[];
+  taggedUserIds?: string[];
 }
 
 export type UpdateDiscussionDto = Partial<{
@@ -257,20 +272,24 @@ export const communityService = {
       .post<boolean>(`/community/discussions/${discussionId}/bookmark`)
       .then((r) => r.data),
 
-  reportDiscussion: async (discussionId: string, reason?: string) => {
-    try {
-      const response = await api.post<DiscussionAPI>(
-        `/community/discussions/${discussionId}/report`,
-        reason ? { reason } : undefined,
-      );
-      return response.data;
-    } catch {
-      const response = await api.patch<DiscussionAPI>(
-        `/community/discussions/${discussionId}`,
-        { flagged: true },
-      );
-      return response.data;
-    }
+  getBookmarkedDiscussions: (params?: {
+    categoryId?: string;
+    groupId?: string;
+    sortBy?: 'latest' | 'oldest' | 'popular' | 'unanswered';
+    timeRange?: 'day' | 'week' | 'month' | 'all';
+    search?: string;
+  }) =>
+    api
+      .get<DiscussionAPI[]>('/community/discussions/bookmarks', { params })
+      .then((r) => r.data),
+
+  flagDiscussion: (discussionId: string) =>
+    api
+      .post<DiscussionAPI>(`/community/discussions/${discussionId}/flag`)
+      .then((r) => r.data),
+
+  reportDiscussion: async (discussionId: string, _reason?: string) => {
+    return communityService.flagDiscussion(discussionId);
   },
 
   /* -- Groups -- */
@@ -302,6 +321,27 @@ export const communityService = {
     api
       .post<CommunityGroupAPI>(`/community/groups/${id}/leave`)
       .then((r) => r.data),
+
+  getGroupMembers: (id: string) =>
+    api
+      .get<DiscussionAuthorAPI[]>(`/community/groups/${id}/members`)
+      .then((r) => r.data),
+
+  requestJoinGroup: (id: string) =>
+    api
+      .post<GroupJoinRequestAPI>(`/community/groups/${id}/request-join`)
+      .then((r) => r.data),
+
+  getJoinRequests: (groupId: string) =>
+    api
+      .get<GroupJoinRequestAPI[]>(`/community/groups/${groupId}/requests`)
+      .then((r) => r.data),
+
+  approveJoinRequest: (requestId: string) =>
+    api.post(`/community/groups/requests/${requestId}/approve`).then((r) => r.data),
+
+  rejectJoinRequest: (requestId: string) =>
+    api.post(`/community/groups/requests/${requestId}/reject`).then((r) => r.data),
 
   /* -- Events -- */
   getEvents: () =>
