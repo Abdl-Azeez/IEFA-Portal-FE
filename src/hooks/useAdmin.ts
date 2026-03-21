@@ -925,8 +925,6 @@ export interface GlossaryListParams {
   search?: string;
 }
 
-const GLOSSARY_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-
 export const useAdminResources = (params: ResourceListParams = {}) =>
   useQuery({
     queryKey: ["admin", "resources", params],
@@ -953,17 +951,17 @@ export const useAdminGlossaryTerms = (params: GlossaryListParams = {}) =>
   useQuery({
     queryKey: ["admin", "resources", "glossary", params],
     queryFn: async () => {
-      const letters = params.letter
-        ? [params.letter.toUpperCase()]
-        : GLOSSARY_LETTERS;
-      const responses = await Promise.all(
-        letters.map((letter) =>
-          api.get<AdminGlossaryTerm[]>("/resources/glossary", {
-            params: { letter },
-          }),
-        ),
+      const requestParams = params.letter
+        ? { letter: params.letter.toUpperCase() }
+        : undefined;
+      const { data } = await api.get<AdminGlossaryTerm[]>(
+        "/resources/glossary",
+        { params: requestParams },
       );
-      let terms = responses.flatMap((response) => response.data);
+      let terms = data.map((term) => ({
+        ...term,
+        status: term.status ?? "published",
+      }));
       if (params.search) {
         const q = params.search.toLowerCase();
         terms = terms.filter(

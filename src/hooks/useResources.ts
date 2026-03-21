@@ -9,8 +9,6 @@ import type {
   PaginatedResponse,
 } from '@/types/resources'
 
-const GLOSSARY_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-
 // ─────────────────────────────────────────────────────────────────────────────
 // User-facing reads
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,13 +58,12 @@ export const useGlossaryTerms = (filters: GlossaryFilters = {}) =>
   useQuery<GlossaryTerm[]>({
     queryKey: ['resources', 'glossary', filters],
     queryFn: async () => {
-      const letters = filters.letter ? [filters.letter.toUpperCase()] : GLOSSARY_LETTERS
-      const responses = await Promise.all(
-        letters.map((letter) =>
-          api.get<GlossaryTerm[]>('/resources/glossary', { params: { letter } })
-        )
-      )
-      let terms = responses.flatMap((response) => response.data)
+      const params = filters.letter ? { letter: filters.letter.toUpperCase() } : undefined
+      const { data } = await api.get<GlossaryTerm[]>('/resources/glossary', { params })
+      let terms = data.map((term) => ({
+        ...term,
+        status: term.status ?? 'published',
+      }))
       if (filters.search) {
         const q = filters.search.toLowerCase()
         terms = terms.filter((t) =>
@@ -86,7 +83,10 @@ export const useGlossaryTerm = (id: string) =>
     queryKey: ['resources', 'glossary', id],
     queryFn: async () => {
       const { data } = await api.get<GlossaryTerm>(`/resources/glossary/${id}`)
-      return data
+      return {
+        ...data,
+        status: data.status ?? 'published',
+      }
     },
     enabled: !!id,
     staleTime: 60_000,

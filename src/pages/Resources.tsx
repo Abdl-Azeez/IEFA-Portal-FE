@@ -243,11 +243,9 @@ export default function Resources() {
                   <span className="flex items-center gap-1.5">
                     <tab.icon className="h-4 w-4 shrink-0" />
                     <span className="hidden sm:inline">{tab.label}</span>
-                    {tab.value !== 'glossary' && (
-                      <span className="hidden sm:inline shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-black/15 group-data-[state=active]:bg-white/20 tabular-nums">
-                        {sectionCounts[tab.value]}
-                      </span>
-                    )}
+                    <span className="hidden sm:inline shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-black/15 group-data-[state=active]:bg-white/20 tabular-nums">
+                      {sectionCounts[tab.value]}
+                    </span>
                   </span>
                 </TabsTrigger>
               ))}
