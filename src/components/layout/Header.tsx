@@ -260,6 +260,7 @@ export function Header() {
   const { user, logout } = useAuth();
   const storeUser = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+  const profileImageUrl = storeUser?.profilePhotoUrl ?? user?.profilePhotoUrl ?? "";
 
   const initials =
     [storeUser?.firstName, storeUser?.lastName]
@@ -444,7 +445,7 @@ export function Header() {
             onClick={() => navigate("/profile")}
           >
             <Avatar className="h-9 w-9 ring-2 ring-primary/20 transition-all duration-200 hover:ring-primary/40 cursor-pointer">
-              <AvatarImage src={storeUser?.profilePhotoUrl ?? ""} alt="User" />
+              <AvatarImage src={profileImageUrl} alt="User" />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
           </motion.div>

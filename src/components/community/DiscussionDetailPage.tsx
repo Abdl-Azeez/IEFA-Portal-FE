@@ -17,6 +17,7 @@ interface DiscussionDetailPageProps {
   initialLikeInteractionId?: string
   onPin?: (postId: string) => void
   onDelete?: (postId: string) => void
+  onReport?: (postId: string) => void
 }
 
 const categoryColors: Record<string, string> = {
@@ -37,7 +38,8 @@ export default function DiscussionDetailPage({
   initialIsLiked = false,
   initialLikeInteractionId,
   onPin,
-  onDelete
+  onDelete,
+  onReport
 }: DiscussionDetailPageProps) {
   const [isLiked, setIsLiked] = useState(initialIsLiked)
   const [isSaved, setIsSaved] = useState(post.isSaved ?? false)
@@ -130,6 +132,18 @@ export default function DiscussionDetailPage({
       // silent fail — keep text so user can retry
     } finally {
       setIsSubmittingReply(false)
+    }
+  }
+
+  const handleDeleteReply = async (replyId: string) => {
+    if (!window.confirm('Delete this reply?')) return
+    const previousReplies = replies
+    setReplies((prev) => prev.filter((reply) => reply.id !== replyId))
+    try {
+      await communityService.deleteInteraction(replyId)
+    } catch {
+      setReplies(previousReplies)
+      alert('Failed to delete reply.')
     }
   }
 
@@ -340,6 +354,7 @@ export default function DiscussionDetailPage({
               </Button>
               <Button
                 variant="outline"
+                onClick={() => onReport?.(post.id)}
                 className="flex items-center gap-2 border-gray-200 text-orange-600 hover:text-orange-700"
               >
                 <Flag className="h-4 w-4" />
@@ -416,6 +431,14 @@ export default function DiscussionDetailPage({
                             Like ({reply.likes})
                           </button>
                           <button className="hover:text-[#D52B1E] transition-colors">Reply</button>
+                          {(isModerator || reply.isAuthor) && (
+                            <button
+                              onClick={() => handleDeleteReply(reply.id)}
+                              className="hover:text-red-600 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

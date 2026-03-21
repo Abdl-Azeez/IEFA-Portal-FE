@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { toast } from "@/hooks/use-toast";
@@ -26,6 +27,74 @@ interface UpdateUserData {
   profilePhotoUrl?: string;
 }
 
+interface AuthUserPayload {
+  id?: string;
+  userId?: string;
+  email: string;
+  role: "student" | "instructor" | "admin" | "staff";
+  isModerator?: boolean;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  profilePhotoUrl?: string;
+  isVerified?: boolean;
+  isActive?: boolean;
+  lastLoginAt?: string;
+  createdAt?: string;
+}
+
+const AUTH_PROFILE_STORAGE_KEY = "authProfile";
+
+type StoredAuthProfile = Pick<
+  AuthUserPayload,
+  "firstName" | "lastName" | "profilePhotoUrl" | "phone" | "country"
+>;
+
+const readStoredAuthProfile = (): StoredAuthProfile | null => {
+  const raw = sessionStorage.getItem(AUTH_PROFILE_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as StoredAuthProfile;
+  } catch {
+    return null;
+  }
+};
+
+const persistAuthProfile = (user: Partial<AuthUserPayload>) => {
+  const profile: StoredAuthProfile = {
+    firstName: user.firstName,
+    lastName: user.lastName,
+    profilePhotoUrl: user.profilePhotoUrl,
+    phone: user.phone,
+    country: user.country,
+  };
+
+  if (!profile.firstName && !profile.lastName && !profile.profilePhotoUrl) {
+    return;
+  }
+
+  sessionStorage.setItem(AUTH_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+};
+
+const normalizeAuthUser = (user: AuthUserPayload) => {
+  const storedProfile = readStoredAuthProfile();
+
+  const normalized = {
+    ...user,
+    id: user.id ?? user.userId ?? "",
+    isModerator: !!user.isModerator,
+    firstName: user.firstName ?? storedProfile?.firstName,
+    lastName: user.lastName ?? storedProfile?.lastName,
+    profilePhotoUrl: user.profilePhotoUrl ?? storedProfile?.profilePhotoUrl,
+    phone: user.phone ?? storedProfile?.phone,
+    country: user.country ?? storedProfile?.country,
+  };
+
+  persistAuthProfile(normalized);
+  return normalized;
+};
+
 export const useLogin = () => {
   const { setUser, setToken, setRefreshToken, setLoading } = useAuthStore();
 
@@ -40,7 +109,11 @@ export const useLogin = () => {
       }
     },
     onSuccess: (data) => {
-      setUser(data.user);
+      if (data.user) {
+        const normalizedUser = normalizeAuthUser(data.user);
+        setUser(normalizedUser);
+        persistAuthProfile(normalizedUser);
+      }
       const token: string = data.accessToken ?? data.token;
       setToken(token);
       sessionStorage.setItem("authToken", token);
@@ -72,7 +145,11 @@ export const useRegister = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      if (data.user) setUser(data.user);
+      if (data.user) {
+        const normalizedUser = normalizeAuthUser(data.user);
+        setUser(normalizedUser);
+        persistAuthProfile(normalizedUser);
+      }
       const token: string | undefined = data.accessToken ?? data.token;
       if (token) {
         setToken(token);
@@ -102,7 +179,8 @@ export const useMe = () => {
     queryKey: ["me"],
     queryFn: async () => {
       const response = await api.get("/auth/me");
-      return response.data;
+      const payload = response.data?.user ?? response.data;
+      return normalizeAuthUser(payload);
     },
     enabled: !!sessionStorage.getItem("authToken"),
   });
@@ -114,7 +192,14 @@ export const useLogout = () => {
 
   return useMutation({
     mutationFn: async () => {
-      await api.post("/auth/logout");
+      if (!sessionStorage.getItem("authToken")) return;
+      try {
+        await api.post("/auth/logout");
+      } catch (error) {
+        if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+          throw error;
+        }
+      }
     },
     onSettled: () => {
       // Always clear local state regardless of server response
@@ -396,7 +481,7 @@ export const useToggleModerator = () => {
       id: string;
       isModerator: boolean;
     }) => {
-      const response = await api.patch(`/users/${id}/moderator`, {
+      const response = await api.patch<{ isModerator: boolean }>(`/users/${id}/moderator`, {
         isModerator,
       });
       return response.data;

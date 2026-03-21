@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 import { useMe } from "@/hooks/useAuth";
 import api from "@/lib/api";
@@ -9,8 +10,12 @@ interface User {
   id: string;
   email: string;
   role: string;
+  isModerator?: boolean;
   firstName?: string;
   lastName?: string;
+  profilePhotoUrl?: string;
+  phone?: string;
+  country?: string;
 }
 
 interface AuthContextType {
@@ -38,6 +43,22 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const hasAuthUserChanged = (current: User | null, next: User) => {
+  if (!current) return true;
+
+  return (
+    current.id !== next.id ||
+    current.email !== next.email ||
+    current.role !== next.role ||
+    !!current.isModerator !== !!next.isModerator ||
+    current.firstName !== next.firstName ||
+    current.lastName !== next.lastName ||
+    current.profilePhotoUrl !== next.profilePhotoUrl ||
+    current.phone !== next.phone ||
+    current.country !== next.country
+  );
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const {
     user,
@@ -51,14 +72,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     // Invalidate server-side refresh token (best-effort, don't block UI)
-    api.post("/auth/logout").catch(() => {});
+    const accessToken = sessionStorage.getItem("authToken");
+    if (accessToken) {
+      api.post("/auth/logout").catch((error) => {
+        if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+          // Ignore here; local logout still proceeds.
+          console.error("Logout request failed:", error);
+        }
+      });
+    }
     storeLogout();
     queryClient.removeQueries({ queryKey: ["me"] });
   };
 
   useEffect(() => {
-    if (token && meData && !user) {
-      setUser(meData);
+    if (token && meData) {
+      const mergedUser: User = {
+        ...user,
+        ...meData,
+        firstName: meData.firstName ?? user?.firstName,
+        lastName: meData.lastName ?? user?.lastName,
+        profilePhotoUrl: meData.profilePhotoUrl ?? user?.profilePhotoUrl,
+        phone: meData.phone ?? user?.phone,
+        country: meData.country ?? user?.country,
+      };
+
+      if (hasAuthUserChanged(user, mergedUser)) {
+        setUser(mergedUser);
+      }
     }
   }, [token, meData, user, setUser]);
 
@@ -78,7 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       signup,
       isAuthenticated,
       isAdmin: user?.role === "admin" || user?.role === "staff",
-      isModerator: user?.role === "moderator",
+      isModerator: !!user?.isModerator,
       isLoading,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

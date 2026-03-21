@@ -404,6 +404,7 @@ export default function AdminCommunity() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
 
   // ── Groups ───────────────────────────────────────────────────────────────
   const [groups, setGroups] = useState<CommunityGroupAPI[]>([])
@@ -570,12 +571,13 @@ export default function AdminCommunity() {
 
   const filtered = discussions.filter(
     (d) =>
-      d.title.toLowerCase().includes(search.toLowerCase()) ||
-      (
+      (d.title.toLowerCase().includes(search.toLowerCase()) ||
+        (
         typeof d.author === 'string'
           ? d.author
           : [d.author?.firstName, d.author?.lastName].filter(Boolean).join(' ')
-      ).toLowerCase().includes(search.toLowerCase()),
+      ).toLowerCase().includes(search.toLowerCase())) &&
+      (!flaggedOnly || !!d.flagged),
   )
   const filteredGroups = groups.filter((g) => g.name.toLowerCase().includes(groupSearch.toLowerCase()))
   const filteredEvents = events.filter((e) => e.title.toLowerCase().includes(eventSearch.toLowerCase()))
@@ -645,7 +647,12 @@ export default function AdminCommunity() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input placeholder="Search discussions…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm rounded-lg" />
               </div>
-              <Button variant="outline" size="sm" className="rounded-lg gap-1.5 text-red-600 border-red-200 hover:bg-red-50">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFlaggedOnly((prev) => !prev)}
+                className={`rounded-lg gap-1.5 text-red-600 border-red-200 hover:bg-red-50 ${flaggedOnly ? 'bg-red-50' : ''}`}
+              >
                 <Flag className="h-3.5 w-3.5" /> Flagged ({flaggedCount})
               </Button>
             </div>

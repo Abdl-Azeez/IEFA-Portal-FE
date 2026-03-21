@@ -450,14 +450,22 @@ export default function Community() {
     }
   };
 
-  const handleReport = (postId: string) => {
+  const handleReport = async (postId: string) => {
     if (reportedPosts.includes(postId)) {
       alert("You've already reported this post.");
       return;
     }
-    setReportedPosts((prev) => [...prev, postId]);
-    // stub for backend call
-    alert("Thank you. The post has been reported to moderators.");
+    try {
+      await communityService.reportDiscussion(postId);
+      setReportedPosts((prev) => [...prev, postId]);
+      setDiscussionPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, isReported: true } : p)),
+      );
+      alert("Thank you. The post has been reported to moderators.");
+    } catch (err) {
+      console.error("Failed to report post:", err);
+      alert("Could not submit report right now. Please try again.");
+    }
   };
 
   const handlePostClick = async (post: DiscussionPost) => {
@@ -626,6 +634,7 @@ export default function Community() {
         initialLikeInteractionId={initialLikeIdForDetail}
         onPin={handlePinPost}
         onDelete={handleDeletePost}
+        onReport={handleReport}
       />
     );
   }

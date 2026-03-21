@@ -5,6 +5,7 @@ interface User {
   id: string;
   email: string;
   role: string;
+  isModerator?: boolean;
   firstName?: string;
   lastName?: string;
   phone?: string;
@@ -55,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
         });
         sessionStorage.removeItem("authToken");
         sessionStorage.removeItem("refreshToken");
+        sessionStorage.removeItem("authProfile");
         // Remove persisted auth state to avoid stale hydration after logout.
         sessionStorage.removeItem("auth-storage");
         // Cleanup legacy local storage keys from older builds.

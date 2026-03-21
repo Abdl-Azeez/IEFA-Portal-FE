@@ -31,6 +31,7 @@ import {
   useAdminDeleteUser,
   useAdminUpdateUser,
   useAdminUpdateUserRole,
+  useAdminToggleModerator,
   type AdminUser,
 } from "@/hooks/useAdmin";
 
@@ -49,7 +50,7 @@ const STATUS_COLORS: Record<string, string> = {
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   instructor: "Educator",
-  staff: "Moderator",
+  staff: "Staff",
   student: "Student",
 };
 
@@ -124,6 +125,7 @@ export default function AdminUsers() {
   const deleteMutation = useAdminDeleteUser();
   const updateMutation = useAdminUpdateUser();
   const roleMutation = useAdminUpdateUserRole();
+  const moderatorMutation = useAdminToggleModerator();
 
   const users = data?.data ?? [];
   const meta = data?.meta;
@@ -334,11 +336,18 @@ export default function AdminUsers() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[u.role] ?? "bg-gray-100 text-gray-600"}`}
-                        >
-                          {ROLE_LABELS[u.role] ?? u.role}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[u.role] ?? "bg-gray-100 text-gray-600"}`}
+                          >
+                            {ROLE_LABELS[u.role] ?? u.role}
+                          </span>
+                          {u.isModerator && (
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                              Moderator
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-slate-600 hidden md:table-cell text-xs">
                         {u.country ?? "—"}
@@ -411,6 +420,21 @@ export default function AdminUsers() {
                                   Activate
                                 </button>
                               )}
+                              <button
+                                onClick={() => {
+                                  moderatorMutation.mutate({
+                                    id: u.id,
+                                    isModerator: !u.isModerator,
+                                  });
+                                  setOpenMenu(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700"
+                              >
+                                <Shield className="h-3.5 w-3.5 text-blue-600" />
+                                {u.isModerator
+                                  ? "Remove Moderator"
+                                  : "Make Moderator"}
+                              </button>
                               <hr className="my-1 border-gray-100" />
                               <button
                                 onClick={() => {
@@ -566,7 +590,7 @@ export default function AdminUsers() {
             >
               <option value="student">Student</option>
               <option value="instructor">Educator</option>
-              <option value="staff">Moderator</option>
+              <option value="staff">Staff</option>
               <option value="admin">Admin</option>
             </Select>
           </div>

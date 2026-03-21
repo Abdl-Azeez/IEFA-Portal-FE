@@ -150,6 +150,7 @@ export function AdminHeader() {
   const { user, logout } = useAuth();
   const storeUser = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+  const profileImageUrl = storeUser?.profilePhotoUrl ?? user?.profilePhotoUrl ?? "";
 
   const initials =
     [storeUser?.firstName, storeUser?.lastName]
@@ -296,9 +297,9 @@ export function AdminHeader() {
           onClick={() => navigate("/admin/profile")}
           className="flex items-center gap-2.5 bg-white rounded-full shadow-sm px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
         >
-          {storeUser?.profilePhotoUrl ? (
+          {profileImageUrl ? (
             <img
-              src={storeUser.profilePhotoUrl}
+              src={profileImageUrl}
               alt="Profile"
               className="h-7 w-7 rounded-full object-cover"
             />

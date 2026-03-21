@@ -162,6 +162,7 @@ export type UpdateDiscussionDto = Partial<{
   content: string;
   isPinned: boolean;
   isAnswered: boolean;
+  flagged: boolean;
   status: string;
 }>;
 
@@ -255,6 +256,22 @@ export const communityService = {
     api
       .post<boolean>(`/community/discussions/${discussionId}/bookmark`)
       .then((r) => r.data),
+
+  reportDiscussion: async (discussionId: string, reason?: string) => {
+    try {
+      const response = await api.post<DiscussionAPI>(
+        `/community/discussions/${discussionId}/report`,
+        reason ? { reason } : undefined,
+      );
+      return response.data;
+    } catch {
+      const response = await api.patch<DiscussionAPI>(
+        `/community/discussions/${discussionId}`,
+        { flagged: true },
+      );
+      return response.data;
+    }
+  },
 
   /* -- Groups -- */
   getGroups: () =>

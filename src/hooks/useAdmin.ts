@@ -43,6 +43,7 @@ export interface AdminUser {
   firstName: string;
   lastName: string;
   role: "student" | "instructor" | "admin" | "staff";
+  isModerator?: boolean;
   phone?: string;
   country?: string;
   profilePhotoUrl?: string;
@@ -224,7 +225,7 @@ export const useAdminToggleModerator = () => {
       id: string;
       isModerator: boolean;
     }) => {
-      const { data } = await api.patch<AdminUser>(`/users/${id}/moderator`, {
+      const { data } = await api.patch<{ isModerator: boolean }>(`/users/${id}/moderator`, {
         isModerator,
       });
       return data;
