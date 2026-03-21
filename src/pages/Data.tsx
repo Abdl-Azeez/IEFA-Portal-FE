@@ -20,9 +20,10 @@ import {
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { useDatasets, useDatasetCategories, type Dataset } from "@/hooks/useDatasets";
+import { useDatasets, useDataset, useDatasetCategories, type Dataset } from "@/hooks/useDatasets";
 
 /* ── Animation variants ─────────────────────────────────────────────────── */
 const containerVariants = {
@@ -35,10 +36,8 @@ const itemVariants = {
 };
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
-type Geography = string;
-type VisualizationType = string;
-
 interface MetricRow {
+  id?: string;
   name: string;
   geography: string;
   value: string;
@@ -202,208 +201,14 @@ const VIZ_ICONS: Record<string, React.ElementType> = {
   "Table": BarChart3,
 };
 
-/* ── Visualization preview placeholders ───────────────────────────────────── */
-function PreviewBarChart() {
-  const data = [
-    { label: "2019", value: 35 },
-    { label: "2020", value: 48 },
-    { label: "2021", value: 55 },
-    { label: "2022", value: 68 },
-    { label: "2023", value: 82 },
-    { label: "2024", value: 90 },
-  ];
-  const max = Math.max(...data.map((d) => d.value));
+/* ── Detail field helper ──────────────────────────────────────────────────── */
+function DetailField({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-end gap-3 h-40">
-        {data.map((d) => (
-          <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
-            <div
-              className="w-full rounded-t-md bg-gradient-to-t from-[#D52B1E] to-[#D52B1E]/60 transition-all duration-500"
-              style={{ height: `${(d.value / max) * 100}%` }}
-            />
-            <span className="text-[10px] text-gray-400">{d.label}</span>
-          </div>
-        ))}
-      </div>
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</span>
+      <span className="text-sm text-gray-800">{children || <span className="text-gray-300 italic">—</span>}</span>
     </div>
   );
-}
-
-function PreviewLineChart() {
-  return (
-    <svg className="w-full h-40" viewBox="0 0 300 120" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="preview-line-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#D52B1E" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#D52B1E" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M0,100 C30,90 50,70 80,75 C110,80 130,35 160,40 C190,45 210,20 240,25 C270,30 290,10 300,5"
-        fill="none" stroke="#D52B1E" strokeWidth="2.5" strokeLinecap="round"
-      />
-      <path
-        d="M0,100 C30,90 50,70 80,75 C110,80 130,35 160,40 C190,45 210,20 240,25 C270,30 290,10 300,5 L300,120 L0,120Z"
-        fill="url(#preview-line-grad)"
-      />
-      {[[0, 100], [80, 75], [160, 40], [240, 25], [300, 5]].map(([cx, cy]) => (
-        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4" fill="#D52B1E" opacity="0.7" />
-      ))}
-    </svg>
-  );
-}
-
-function PreviewPieChart() {
-  const segments = [
-    { pct: 45, color: "#D52B1E", label: "Segment A" },
-    { pct: 25, color: "#0891b2", label: "Segment B" },
-    { pct: 18, color: "#7c3aed", label: "Segment C" },
-    { pct: 12, color: "#059669", label: "Segment D" },
-  ];
-  let cumulative = 0;
-  return (
-    <div className="flex items-center gap-6">
-      <svg width="140" height="140" viewBox="0 0 140 140">
-        {segments.map((seg) => {
-          const start = cumulative;
-          cumulative += seg.pct;
-          const startAngle = (start / 100) * 360 - 90;
-          const endAngle = (cumulative / 100) * 360 - 90;
-          const largeArc = seg.pct > 50 ? 1 : 0;
-          const r = 55;
-          const cx = 70, cy = 70;
-          const x1 = cx + r * Math.cos((startAngle * Math.PI) / 180);
-          const y1 = cy + r * Math.sin((startAngle * Math.PI) / 180);
-          const x2 = cx + r * Math.cos((endAngle * Math.PI) / 180);
-          const y2 = cy + r * Math.sin((endAngle * Math.PI) / 180);
-          return (
-            <path
-              key={seg.label}
-              d={`M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`}
-              fill={seg.color} opacity="0.75"
-            />
-          );
-        })}
-        <circle cx="70" cy="70" r="30" fill="white" />
-      </svg>
-      <div className="space-y-1.5">
-        {segments.map((seg) => (
-          <div key={seg.label} className="flex items-center gap-2 text-xs text-gray-600">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
-            {seg.label} ({seg.pct}%)
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PreviewStackedBar() {
-  const rows = [
-    { label: "2021", a: 60, b: 40 },
-    { label: "2022", a: 55, b: 45 },
-    { label: "2023", a: 48, b: 52 },
-    { label: "2024", a: 42, b: 58 },
-  ];
-  return (
-    <div className="space-y-2.5">
-      {rows.map((r) => (
-        <div key={r.label} className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">{r.label}</span>
-          <div className="flex-1 flex h-6 rounded-md overflow-hidden">
-            <div className="bg-[#D52B1E]/70 transition-all" style={{ width: `${r.a}%` }} />
-            <div className="bg-blue-400/70 transition-all" style={{ width: `${r.b}%` }} />
-          </div>
-        </div>
-      ))}
-      <div className="flex items-center gap-4 pt-1">
-        <span className="flex items-center gap-1.5 text-[10px] text-gray-500"><span className="w-2 h-2 rounded-sm bg-[#D52B1E]/70" /> Conventional</span>
-        <span className="flex items-center gap-1.5 text-[10px] text-gray-500"><span className="w-2 h-2 rounded-sm bg-blue-400/70" /> Islamic</span>
-      </div>
-    </div>
-  );
-}
-
-function PreviewKPI() {
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      {[
-        { label: "Total Value", value: "—", sub: "Awaiting data" },
-        { label: "YoY Growth", value: "—", sub: "Awaiting data" },
-        { label: "Market Share", value: "—", sub: "Awaiting data" },
-        { label: "Institutions", value: "—", sub: "Awaiting data" },
-      ].map((kpi) => (
-        <div key={kpi.label} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
-          <p className="text-2xl font-bold text-gray-300">{kpi.value}</p>
-          <p className="text-xs font-medium text-gray-700 mt-1">{kpi.label}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">{kpi.sub}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PreviewMap() {
-  return (
-    <div className="flex flex-col items-center justify-center h-40 bg-gray-50 rounded-xl border border-gray-100">
-      <Globe className="h-12 w-12 text-gray-200 mb-2" />
-      <p className="text-sm text-gray-400 font-medium">Interactive Map</p>
-      <p className="text-[10px] text-gray-300 mt-0.5">Geographic data visualization</p>
-    </div>
-  );
-}
-
-function PreviewGauge() {
-  return (
-    <div className="flex justify-center items-center py-4">
-      <svg width="180" height="100" viewBox="0 0 180 100">
-        <path d="M20,90 A70,70 0 0,1 160,90" fill="none" stroke="#f3f4f6" strokeWidth="14" strokeLinecap="round" />
-        <path d="M20,90 A70,70 0 0,1 110,23" fill="none" stroke="#D52B1E" strokeWidth="14" strokeLinecap="round" opacity="0.6" />
-        <text x="90" y="80" textAnchor="middle" fontSize="20" fontWeight="700" fill="#374151">—</text>
-        <text x="90" y="95" textAnchor="middle" fontSize="9" fill="#9ca3af">Awaiting data</text>
-      </svg>
-    </div>
-  );
-}
-
-function PreviewTable() {
-  return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-xs">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-3 py-2 text-left text-gray-500 font-semibold">Rank</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-semibold">Country</th>
-            <th className="px-3 py-2 text-right text-gray-500 font-semibold">Score</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {[1, 2, 3, 4, 5].map((rank) => (
-            <tr key={rank} className="hover:bg-gray-50/50">
-              <td className="px-3 py-2 text-gray-400">#{rank}</td>
-              <td className="px-3 py-2"><span className="bg-gray-100 rounded h-3 w-24 inline-block" /></td>
-              <td className="px-3 py-2 text-right text-gray-300">—</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function getVisualizationPreview(type: VisualizationType) {
-  switch (type) {
-    case "Bar chart": return <PreviewBarChart />;
-    case "Line chart": case "Trend line": case "Area chart": case "Timeline chart": return <PreviewLineChart />;
-    case "Pie chart": return <PreviewPieChart />;
-    case "Stacked bar": return <PreviewStackedBar />;
-    case "KPI card": return <PreviewKPI />;
-    case "Map": case "Heat map": case "Bubble chart": return <PreviewMap />;
-    case "Gauge": return <PreviewGauge />;
-    case "Ranking table": case "Leaderboard": case "Table": return <PreviewTable />;
-    default: return <PreviewBarChart />;
-  }
 }
 
 /* ── Preview modal ───────────────────────────────────────────────────────── */
@@ -413,52 +218,148 @@ function MetricPreviewModal({
   onClose,
 }: Readonly<{ metric: MetricRow | null; open: boolean; onClose: () => void }>) {
   if (!metric) return null;
-  const geo = GEO_STYLES[metric.geography] ?? GEO_STYLES.Global;
+  const { data: ds, isLoading } = useDataset(metric.id ?? "");
+  const geo = GEO_STYLES[ds?.geography ?? metric.geography] ?? GEO_STYLES.Global;
 
   return (
     <Dialog open={open} onClose={onClose} title="" maxWidth="max-w-2xl">
-      <div className="space-y-5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">{metric.name}</h2>
-            <div className="flex items-center gap-2 mt-2">
-              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${geo.bg} ${geo.text}`}>
-                {geo.flag} {metric.geography}
-              </span>
-              <span className="text-xs text-gray-400">{metric.year}</span>
-              <span className="text-xs text-gray-400">•</span>
-              <span className="text-xs text-gray-500">{metric.sourceType}</span>
+      {isLoading ? (
+        <div className="py-12 text-center text-sm text-gray-400">Loading details...</div>
+      ) : !ds ? (
+        <div className="py-12 text-center text-sm text-gray-400">Details not available.</div>
+      ) : (
+        <div className="space-y-5">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">{ds.title}</h2>
+              <p className="text-xs text-gray-400 mt-0.5">{ds.slug}</p>
             </div>
+            {ds.isPremium ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full shrink-0">
+                <Lock className="w-2.5 h-2.5" /> Premium
+              </span>
+            ) : (
+              <span className="inline-flex items-center text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+                Free
+              </span>
+            )}
           </div>
-          {metric.premium ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-              <Lock className="w-2.5 h-2.5" /> Premium
+
+          {/* Description */}
+          <p className="text-sm text-gray-600 leading-relaxed">{ds.description}</p>
+
+          {/* Primary info row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${geo.bg} ${geo.text}`}>
+              {geo.flag} {ds.geography ?? "Global"}
             </span>
-          ) : (
-            <span className="inline-flex items-center text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-              Free
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{ds.year ?? "—"}</span>
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md border ${
+              ds.source === "Regulatory"
+                ? "bg-green-50 text-green-700 border-green-200"
+                : ds.source === "Paid database" || ds.source === "API"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : ds.source === "Research"
+                ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                : "bg-gray-50 text-gray-600 border-gray-200"
+            }`}>
+              {ds.source ?? "Unknown"}
             </span>
+            {ds.visualizationType && (() => {
+              const VizIcon = VIZ_ICONS[ds.visualizationType!] || BarChart3;
+              return (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                  <VizIcon className="w-3 h-3" />
+                  {ds.visualizationType}
+                </span>
+              );
+            })()}
+          </div>
+
+          {/* Value highlight */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 text-center">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Value</p>
+            <p className={`text-3xl font-bold tabular-nums ${
+              ds.value && ds.value !== "--" && ds.value !== "—"
+                ? "text-gray-800"
+                : "text-gray-300"
+            }`}>
+              {ds.value || "—"}
+            </p>
+          </div>
+
+          {/* Category */}
+          {ds.category && (
+            <div className="rounded-lg border border-gray-100 bg-white p-3 flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center shrink-0">
+                {(() => { const Icon = getCategoryIcon(ds.category.name, ds.category.icon); return <Icon className="h-4 w-4 text-[#D52B1E]" />; })()}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">{ds.category.name}</p>
+                {ds.category.description && <p className="text-xs text-gray-400">{ds.category.description}</p>}
+              </div>
+            </div>
           )}
-        </div>
 
-        {/* Visualization type badge */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Visualization type:</span>
-          <span className="inline-flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
-            {metric.visualization}
-          </span>
-        </div>
+          {/* Detail grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 rounded-xl border border-gray-200 bg-white p-4">
+            <DetailField label="Status">
+              <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
+                ds.status === "published"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : ds.status === "draft"
+                  ? "bg-gray-100 text-gray-600"
+                  : "bg-amber-50 text-amber-700"
+              }`}>
+                {ds.status}
+              </span>
+            </DetailField>
+            <DetailField label="Views">{ds.viewCount}</DetailField>
+            <DetailField label="Visualization Data">
+              {ds.visualizationData ? (
+                <span className="text-emerald-600 text-xs font-medium">Available</span>
+              ) : (
+                <span className="text-gray-300 text-xs italic">None</span>
+              )}
+            </DetailField>
+            <DetailField label="Published At">
+              {ds.publishedAt
+                ? new Date(ds.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                : null}
+            </DetailField>
+            <DetailField label="Created">
+              {new Date(ds.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            </DetailField>
+            <DetailField label="Updated">
+              {ds.updatedAt
+                ? new Date(ds.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                : null}
+            </DetailField>
+          </div>
 
-        {/* Preview area */}
-        {metric.premium ? (
-          <div className="relative rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50/50 to-orange-50/30 p-8">
-            <div className="absolute inset-0 backdrop-blur-[2px] rounded-xl flex flex-col items-center justify-center gap-3 z-10">
+          {/* Tags */}
+          {ds.tags && ds.tags.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Tags</p>
+              <div className="flex flex-wrap gap-1.5">
+                {ds.tags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center text-xs text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Premium gate */}
+          {ds.isPremium && (
+            <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50/50 to-orange-50/30 p-6 flex flex-col items-center text-center gap-3">
               <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 rounded-full shadow-lg">
                 <Lock className="w-6 h-6" />
               </div>
               <p className="text-sm font-bold text-gray-800">Premium Data</p>
-              <p className="text-xs text-gray-500 text-center max-w-xs">
+              <p className="text-xs text-gray-500 max-w-xs">
                 This metric requires a premium subscription. Upgrade your plan to access the full visualization and data.
               </p>
               <Button
@@ -468,26 +369,9 @@ function MetricPreviewModal({
                 <CreditCard className="w-3.5 h-3.5" /> Upgrade to Premium
               </Button>
             </div>
-            {/* Blurred preview behind the overlay */}
-            <div className="opacity-20 blur-sm pointer-events-none">
-              {getVisualizationPreview(metric.visualization)}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Preview — {metric.visualization}
-              </span>
-              <span className="text-[10px] text-gray-300 italic">Sample visualization</span>
-            </div>
-            {getVisualizationPreview(metric.visualization)}
-            <p className="text-[10px] text-gray-400 mt-4 text-center italic">
-              Actual data will be displayed once available from the backend.
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </Dialog>
   );
 }
@@ -653,7 +537,6 @@ function DataTable({
 }: Readonly<{ metrics: MetricRow[] }>) {
   const [sortField, setSortField] = useState<"name" | "geography" | "year" | "premium" | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [geoFilter, setGeoFilter] = useState<Geography | "all">("all");
   const [previewMetric, setPreviewMetric] = useState<MetricRow | null>(null);
 
   const handleSort = (field: typeof sortField) => {
@@ -666,10 +549,7 @@ function DataTable({
   };
 
   const filtered = useMemo(() => {
-    let result = [...metrics];
-    if (geoFilter !== "all") {
-      result = result.filter((m) => m.geography === geoFilter);
-    }
+    const result = [...metrics];
     if (sortField) {
       result.sort((a, b) => {
         const valA = String(a[sortField]);
@@ -678,46 +558,15 @@ function DataTable({
       });
     }
     return result;
-  }, [metrics, geoFilter, sortField, sortDir]);
+  }, [metrics, sortField, sortDir]);
 
-  const geos = [...new Set(metrics.map((m) => m.geography))];
   const SortIcon = sortDir === "asc" ? ChevronUp : ChevronDown;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50/50">
-        <span className="text-xs text-gray-400 font-medium mr-1">Filter:</span>
-        <button
-          type="button"
-          onClick={() => setGeoFilter("all")}
-          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-            geoFilter === "all"
-              ? "bg-[#D52B1E] text-white border-[#D52B1E]"
-              : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-          }`}
-        >
-          All
-        </button>
-        {geos.map((g) => {
-          const style = GEO_STYLES[g];
-          return (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGeoFilter(g)}
-              className={`text-xs px-2.5 py-1 rounded-full border transition-colors inline-flex items-center gap-1 ${
-                geoFilter === g
-                  ? `${style.bg} ${style.text} font-semibold`
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              {style.flag} {g}
-            </button>
-          );
-        })}
-        <span className="ml-auto text-[11px] text-gray-400">
-          {filtered.length} of {metrics.length} rows
+      <div className="flex items-center justify-end px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+        <span className="text-[11px] text-gray-400">
+          {filtered.length} rows
         </span>
       </div>
 
@@ -830,6 +679,7 @@ function mapDatasetToMetric(dataset: Dataset): MetricRow {
     : from || to || "N/A";
 
   return {
+    id: dataset.id,
     name: dataset.title,
     geography: dataset.geography ?? "Global",
     value: dataset.value ?? "--",
@@ -841,11 +691,31 @@ function mapDatasetToMetric(dataset: Dataset): MetricRow {
 }
 
 export default function Data() {
+  const [search, setSearch] = useState("");
+  const [geoFilter, setGeoFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [visualizationFilter, setVisualizationFilter] = useState("all");
+  const [premiumFilter, setPremiumFilter] = useState<"all" | "free" | "premium">("all");
+
   const { data: categoriesData } = useDatasetCategories();
+  const [activeTab, setActiveTab] = useState("");
+
+  const activeCategoryId = useMemo(() => {
+    const categories = categoriesData ?? [];
+    const current = categories.find((category) => (category.slug || category.id) === activeTab);
+    return current?.id;
+  }, [categoriesData, activeTab]);
+
   const { data: datasetsData, isLoading: datasetsLoading } = useDatasets({
     page: 1,
     perPage: 100,
     status: "published",
+    search: search.trim() || undefined,
+    geography: geoFilter !== "all" ? geoFilter : undefined,
+    source: sourceFilter !== "all" ? sourceFilter : undefined,
+    visualizationType: visualizationFilter !== "all" ? visualizationFilter : undefined,
+    isPremium: premiumFilter === "all" ? undefined : premiumFilter === "premium",
+    categoryId: search.trim() ? undefined : activeCategoryId,
     order: "DESC",
   });
 
@@ -865,9 +735,6 @@ export default function Data() {
     }));
   }, [categoriesData, datasetsData?.data]);
 
-  const [activeTab, setActiveTab] = useState((SECTIONS[0]?.id ?? ""));
-  const [search, setSearch] = useState("");
-
   useEffect(() => {
     if (!sections.length) return;
     if (!sections.some((section) => section.id === activeTab)) {
@@ -884,24 +751,30 @@ export default function Data() {
 
   // Global search across all sections
   const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return null;
-    return sections.map((section) => ({
-      section,
-      matches: section.metrics.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          section.title.toLowerCase().includes(q) ||
-          m.geography.toLowerCase().includes(q) ||
-          m.sourceType.toLowerCase().includes(q) ||
-          m.visualization.toLowerCase().includes(q),
-      ),
-    })).filter((r) => r.matches.length > 0);
+    if (!search.trim()) return null;
+    return sections
+      .map((section) => ({ section, matches: section.metrics }))
+      .filter((result) => result.matches.length > 0);
   }, [search, sections]);
 
   const totalMatches = searchResults
     ? searchResults.reduce((sum, r) => sum + r.matches.length, 0)
     : 0;
+
+  const availableGeographies = useMemo(
+    () => Array.from(new Set((datasetsData?.data ?? []).map((d) => d.geography).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+    [datasetsData?.data],
+  );
+
+  const availableSources = useMemo(
+    () => Array.from(new Set((datasetsData?.data ?? []).map((d) => d.source).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+    [datasetsData?.data],
+  );
+
+  const availableVisualizations = useMemo(
+    () => Array.from(new Set((datasetsData?.data ?? []).map((d) => d.visualizationType).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+    [datasetsData?.data],
+  );
 
   return (
     <motion.div
@@ -977,22 +850,91 @@ export default function Data() {
 
       {/* ── Search Bar ───────────────────────────────────────────── */}
       <motion.div variants={itemVariants}>
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-          <Input
-            placeholder="Search across all data categories — e.g. Sukuk, Nigeria, FinTech…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-10 h-11 rounded-xl border-gray-200 bg-white shadow-sm focus-visible:ring-[#D52B1E]/30 text-sm"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <Input
+              placeholder="Search datasets — e.g. Sukuk, Nigeria, FinTech..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 pr-10 h-11 rounded-xl border-gray-200 bg-white shadow-sm focus-visible:ring-[#D52B1E]/30 text-sm"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Select
+              value={geoFilter}
+              onChange={e => setGeoFilter(e.target.value)}
+              variant="student"
+              className="h-10"
             >
-              <X className="h-4 w-4" />
-            </button>
+              <option value="all">All geographies</option>
+              {availableGeographies.length === 0 && <option value="" disabled>No geographies</option>}
+              {availableGeographies.map((geo) => (
+                <option key={geo} value={geo}>{geo}</option>
+              ))}
+            </Select>
+            <Select
+              value={sourceFilter}
+              onChange={e => setSourceFilter(e.target.value)}
+              variant="student"
+              className="h-10"
+            >
+              <option value="all">All sources</option>
+              {availableSources.length === 0 && <option value="" disabled>No sources</option>}
+              {availableSources.map((source) => (
+                <option key={source} value={source}>{source}</option>
+              ))}
+            </Select>
+            <Select
+              value={visualizationFilter}
+              onChange={e => setVisualizationFilter(e.target.value)}
+              variant="student"
+              className="h-10"
+            >
+              <option value="all">All visualizations</option>
+              {availableVisualizations.length === 0 && <option value="" disabled>No visualizations</option>}
+              {availableVisualizations.map((viz) => (
+                <option key={viz} value={viz}>{viz}</option>
+              ))}
+            </Select>
+            <Select
+              value={premiumFilter}
+              onChange={e => setPremiumFilter(e.target.value as "all" | "free" | "premium")}
+              variant="student"
+              className="h-10"
+            >
+              <option value="all">All access</option>
+              <option value="free">Free only</option>
+              <option value="premium">Premium only</option>
+            </Select>
+          </div>
+
+          {(geoFilter !== "all" || sourceFilter !== "all" || visualizationFilter !== "all" || premiumFilter !== "all") && (
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => {
+                  setGeoFilter("all");
+                  setSourceFilter("all");
+                  setVisualizationFilter("all");
+                  setPremiumFilter("all");
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
           )}
         </div>
       </motion.div>

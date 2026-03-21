@@ -6,7 +6,7 @@ import type { ResourceItem } from '@/types/resources'
 
 interface ResourceCardProps {
   readonly resource: ResourceItem
-  readonly onPreview: (resource: ResourceItem) => void
+  readonly onPreview: (resourceId: string) => void
   readonly onDownload: (resource: ResourceItem) => void
   readonly index?: number
 }
@@ -88,7 +88,7 @@ export function ResourceCard({ resource, onPreview, onDownload, index = 0 }: Res
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onPreview(resource)}
+            onClick={() => onPreview(resource.id)}
             className="flex-1 text-xs border-[#D52B1E]/30 text-[#D52B1E] hover:bg-[#FFEFEF]"
           >
             <Eye className="h-3 w-3 mr-1" />

@@ -83,7 +83,7 @@ const PAGE_SIZE = 9
 
 export default function Resources() {
   const [activeTab, setActiveTab] = useState<ResourceSection>('educational-guides')
-  const [previewResource, setPreviewResource] = useState<ResourceItem | null>(null)
+  const [previewResourceId, setPreviewResourceId] = useState('')
   const [downloadResource, setDownloadResource] = useState<ResourceItem | null>(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'date' | 'views' | 'downloads'>('date')
@@ -162,24 +162,24 @@ export default function Resources() {
 
   const currentResources = useMemo(() => {
     const items = [...(tabResourcesData?.data ?? [])]
-    items.sort((a, b) => {
-      if (sortBy === 'views') return b.viewCount - a.viewCount
-      if (sortBy === 'downloads') return b.downloadCount - a.downloadCount
-      return new Date(b.publishedAt ?? b.createdAt).getTime() - new Date(a.publishedAt ?? a.createdAt).getTime()
-    })
+    if (sortBy === 'views') {
+      items.sort((a, b) => b.viewCount - a.viewCount)
+    } else if (sortBy === 'downloads') {
+      items.sort((a, b) => b.downloadCount - a.downloadCount)
+    } else {
+      items.sort((a, b) => new Date(b.publishedAt ?? b.createdAt).getTime() - new Date(a.publishedAt ?? a.createdAt).getTime())
+    }
     return items
   }, [tabResourcesData?.data, sortBy])
 
   const currentCategories = useMemo(() => {
-    const idSet = new Set((tabResourcesData?.data ?? []).map((r) => r.categoryId).filter(Boolean) as string[])
     return (categoriesData ?? [])
-      .filter((c) => idSet.has(c.id))
-      .map((c) => c.name)
-      .sort((a, b) => a.localeCompare(b))
-  }, [categoriesData, tabResourcesData?.data])
+      .map((c) => ({ id: c.id, name: c.name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [categoriesData])
 
-  if (previewResource) {
-    return <ResourcePreviewPage resource={previewResource} onBack={() => setPreviewResource(null)} />
+  if (previewResourceId) {
+    return <ResourcePreviewPage resourceId={previewResourceId} onBack={() => setPreviewResourceId('')} />
   }
 
   const isLoading = activeTab === 'glossary' ? glossaryLoading : resourcesLoading
@@ -348,7 +348,7 @@ export default function Resources() {
                                     key={resource.id}
                                     resource={resource}
                                     index={idx}
-                                    onPreview={setPreviewResource}
+                                    onPreview={setPreviewResourceId}
                                     onDownload={(resourceToDownload) => {
                                       trackDownload.mutate(resourceToDownload.id)
                                       setDownloadResource(resourceToDownload)

@@ -4,19 +4,62 @@ import { ArrowLeft, Download, Calendar, Eye, User } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DownloadEmailModal } from '@/components/resources/DownloadEmailModal'
-import type { ResourceItem } from '@/types/resources'
+import { useResource } from '@/hooks/useResources'
 
 interface ResourcePreviewPageProps {
-  readonly resource: ResourceItem
+  readonly resourceId: string
   readonly onBack: () => void
 }
 
-export function ResourcePreviewPage({ resource, onBack }: ResourcePreviewPageProps) {
+export function ResourcePreviewPage({ resourceId, onBack }: ResourcePreviewPageProps) {
   const [downloadOpen, setDownloadOpen] = useState(false)
+  const { data: resource, isLoading } = useResource(resourceId)
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="text-[#737692] hover:text-[#000000]"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-[#737692]">
+          Loading resource details...
+        </div>
+      </div>
+    )
+  }
+
+  if (!resource) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="text-[#737692] hover:text-[#000000]"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-[#737692]">
+          Resource details are not available.
+        </div>
+      </div>
+    )
+  }
 
   return (
     <motion.div

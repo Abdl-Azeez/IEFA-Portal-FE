@@ -17,7 +17,7 @@ interface ResourceFilterBarProps {
   readonly onSortChange: (value: 'date' | 'views' | 'downloads') => void
   readonly selectedCategory: string
   readonly onCategoryChange: (value: string) => void
-  readonly categories: string[]
+  readonly categories: Array<{ id: string; name: string }>
 }
 
 export function ResourceFilterBar({
@@ -103,15 +103,15 @@ export function ResourceFilterBar({
                 </button>
                 {categories.map(cat => (
                   <button
-                    key={cat}
-                    onClick={() => onCategoryChange(cat)}
+                    key={cat.id}
+                    onClick={() => onCategoryChange(cat.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      selectedCategory === cat
+                      selectedCategory === cat.id
                         ? 'bg-[#D52B1E] text-white'
                         : 'bg-gray-50 text-[#737692] hover:bg-[#FFEFEF] hover:text-[#D52B1E]'
                     }`}
                   >
-                    {cat}
+                    {cat.name}
                   </button>
                 ))}
               </div>
@@ -131,7 +131,7 @@ export function ResourceFilterBar({
               )}
               {selectedCategory && (
                 <Badge variant="outline" className="gap-1 text-xs border-[#D52B1E]/20 text-[#D52B1E]">
-                  {selectedCategory}
+                  {categories.find((cat) => cat.id === selectedCategory)?.name ?? selectedCategory}
                   <button onClick={() => onCategoryChange('')}><X className="h-2.5 w-2.5" /></button>
                 </Badge>
               )}
