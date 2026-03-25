@@ -48,7 +48,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   return (
     <motion.aside 
       className={cn(
-        "absolute left-0 top-0 z-40 min-h-screen h-full transition-all duration-300",
+        "fixed left-0 top-0 z-40 h-screen transition-all duration-300 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full",
         isCollapsed ? "w-20" : "w-[297px]"
       )}
       style={{ 
