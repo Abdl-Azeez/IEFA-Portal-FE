@@ -1474,14 +1474,22 @@ export const useAdminDeleteDataCategory = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type CareerLevel = "Early career" | "Mid career" | "Senior";
+export type ProfessionalScope = "Local" | "Global";
+export type VerificationStatus = "Verified" | "Pending" | "Unverified";
 
 export interface IFProfessional {
   id: string;
   fullName: string;
+  organization?: string;
+  linkedinUrl?: string;
   role?: string;
   location?: string;
   description?: string;
   seniority?: CareerLevel;
+  resumeUrl?: string;
+  scope?: ProfessionalScope;
+  verificationStatus?: VerificationStatus;
+  isVerified?: boolean;
   profileImageUrl?: string;
   createdAt: string;
   updatedAt: string;
@@ -1493,10 +1501,15 @@ export interface IFProfessionalsListParams extends ListParams {
 
 export interface CreateIFProfessionalDto {
   fullName: string;
+  organization?: string;
+  linkedinUrl?: string;
   role?: string;
   location?: string;
   description?: string;
   seniority?: CareerLevel;
+  resumeUrl?: string;
+  scope?: ProfessionalScope;
+  verificationStatus?: VerificationStatus;
   profileImageUrl?: string;
 }
 
@@ -1509,6 +1522,27 @@ export const useProfessionals = () =>
       return data;
     },
   });
+
+export const useCreateProfessionalProfile = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: CreateIFProfessionalDto) => {
+      const { data } = await api.post<IFProfessional>("/professionals", dto);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["professionals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
+      toast({ title: "Profile submitted", description: "Your profile will appear after review." });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Submission failed",
+        variant: "destructive",
+      }),
+  });
+};
 
 export const useAdminIFProfessionals = () =>
   useQuery({

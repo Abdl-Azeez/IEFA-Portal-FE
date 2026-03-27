@@ -28,6 +28,7 @@ import {
   useAdminDeleteIFProfessional,
   type IFProfessional,
   type CareerLevel,
+  type ProfessionalScope,
   type CreateIFProfessionalDto,
 } from "@/hooks/useAdmin";
 
@@ -52,14 +53,19 @@ const LEVEL_COLORS: Record<CareerLevel, string> = {
 type LevelFilter = "All" | CareerLevel;
 
 const CAREER_LEVELS: CareerLevel[] = ["Early career", "Mid career", "Senior"];
+const SCOPE_OPTIONS: ProfessionalScope[] = ["Local", "Global"];
 
 const EMPTY_FORM: CreateIFProfessionalDto = {
   fullName: "",
+  organization: "",
+  linkedinUrl: "",
   role: "",
   location: "",
   description: "",
   seniority: "Early career",
+  scope: "Local",
   profileImageUrl: "",
+  resumeUrl: "",
 };
 
 export default function AdminIFProfessionals() {
@@ -84,11 +90,15 @@ export default function AdminIFProfessionals() {
     setEditItem(p);
     setForm({
       fullName: p.fullName,
+      organization: p.organization ?? "",
+      linkedinUrl: p.linkedinUrl ?? "",
       role: p.role ?? "",
       location: p.location ?? "",
       description: p.description ?? "",
       seniority: p.seniority ?? "Early career",
+      scope: p.scope ?? "Local",
       profileImageUrl: p.profileImageUrl ?? "",
+      resumeUrl: p.resumeUrl ?? "",
     });
     setOpenMenu(null);
     setModalOpen(true);
@@ -104,6 +114,12 @@ export default function AdminIFProfessionals() {
   function validate() {
     const errs: Record<string, string> = {};
     if (!form.fullName.trim()) errs.fullName = "Name is required";
+    if (
+      form.linkedinUrl?.trim() &&
+      !/^https?:\/\/(www\.)?linkedin\.com\/.+/i.test(form.linkedinUrl.trim())
+    ) {
+      errs.linkedinUrl = "Enter a valid LinkedIn profile URL";
+    }
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -449,7 +465,7 @@ export default function AdminIFProfessionals() {
                 htmlFor="prof-name"
                 className="block text-xs font-medium text-slate-600 mb-1"
               >
-                Full Name <span className="text-red-500">*</span>
+                Full name <span className="text-red-500">*</span>
               </label>
               <Input
                 id="prof-name"
@@ -457,12 +473,52 @@ export default function AdminIFProfessionals() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, fullName: e.target.value }))
                 }
-                placeholder="Full name"
+                placeholder="Your name"
                 className="h-9 text-sm"
               />
               {formErrors.fullName && (
                 <p className="text-xs text-red-500 mt-0.5">
                   {formErrors.fullName}
+                </p>
+              )}
+            </div>
+            <div>
+              <label
+                htmlFor="prof-organization"
+                className="block text-xs font-medium text-slate-600 mb-1"
+              >
+                Organization
+              </label>
+              <Input
+                id="prof-organization"
+                value={form.organization ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, organization: e.target.value }))
+                }
+                placeholder="Organization or institution"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="prof-linkedin"
+                className="block text-xs font-medium text-slate-600 mb-1"
+              >
+                LinkedIn profile URL
+              </label>
+              <Input
+                id="prof-linkedin"
+                type="url"
+                value={form.linkedinUrl ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, linkedinUrl: e.target.value }))
+                }
+                placeholder="https://www.linkedin.com/in/yourname"
+                className="h-9 text-sm"
+              />
+              {formErrors.linkedinUrl && (
+                <p className="text-xs text-red-500 mt-0.5">
+                  {formErrors.linkedinUrl}
                 </p>
               )}
             </div>
@@ -523,7 +579,7 @@ export default function AdminIFProfessionals() {
 
           <div>
             <p className="block text-xs font-medium text-slate-600 mb-1">
-              Profile Image
+              Picture
             </p>
             <ImageUpload
               id="prof-image"
@@ -535,29 +591,76 @@ export default function AdminIFProfessionals() {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="prof-level"
+                className="block text-xs font-medium text-slate-600 mb-1"
+              >
+                Career level
+              </label>
+              <Select
+                id="prof-level"
+                value={form.seniority ?? "Early career"}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    seniority: e.target.value as CareerLevel,
+                  }))
+                }
+              >
+                {CAREER_LEVELS.map((l) => (
+                  <option key={l} value={l}>
+                    {LEVEL_LABELS[l]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label
+                htmlFor="prof-scope"
+                className="block text-xs font-medium text-slate-600 mb-1"
+              >
+                Local / Global
+              </label>
+              <Select
+                id="prof-scope"
+                value={form.scope ?? "Local"}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    scope: e.target.value as ProfessionalScope,
+                  }))
+                }
+              >
+                {SCOPE_OPTIONS.map((scope) => (
+                  <option key={scope} value={scope}>
+                    {scope}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
           <div>
             <label
-              htmlFor="prof-level"
+              htmlFor="prof-resume"
               className="block text-xs font-medium text-slate-600 mb-1"
             >
-              Career Level
+              Resume
             </label>
-            <Select
-              id="prof-level"
-              value={form.seniority ?? "Early career"}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  seniority: e.target.value as CareerLevel,
-                }))
+            <ImageUpload
+              id="prof-resume"
+              mode="document"
+              value={form.resumeUrl ?? ""}
+              onChange={(url) =>
+                setForm((f) => ({ ...f, resumeUrl: url }))
               }
-            >
-              {CAREER_LEVELS.map((l) => (
-                <option key={l} value={l}>
-                  {LEVEL_LABELS[l]}
-                </option>
-              ))}
-            </Select>
+              previewHeight="h-28"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-1">
             <Button
               variant="outline"
               size="sm"
