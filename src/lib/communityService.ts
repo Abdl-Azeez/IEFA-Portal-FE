@@ -206,14 +206,21 @@ export interface CreateCommunityGroupDto {
 
 export type UpdateCommunityGroupDto = Partial<CreateCommunityGroupDto>;
 
+type ListResponse<T> = T[] | { data: T[] };
+
+function unwrapListResponse<T>(payload: ListResponse<T>): T[] {
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload?.data) ? payload.data : [];
+}
+
 /* ── Service functions ──────────────────────────────────────────────────── */
 
 export const communityService = {
   /* -- Categories -- */
   getCategories: () =>
     api
-      .get<CommunityCategoryAPI[]>("/community/categories")
-      .then((r) => r.data),
+      .get<ListResponse<CommunityCategoryAPI>>("/community/categories")
+      .then((r) => unwrapListResponse(r.data)),
 
   createCategory: (data: CreateCommunityCategoryDto) =>
     api
@@ -235,8 +242,8 @@ export const communityService = {
     showBookmarkedOnly?: boolean;
   }) =>
     api
-      .get<DiscussionAPI[]>("/community/discussions", { params })
-      .then((r) => r.data),
+      .get<ListResponse<DiscussionAPI>>("/community/discussions", { params })
+      .then((r) => unwrapListResponse(r.data)),
 
   getDiscussionById: (id: string) =>
     api
@@ -280,8 +287,8 @@ export const communityService = {
     search?: string;
   }) =>
     api
-      .get<DiscussionAPI[]>('/community/discussions/bookmarks', { params })
-      .then((r) => r.data),
+      .get<ListResponse<DiscussionAPI>>('/community/discussions/bookmarks', { params })
+      .then((r) => unwrapListResponse(r.data)),
 
   flagDiscussion: (discussionId: string) =>
     api
