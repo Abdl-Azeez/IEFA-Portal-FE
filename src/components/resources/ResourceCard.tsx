@@ -2,7 +2,14 @@ import { motion } from 'framer-motion'
 import { Eye, Download, Calendar, User } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import type { ResourceItem } from '@/types/resources'
+import type { ResourceItem, ResourceType } from '@/types/resources'
+
+const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
+  guide: 'Educational Guide',
+  research: 'Research',
+  standard: 'Standards & Governance',
+  tool: 'Tool',
+}
 
 interface ResourceCardProps {
   readonly resource: ResourceItem
@@ -36,7 +43,7 @@ export function ResourceCard({ resource, onPreview, onDownload, index = 0 }: Res
         )}
         <div className="absolute top-3 left-3">
           <Badge className="bg-[#D52B1E] text-white text-xs shadow-md">
-            {resource.topic ?? 'Resource'}
+            {resource.topic ?? RESOURCE_TYPE_LABELS[resource.resourceType] ?? 'Resource'}
           </Badge>
         </div>
       </div>

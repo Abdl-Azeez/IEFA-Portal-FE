@@ -26,6 +26,9 @@ export interface ResourceCategory {
   id: string
   name: string
   slug: string
+  parentId?: string | null
+  parent?: ResourceCategory | null
+  children?: ResourceCategory[]
 }
 
 /** API Resource response shape */
@@ -115,4 +118,35 @@ export interface PaginatedResponse<T> {
     hasPreviousPage: boolean
     hasNextPage: boolean
   }
+}
+
+export interface SubmitUserResourceDto {
+  title: string
+  briefIntro?: string
+  categoryId: string
+  subCategoryId?: string
+  resourceType?: ResourceType
+  /** Free-text sub-category name when user selects "Other" on General resources */
+  suggestedSubCategoryName?: string
+  /** Free-text document type name when user selects "Other" on Regulatory resources */
+  suggestedDocTypeName?: string
+  fileUrl: string
+  coverImageUrl?: string
+  authorName?: string
+}
+
+export interface UserResourceSubmission {
+  id: string
+  title: string
+  briefIntro: string | null
+  fileUrl: string
+  coverImageUrl: string | null
+  authorName: string | null
+  categoryId: string
+  category: ResourceCategory | null
+  subCategoryId: string | null
+  subCategory: ResourceCategory | null
+  status: 'pending' | 'approved' | 'rejected'
+  submittedBy?: string
+  createdAt: string
 }

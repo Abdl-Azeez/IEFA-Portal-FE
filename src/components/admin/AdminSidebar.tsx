@@ -69,7 +69,7 @@ export function AdminSidebar({ isCollapsed, onToggle }: Props) {
   return (
     <motion.aside
       className={cn(
-        'absolute left-0 top-0 z-40 min-h-screen h-full transition-all duration-300',
+        'fixed left-0 top-0 z-40 h-screen transition-all duration-300',
         isCollapsed ? 'w-20' : 'w-[280px]',
       )}
       style={{ backgroundColor: '#0f172a', boxShadow: '4px 0 24px rgba(0,0,0,0.35)' }}

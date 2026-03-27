@@ -137,7 +137,7 @@ function Pager({ page, pageCount, onPage }: Readonly<PagerProps>) {
           >
             {entry.value}
           </Button>
-        ),
+        )
       )}
       <Button
         variant="ghost"
@@ -157,16 +157,41 @@ function FeaturedSection({
   onOpen,
 }: Readonly<{ onOpen: (id: string) => void }>) {
   const { data: featured, isLoading } = useFeaturedNews();
-  const [main, ...side] = featured ?? [];
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [rotationMs, setRotationMs] = useState(() =>
+    globalThis.window?.matchMedia('(min-width: 768px)').matches ? 6500 : 4500,
+  );
+
+  const featuredItems = featured ?? [];
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const media = globalThis.window.matchMedia('(min-width: 768px)');
+    const updateRotation = () => setRotationMs(media.matches ? 6500 : 4500);
+    updateRotation();
+    media.addEventListener('change', updateRotation);
+    return () => media.removeEventListener('change', updateRotation);
+  }, []);
+
+  useEffect(() => {
+    if (activeIndex < featuredItems.length) return;
+    setActiveIndex(0);
+  }, [activeIndex, featuredItems.length]);
+
+  useEffect(() => {
+    if (featuredItems.length <= 1) return;
+    const timer = globalThis.window.setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % featuredItems.length);
+    }, rotationMs);
+    return () => globalThis.window.clearInterval(timer);
+  }, [featuredItems.length, rotationMs]);
 
   if (isLoading) {
     return (
       <motion.div variants={itemVariants} className="space-y-4">
         <div className="flex items-center gap-2">
           <div className="h-6 w-1 rounded-full bg-[#D52B1E]" />
-          <h2 className="text-xl font-bold text-[#000000]">
-            Featured This Week
-          </h2>
+          <h2 className="text-xl font-bold text-[#000000]">Featured This Week</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-4 animate-pulse">
           <div className="md:col-span-2 rounded-2xl bg-gray-200 h-[420px]" />
@@ -179,21 +204,23 @@ function FeaturedSection({
     );
   }
 
-  if (!main) return null;
+  if (featuredItems.length === 0) return null;
+
+  const main = featuredItems[activeIndex];
+  const previousMain = featuredItems[(activeIndex - 1 + featuredItems.length) % featuredItems.length];
+  const side = featuredItems
+    .map((_, idx) => featuredItems[(activeIndex + idx + 1) % featuredItems.length])
+    .filter((story, idx, arr) => arr.findIndex((s) => s.id === story.id) === idx)
+    .slice(0, 2);
 
   return (
     <motion.div variants={itemVariants} className="space-y-4">
-      {/* Label row */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <div className="h-6 w-1 rounded-full bg-[#D52B1E]" />
-          <h2 className="text-xl font-bold text-[#000000]">
-            Featured This Week
-          </h2>
+          <h2 className="text-xl font-bold text-[#000000]">Featured This Week</h2>
         </div>
-        <span className="text-sm text-[#737692]">
-          Most impactful stories of the week
-        </span>
+        <span className="text-sm text-[#737692]">Most impactful stories of the week</span>
         <div className="hidden md:flex flex-1 h-px bg-gray-100" />
         <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-0 text-xs font-semibold">
           <Star className="h-3 w-3 mr-1" />
@@ -201,68 +228,101 @@ function FeaturedSection({
         </Badge>
       </div>
 
-      {/* Magazine layout */}
       <div className="grid md:grid-cols-3 gap-4">
-        {/* Main story */}
-        <div
-          className="md:col-span-2 relative group rounded-2xl overflow-hidden h-80 md:h-[420px] bg-gray-900 cursor-pointer"
-          onClick={() => onOpen(main.id)}
-        >
-          {main.coverImageUrl ? (
-            <img
-              src={main.coverImageUrl}
-              alt={main.title}
-              className="absolute inset-0 w-full h-full object-cover opacity-55 transition-transform duration-700 group-hover:scale-105"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#D52B1E]/40 to-slate-900">
-              <BookOpen className="h-20 w-20 text-white/20" />
+        <div className="md:col-span-2 relative h-80 md:h-[420px]">
+          {featuredItems.length > 1 && previousMain.coverImageUrl && (
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+              <img
+                src={previousMain.coverImageUrl}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-20 scale-[1.03]"
+              />
+              <div className="absolute inset-0 bg-black/35" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-6">
-            <div className="flex items-center gap-2 mb-3">
-              {main.tags?.[0] && (
-                <span className="bg-[#D52B1E] text-white text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
-                  {main.tags[0].name}
-                </span>
+          <AnimatePresence mode="sync" initial={false}>
+            <motion.div
+              key={main.id}
+              className="absolute inset-0 group rounded-2xl overflow-hidden bg-gray-900 cursor-pointer"
+              initial={{ opacity: 0.35, scale: 0.985 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0.35, scale: 1.015 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              onClick={() => onOpen(main.id)}
+            >
+              {main.coverImageUrl ? (
+                <img
+                  src={main.coverImageUrl}
+                  alt={main.title}
+                  className="absolute inset-0 w-full h-full object-cover opacity-55 transition-transform duration-700 group-hover:scale-105"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#D52B1E]/40 to-slate-900">
+                  <BookOpen className="h-20 w-20 text-white/20" />
+                </div>
               )}
-              {main.tags?.[1] && (
-                <span className="text-white/55 text-xs">
-                  {main.tags[1].name}
-                </span>
-              )}
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 0.35 }}
+                animate={{ opacity: [0.35, 0.52, 0.35] }}
+                transition={{ duration: 4.8, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
+                style={{ background: 'radial-gradient(circle at 20% 25%, rgba(255,255,255,0.22), transparent 45%)' }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  {main.tags?.[0] && (
+                    <span className="bg-[#D52B1E] text-white text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                      {main.tags[0].name}
+                    </span>
+                  )}
+                  {main.tags?.[1] && <span className="text-white/55 text-xs">{main.tags[1].name}</span>}
+                </div>
+                <h3 className="text-white font-bold text-xl md:text-2xl leading-snug mb-2">{main.title}</h3>
+                {main.excerpt && <p className="text-white/65 text-sm leading-relaxed line-clamp-2 mb-4">{main.excerpt}</p>}
+                <div className="flex items-center gap-3 text-white/45 text-xs">
+                  {main.publishedAt && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {fmtDate(main.publishedAt)}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    {main.viewCount.toLocaleString()} views
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          {featuredItems.length > 1 && (
+            <div className="absolute left-4 bottom-4 z-10 flex items-center gap-1.5 rounded-full bg-black/35 backdrop-blur px-2.5 py-1.5">
+              {featuredItems.map((story, idx) => (
+                <button
+                  key={story.id}
+                  aria-label={`Show featured story ${idx + 1}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveIndex(idx);
+                  }}
+                  className={`h-1.5 rounded-full transition-all ${idx === activeIndex ? 'w-5 bg-white' : 'w-2 bg-white/50 hover:bg-white/80'}`}
+                />
+              ))}
             </div>
-            <h3 className="text-white font-bold text-xl md:text-2xl leading-snug mb-2">
-              {main.title}
-            </h3>
-            {main.excerpt && (
-              <p className="text-white/65 text-sm leading-relaxed line-clamp-2 mb-4">
-                {main.excerpt}
-              </p>
-            )}
-            <div className="flex items-center gap-3 text-white/45 text-xs">
-              {main.publishedAt && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {fmtDate(main.publishedAt)}
-                </span>
-              )}
-              <span className="flex items-center gap-1">
-                <Eye className="h-3 w-3" />
-                {main.viewCount.toLocaleString()} views
-              </span>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Side stories */}
         <div className="flex flex-col gap-4">
-          {side.slice(0, 2).map((story) => (
-            <div
+          {side.map((story, idx) => (
+            <motion.div
               key={story.id}
               className="relative group rounded-2xl overflow-hidden flex-1 bg-gray-900 min-h-[180px] cursor-pointer"
+              initial={{ opacity: 0, x: 24, scale: 0.97 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 0.55, delay: idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
               onClick={() => onOpen(story.id)}
             >
               {story.coverImageUrl ? (
@@ -281,20 +341,16 @@ function FeaturedSection({
                     {story.tags[0].name}
                   </span>
                 )}
-                <h4 className="text-white font-bold text-sm leading-snug line-clamp-2 mb-1">
-                  {story.title}
-                </h4>
+                <h4 className="text-white font-bold text-sm leading-snug line-clamp-2 mb-1">{story.title}</h4>
                 <div className="flex items-center gap-2 text-white/40 text-xs">
-                  {story.publishedAt && (
-                    <span>{fmtDate(story.publishedAt)}</span>
-                  )}
+                  {story.publishedAt && <span>{fmtDate(story.publishedAt)}</span>}
                   <span className="flex items-center gap-1">
                     <Eye className="h-3 w-3" />
                     {story.viewCount.toLocaleString()}
                   </span>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>

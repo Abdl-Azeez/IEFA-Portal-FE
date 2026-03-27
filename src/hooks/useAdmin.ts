@@ -851,6 +851,9 @@ export interface AdminResourceCategory {
   id: string;
   name: string;
   slug: string;
+  parentId?: string | null;
+  parent?: AdminResourceCategory | null;
+  children?: AdminResourceCategory[];
 }
 
 export interface AdminResource {
@@ -1107,6 +1110,121 @@ export const useAdminDeleteGlossaryTerm = () => {
         description: e.response?.data?.message ?? "Delete failed",
         variant: "destructive",
       }),
+  });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resource Categories CRUD
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const useAdminCreateResourceCategory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: { name: string; parentId?: string }) => {
+      const { data } = await api.post<AdminResourceCategory>('/resources/categories', dto);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'resources', 'categories'] });
+      qc.invalidateQueries({ queryKey: ['resources', 'categories'] });
+      toast({ title: 'Category created' });
+    },
+    onError: (e: any) =>
+      toast({ title: 'Error', description: e.response?.data?.message ?? 'Create failed', variant: 'destructive' }),
+  });
+};
+
+export const useAdminUpdateResourceCategory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, dto }: { id: string; dto: { name?: string; parentId?: string } }) => {
+      const { data } = await api.patch<AdminResourceCategory>(`/resources/categories/${id}`, dto);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'resources', 'categories'] });
+      qc.invalidateQueries({ queryKey: ['resources', 'categories'] });
+      toast({ title: 'Category updated' });
+    },
+    onError: (e: any) =>
+      toast({ title: 'Error', description: e.response?.data?.message ?? 'Update failed', variant: 'destructive' }),
+  });
+};
+
+export const useAdminDeleteResourceCategory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => api.delete(`/resources/categories/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'resources', 'categories'] });
+      qc.invalidateQueries({ queryKey: ['resources', 'categories'] });
+      toast({ title: 'Category deleted' });
+    },
+    onError: (e: any) =>
+      toast({ title: 'Error', description: e.response?.data?.message ?? 'Delete failed', variant: 'destructive' }),
+  });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending user resource submissions
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PendingResourceSubmission {
+  id: string;
+  title: string;
+  briefIntro: string | null;
+  fileUrl: string;
+  coverImageUrl: string | null;
+  authorName: string | null;
+  categoryId: string;
+  category: AdminResourceCategory | null;
+  subCategoryId: string | null;
+  subCategory: AdminResourceCategory | null;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedBy?: string;
+  submitter?: { id: string; firstName: string; lastName: string; email: string };
+  createdAt: string;
+}
+
+export const useAdminPendingResources = () =>
+  useQuery({
+    queryKey: ['admin', 'resources', 'pending'],
+    queryFn: async () => {
+      const { data } = await api.get<PendingResourceSubmission[]>('/resources/submissions/pending');
+      return data;
+    },
+  });
+
+export const useAdminApproveResource = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.patch<PendingResourceSubmission>(`/resources/submissions/${id}/approve`);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'resources', 'pending'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'resources'] });
+      toast({ title: 'Resource approved and published' });
+    },
+    onError: (e: any) =>
+      toast({ title: 'Error', description: e.response?.data?.message ?? 'Approve failed', variant: 'destructive' }),
+  });
+};
+
+export const useAdminRejectResource = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      const { data } = await api.patch<PendingResourceSubmission>(`/resources/submissions/${id}/reject`, { reason });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'resources', 'pending'] });
+      toast({ title: 'Resource rejected' });
+    },
+    onError: (e: any) =>
+      toast({ title: 'Error', description: e.response?.data?.message ?? 'Reject failed', variant: 'destructive' }),
   });
 };
 

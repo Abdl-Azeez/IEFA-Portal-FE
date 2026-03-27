@@ -1,11 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  BookOpen,
   FileText,
-  Shield,
-  Wrench,
   BookA,
   Plus,
   Search,
@@ -19,6 +16,12 @@ import {
   Upload,
   Loader2,
   Lock,
+  CheckCircle,
+  XCircle,
+  Clock,
+  FolderTree,
+  ChevronRight,
+  User,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,8 +38,15 @@ import {
   useAdminCreateGlossaryTerm,
   useAdminUpdateGlossaryTerm,
   useAdminDeleteGlossaryTerm,
+  useAdminCreateResourceCategory,
+  useAdminUpdateResourceCategory,
+  useAdminDeleteResourceCategory,
+  useAdminPendingResources,
+  useAdminApproveResource,
+  useAdminRejectResource,
   type AdminResource,
   type AdminGlossaryTerm,
+  type AdminResourceCategory,
   type AdminResourceType,
   type CreateResourceDto,
   type CreateGlossaryTermDto,
@@ -46,28 +56,42 @@ import api from '@/lib/api'
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
 const item = { hidden: { y: 14, opacity: 0 }, show: { y: 0, opacity: 1 } }
 
-/* ── Section config ─────────────────────────────────────────────────────── */
-type SectionKey = 'educational' | 'research' | 'standards' | 'tools' | 'glossary'
+/* ── View config ────────────────────────────────────────────────────────── */
+type ViewKey = 'resources' | 'glossary' | 'pending'
 
-interface SectionConfig {
-  key: SectionKey
-  label: string
-  icon: React.ElementType
-  description: string
-}
+type MajorCategoryKey = 'general' | 'regulatory'
 
-const SECTIONS: SectionConfig[] = [
-  { key: 'educational', label: 'Educational Guides',          icon: BookOpen, description: 'Introductory and explanatory guides on Islamic finance fundamentals.' },
-  { key: 'research',    label: 'Research & Publications',     icon: FileText, description: 'Academic and industry research, whitepapers, case studies and journal articles.' },
-  { key: 'standards',   label: 'Standards & Governance',      icon: Shield,   description: 'Shariah standards, regulatory frameworks, policy documents and compliance manuals.' },
-  { key: 'tools',       label: 'Tools & Practical Resources', icon: Wrench,   description: 'Financial planning templates, contract templates and downloadable worksheets.' },
+const MAJOR_CATEGORIES: Array<{ id: MajorCategoryKey; label: string }> = [
+  { id: 'general', label: 'General' },
+  { id: 'regulatory', label: 'Regulatory' },
 ]
 
-const SECTION_TO_TYPE: Record<Exclude<SectionKey, 'glossary'>, AdminResourceType> = {
-  educational: 'guide',
-  research: 'research',
-  standards: 'standard',
-  tools: 'tool',
+const REGULATORY_BODIES = [
+  { id: 'cbn', name: 'CBN', fullName: 'Central Bank of Nigeria' },
+  { id: 'sec', name: 'SEC', fullName: 'Securities & Exchange Commission' },
+  { id: 'naicom', name: 'NAICOM', fullName: 'National Insurance Commission' },
+  { id: 'ndic', name: 'NDIC', fullName: 'Nigeria Deposit Insurance Corporation' },
+] as const
+
+const DOCUMENT_TYPES = [
+  { id: 'circulars-directives', label: 'Circulars & Directives' },
+  { id: 'guidelines-frameworks', label: 'Guidelines & Frameworks' },
+  { id: 'notices-press-releases', label: 'Notices & Press Releases' },
+  { id: 'data-statistical-bulletins', label: 'Data & Statistical Bulletins' },
+  { id: 'communiques', label: 'Communiques' },
+] as const
+
+const RESOURCE_TYPE_LABELS: Record<AdminResourceType, string> = {
+  guide: 'Educational Guide',
+  research: 'Research & Publication',
+  standard: 'Standards & Governance',
+  tool: 'Tools & Practical',
+}
+
+const PENDING_STATUS_STYLE: Record<string, string> = {
+  pending: 'bg-amber-50 text-amber-700',
+  approved: 'bg-green-50 text-green-700',
+  rejected: 'bg-red-50 text-red-700',
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -79,11 +103,17 @@ const STATUS_STYLE: Record<string, string> = {
 /* ── Form types ─────────────────────────────────────────────────────────── */
 interface ResourceForm {
   title: string
+  majorCategory: MajorCategoryKey
+  resourceType: AdminResourceType
   authorName: string
   authorType: 'individual' | 'organization'
   topic: string
   briefIntro: string
   categoryId: string
+  regulatoryBodyId: string
+  docTypeId: string
+  customSubCategory: string
+  customDocType: string
   coverImageUrl: string
   fileUrl: string
   status: 'draft' | 'published' | 'archived'
@@ -91,8 +121,9 @@ interface ResourceForm {
 }
 
 const EMPTY_FORM: ResourceForm = {
-  title: '', authorName: '', authorType: 'organization', topic: '', briefIntro: '',
-  categoryId: '', coverImageUrl: '', fileUrl: '', status: 'draft', isPremium: false,
+  title: '', majorCategory: 'general', resourceType: 'guide', authorName: '', authorType: 'organization', topic: '', briefIntro: '',
+  categoryId: '', regulatoryBodyId: '', docTypeId: '', customSubCategory: '', customDocType: '',
+  coverImageUrl: '', fileUrl: '', status: 'draft', isPremium: false,
 }
 
 interface GlossaryForm { term: string; definition: string; status: 'draft' | 'published' }
@@ -103,29 +134,45 @@ export default function AdminResources() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const tabFromUrl = (new URLSearchParams(location.search).get('tab') ?? 'educational') as SectionKey
-  const validKeys: SectionKey[] = ['educational', 'research', 'standards', 'tools', 'glossary']
-  const [activeSection, setActiveSection] = useState<SectionKey>(
-    validKeys.includes(tabFromUrl) ? tabFromUrl : 'educational'
-  )
+  const params = new URLSearchParams(location.search)
+  const viewFromUrl = (params.get('tab') ?? 'resources') as ViewKey
+  const categoryFromUrl = params.get('category') ?? 'all'
+  const validViews: ViewKey[] = ['resources', 'glossary', 'pending']
 
-  const handleSetSection = (key: SectionKey) => {
-    setActiveSection(key)
-    navigate(`?tab=${key}`, { replace: true })
+  const [activeView, setActiveView] = useState<ViewKey>(
+    validViews.includes(viewFromUrl) ? viewFromUrl : 'resources'
+  )
+  const [activeCategoryId, setActiveCategoryId] = useState<string>(categoryFromUrl)
+
+  const updateRoute = (nextView: ViewKey, nextCategoryId = activeCategoryId) => {
+    const nextParams = new URLSearchParams()
+    nextParams.set('tab', nextView)
+    if (nextCategoryId !== 'all') nextParams.set('category', nextCategoryId)
+    navigate(`?${nextParams.toString()}`, { replace: true })
+  }
+
+  const handleSetView = (key: ViewKey) => {
+    setActiveView(key)
+    updateRoute(key)
     setSearch('')
     setOpenMenu(null)
   }
 
-  const currentType = activeSection !== 'glossary'
-    ? SECTION_TO_TYPE[activeSection as Exclude<SectionKey, 'glossary'>]
-    : undefined
+  const handleSetCategory = (categoryId: string) => {
+    setActiveCategoryId(categoryId)
+    updateRoute(activeView, categoryId)
+    setSearch('')
+    setOpenMenu(null)
+  }
 
   /* ── API hooks ──────────────────────────────────────────────────────── */
-  const { data: resourcesData, isLoading: resourcesLoading } = useAdminResources(
-    currentType ? { resourceType: currentType, perPage: 100 } : { perPage: 1 }
-  )
+  const resourceListParams =
+    activeCategoryId !== 'all' && activeCategoryId !== 'general' && activeCategoryId !== 'regulatory'
+      ? { perPage: 100, categoryId: activeCategoryId }
+      : { perPage: 100 }
+  const { data: resourcesData, isLoading: resourcesLoading } = useAdminResources(resourceListParams)
   const { data: glossaryData, isLoading: glossaryLoading } = useAdminGlossaryTerms(
-    activeSection === 'glossary' ? {} : { letter: 'A' }
+    activeView === 'glossary' ? {} : { letter: 'A' }
   )
   const { data: categories } = useAdminResourceCategories()
 
@@ -138,6 +185,16 @@ export default function AdminResources() {
   const createGlossTerm = useAdminCreateGlossaryTerm()
   const updateGlossTerm = useAdminUpdateGlossaryTerm()
   const deleteGlossTerm = useAdminDeleteGlossaryTerm()
+
+  /* ── Category CRUD hooks ────────────────────────────────────────────── */
+  const createCategory = useAdminCreateResourceCategory()
+  const updateCategory = useAdminUpdateResourceCategory()
+  const deleteCategory = useAdminDeleteResourceCategory()
+
+  /* ── Pending submissions hooks ──────────────────────────────────────── */
+  const { data: pendingData, isLoading: pendingLoading } = useAdminPendingResources()
+  const approveResource = useAdminApproveResource()
+  const rejectResource  = useAdminRejectResource()
 
   /* ── Local UI state ─────────────────────────────────────────────────── */
   const [search, setSearch]     = useState('')
@@ -159,11 +216,44 @@ export default function AdminResources() {
   const [bulkError, setBulkError]           = useState<string | null>(null)
   const [bulkImporting, setBulkImporting]   = useState(false)
 
+  /* ── Category form state ────────────────────────────────────────────── */
+  const [catModalOpen, setCatModalOpen]   = useState(false)
+  const [editCatId, setEditCatId]         = useState<string | null>(null)
+  const [catName, setCatName]             = useState('')
+  const [catParentId, setCatParentId]     = useState('')         // '' = top-level
+
   /* ── Derived lists ──────────────────────────────────────────────────── */
   const lc = search.toLowerCase()
-  const items = (resourcesData?.data ?? []).filter(r =>
-    !search || r.title.toLowerCase().includes(lc) || (r.authorName ?? '').toLowerCase().includes(lc)
+  const childCategories = useMemo(
+    () => (categories ?? []).filter(c => !!c.parentId).sort((a, b) => a.name.localeCompare(b.name)),
+    [categories],
   )
+  const categoryTabs = useMemo(
+    () => (categories ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [categories],
+  )
+  const isKnownCategoryId = useMemo(
+    () => new Set(categoryTabs.map(c => c.id)),
+    [categoryTabs],
+  )
+  const activeSubCategoryId = isKnownCategoryId.has(activeCategoryId) ? activeCategoryId : ''
+  const activeCategoryChildren = useMemo(
+    () => childCategories.filter(c => c.parentId === activeSubCategoryId),
+    [childCategories, activeSubCategoryId],
+  )
+  const items = (resourcesData?.data ?? [])
+    .filter(r => {
+      if (activeCategoryId === 'all') return true
+      if (activeCategoryId === 'general') return true
+      if (activeCategoryId === 'regulatory') {
+        return (r.tags ?? []).includes('major:regulatory')
+      }
+      if (isKnownCategoryId.has(activeCategoryId)) {
+        return r.categoryId === activeCategoryId || r.category?.id === activeCategoryId || r.category?.parentId === activeCategoryId
+      }
+      return true
+    })
+    .filter(r => !search || r.title.toLowerCase().includes(lc) || (r.authorName ?? '').toLowerCase().includes(lc))
   const filteredGlossary = (glossaryData ?? []).filter(g =>
     !search || g.term.toLowerCase().includes(lc)
   )
@@ -190,14 +280,28 @@ export default function AdminResources() {
   }
 
   function openEdit(r: AdminResource) {
+    const tags = r.tags ?? []
+    const majorTag = tags.find(t => t.startsWith('major:'))
+    const majorCategory: MajorCategoryKey = majorTag === 'major:regulatory' ? 'regulatory' : 'general'
+    const regulatoryBodyId = tags.find(t => t.startsWith('reg-body:'))?.replace('reg-body:', '') ?? ''
+    const docTypeId = tags.find(t => t.startsWith('doc-type:'))?.replace('doc-type:', '') ?? ''
+    const customDocType = tags.find(t => t.startsWith('doc-type-custom:'))?.replace('doc-type-custom:', '') ?? ''
+    const customSubCategory = tags.find(t => t.startsWith('general-sub-custom:'))?.replace('general-sub-custom:', '') ?? ''
+
     setEditId(r.id)
     setForm({
       title: r.title,
+      majorCategory,
+      resourceType: r.resourceType,
       authorName: r.authorName ?? '',
       authorType: r.authorType ?? 'organization',
       topic: r.topic ?? '',
       briefIntro: r.briefIntro ?? '',
       categoryId: r.categoryId ?? '',
+      regulatoryBodyId,
+      docTypeId: customDocType ? '__custom__' : docTypeId,
+      customSubCategory,
+      customDocType,
       coverImageUrl: r.coverImageUrl ?? '',
       fileUrl: r.fileUrl ?? '',
       status: r.status,
@@ -207,7 +311,7 @@ export default function AdminResources() {
   }
 
   async function saveResource() {
-    if (!form.title.trim() || !currentType) return
+    if (!form.title.trim()) return
     try {
       setUploading(true)
       let coverImageUrl = form.coverImageUrl
@@ -215,16 +319,34 @@ export default function AdminResources() {
       if (coverImageFile) coverImageUrl = await uploadFile(coverImageFile)
       if (documentFile)   fileUrl       = await uploadFile(documentFile)
 
+      const tags: string[] = [`major:${form.majorCategory}`]
+      const isGeneralCustomSub = form.majorCategory === 'general' && form.categoryId === '__custom__'
+      const isRegCustomDoc = form.majorCategory === 'regulatory' && form.docTypeId === '__custom__'
+
+      if (form.majorCategory === 'regulatory') {
+        if (form.regulatoryBodyId) tags.push(`reg-body:${form.regulatoryBodyId}`)
+        if (isRegCustomDoc && form.customDocType.trim()) tags.push(`doc-type-custom:${form.customDocType.trim()}`)
+        else if (form.docTypeId) tags.push(`doc-type:${form.docTypeId}`)
+      }
+      if (isGeneralCustomSub && form.customSubCategory.trim()) {
+        tags.push(`general-sub-custom:${form.customSubCategory.trim()}`)
+      }
+
+      const categoryId = form.majorCategory === 'general' && !isGeneralCustomSub
+        ? (form.categoryId || undefined)
+        : undefined
+
       const dto: CreateResourceDto = {
         title: form.title.trim(),
-        resourceType: currentType,
+        resourceType: form.resourceType,
         status: form.status,
         isPremium: form.isPremium,
         ...(form.authorName && { authorName: form.authorName }),
         ...(form.authorType && { authorType: form.authorType }),
         ...(form.topic      && { topic: form.topic }),
         ...(form.briefIntro && { briefIntro: form.briefIntro }),
-        ...(form.categoryId && { categoryId: form.categoryId }),
+        ...(categoryId && { categoryId }),
+        ...(tags.length > 0 && { tags }),
         ...(coverImageUrl   && { coverImageUrl }),
         ...(fileUrl         && { fileUrl }),
       }
@@ -283,40 +405,66 @@ export default function AdminResources() {
     await updateGlossTerm.mutateAsync({ id: g.id, dto: { status: newStatus } }); setOpenMenu(null)
   }
 
+  /* ── Category CRUD ──────────────────────────────────────────────────── */
+  function openCreateCategory(parentId = '') {
+    setEditCatId(null); setCatName(''); setCatParentId(parentId); setCatModalOpen(true)
+  }
+
+  function openEditCategory(cat: AdminResourceCategory) {
+    setEditCatId(cat.id)
+    setCatName(cat.name)
+    setCatParentId(cat.parentId ?? '')
+    setCatModalOpen(true)
+  }
+
+  async function saveCategory() {
+    if (!catName.trim()) return
+    const dto = { name: catName.trim(), ...(catParentId ? { parentId: catParentId } : {}) }
+    if (editCatId) {
+      await updateCategory.mutateAsync({ id: editCatId, dto })
+    } else {
+      await createCategory.mutateAsync(dto)
+    }
+    setCatModalOpen(false)
+  }
+
+  async function handleDeleteCategory(id: string) {
+    await deleteCategory.mutateAsync(id)
+  }
+
   /* ── Bulk CSV import ────────────────────────────────────────────────── */
-  function handleBulkFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleBulkFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setBulkError(null); setBulkPreview([])
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string
-      if (!text) { setBulkError('Could not read file.'); return }
-      const lines = text.split(/\r?\n/).filter(l => l.trim())
-      if (lines.length < 2) { setBulkError('File must have a header row and at least one data row.'); return }
-      const header = lines[0]
-      const delim = header.includes('\t') ? '\t' : header.includes(';') ? ';' : ','
-      const cols = header.split(delim).map(c => c.replace(/^"|"$/g, '').trim().toLowerCase())
-      const termIdx   = cols.findIndex(c => ['term', 'word', 'title'].includes(c))
-      const defIdx    = cols.findIndex(c => ['definition', 'description', 'meaning', 'desc'].includes(c))
-      const statusIdx = cols.findIndex(c => c === 'status')
-      if (termIdx === -1 || defIdx === -1) {
-        setBulkError(`Could not find 'term' and 'definition' columns. Found: ${cols.join(', ')}`)
-        return
-      }
-      const parsed: { term: string; definition: string; status: 'draft' | 'published' }[] = []
-      for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(delim).map(c => c.replace(/^"|"$/g, '').trim())
-        const term = row[termIdx]; const definition = row[defIdx]
-        if (!term || !definition) continue
-        const rawStatus = (row[statusIdx] ?? '').toLowerCase()
-        parsed.push({ term, definition, status: rawStatus === 'published' ? 'published' : 'draft' })
-      }
-      if (parsed.length === 0) { setBulkError('No valid rows found in the file.'); return }
-      setBulkPreview(parsed)
+    const targetInput = e.target
+    const text = await file.text().catch(() => null)
+    if (!text) { setBulkError('Could not read file.'); return }
+    const lines = text.split(/\r?\n/).filter(l => l.trim())
+    if (lines.length < 2) { setBulkError('File must have a header row and at least one data row.'); return }
+    const header = lines[0]
+    let delim = ','
+    if (header.includes('\t')) delim = '\t'
+    else if (header.includes(';')) delim = ';'
+    const cols = header.split(delim).map(c => c.replaceAll(/(^"|"$)/g, '').trim().toLowerCase())
+    const termIdx   = cols.findIndex(c => ['term', 'word', 'title'].includes(c))
+    const defIdx    = cols.findIndex(c => ['definition', 'description', 'meaning', 'desc'].includes(c))
+    const statusIdx = cols.indexOf('status')
+    if (termIdx === -1 || defIdx === -1) {
+      setBulkError(`Could not find 'term' and 'definition' columns. Found: ${cols.join(', ')}`)
+      return
     }
-    reader.readAsText(file)
-    e.target.value = ''
+    const parsed: { term: string; definition: string; status: 'draft' | 'published' }[] = []
+    for (let i = 1; i < lines.length; i++) {
+      const row = lines[i].split(delim).map(c => c.replaceAll(/(^"|"$)/g, '').trim())
+      const term = row[termIdx]; const definition = row[defIdx]
+      if (!term || !definition) continue
+      const rawStatus = (row[statusIdx] ?? '').toLowerCase()
+      parsed.push({ term, definition, status: rawStatus === 'published' ? 'published' : 'draft' })
+    }
+    if (parsed.length === 0) { setBulkError('No valid rows found in the file.'); return }
+    setBulkPreview(parsed)
+    targetInput.value = ''
   }
 
   async function confirmBulkImport() {
@@ -331,9 +479,64 @@ export default function AdminResources() {
     }
   }
 
+  /* ── Reject reason state ───────────────────────────────────────────── */
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [rejectTargetId, setRejectTargetId]   = useState<string | null>(null)
+  const [rejectReason, setRejectReason]       = useState('')
+
+  function openRejectModal(id: string) {
+    setRejectTargetId(id); setRejectReason(''); setRejectModalOpen(true)
+  }
+  async function confirmReject() {
+    if (!rejectTargetId) return
+    await rejectResource.mutateAsync({ id: rejectTargetId, reason: rejectReason || undefined })
+    setRejectModalOpen(false); setRejectTargetId(null); setRejectReason('')
+  }
+
   const isSaving        = uploading || createResource.isPending || updateResource.isPending
   const isGlossarySaving = createGlossTerm.isPending || updateGlossTerm.isPending
-  const isCurrentLoading = activeSection === 'glossary' ? glossaryLoading : resourcesLoading
+  let isCurrentLoading = resourcesLoading
+  if (activeView === 'glossary') isCurrentLoading = glossaryLoading
+  else if (activeView === 'pending') isCurrentLoading = pendingLoading
+  let coverImageDisplayName = coverImageFile?.name ?? 'Choose image\u2026'
+  if (!coverImageFile && form.coverImageUrl) coverImageDisplayName = 'Replace image\u2026'
+  let documentDisplayName = documentFile?.name ?? 'Choose file\u2026'
+  if (!documentFile && form.fileUrl) documentDisplayName = 'Replace file\u2026'
+
+  let mainActionClick: (() => void) = openCreate
+  let mainActionLabel = 'Upload Resource'
+  if (activeView === 'glossary') { mainActionClick = openCreateGlossary; mainActionLabel = 'Add Term' }
+
+  let sectionContent: React.ReactNode
+  if (isCurrentLoading) {
+    sectionContent = (
+      <div className="py-16 flex items-center justify-center gap-2 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Loading\u2026</span>
+      </div>
+    )
+  } else if (activeView === 'glossary') {
+    sectionContent = (
+      <GlossaryTable entries={filteredGlossary} openMenu={openMenu} setOpenMenu={setOpenMenu}
+        onEdit={openEditGlossary} onDelete={handleDeleteGlossary} onTogglePublish={toggleGlossaryPublish}
+        deleting={deleteGlossTerm.isPending} />
+    )
+  } else if (activeView === 'pending') {
+    sectionContent = (
+      <PendingTable
+        items={pendingData ?? []}
+        loading={pendingLoading}
+        onApprove={id => approveResource.mutateAsync(id)}
+        onReject={openRejectModal}
+        approving={approveResource.isPending}
+      />
+    )
+  } else {
+    sectionContent = (
+      <ResourceTable items={items} openMenu={openMenu} setOpenMenu={setOpenMenu}
+        onEdit={openEdit} onDelete={handleDeleteResource} onTogglePublish={togglePublish}
+        deleting={deleteResource.isPending} />
+    )
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -345,21 +548,23 @@ export default function AdminResources() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Resources Management</h1>
-            <p className="text-slate-500 text-sm">Manage all resource sections — guides, publications, standards, tools & glossary</p>
+            <p className="text-slate-500 text-sm">Manage resources by category, maintain glossary terms, and review pending submissions.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {activeSection === 'glossary' && (
+          {activeView === 'glossary' && (
             <Button size="sm" variant="outline" className="rounded-lg gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
               onClick={() => { setBulkImportOpen(true); setBulkPreview([]); setBulkError(null) }}>
               <Upload className="h-3.5 w-3.5" /> Bulk Import
             </Button>
           )}
-          <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
-            onClick={activeSection === 'glossary' ? openCreateGlossary : openCreate}>
-            <Plus className="h-3.5 w-3.5" />
-            {activeSection === 'glossary' ? 'Add Term' : 'Upload Resource'}
-          </Button>
+          {(activeView !== 'pending') && (
+            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
+              onClick={mainActionClick}>
+              <Plus className="h-3.5 w-3.5" />
+              {mainActionLabel}
+            </Button>
+          )}
         </div>
       </motion.div>
 
@@ -378,43 +583,142 @@ export default function AdminResources() {
         ))}
       </motion.div>
 
-      {/* Section Tabs + Table */}
+      {/* Main Content Card */}
       <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex overflow-x-auto border-b border-gray-100 scrollbar-hide">
-          {[...SECTIONS, { key: 'glossary' as SectionKey, label: 'Glossary', icon: BookA, description: '' }].map(s => (
-            <button key={s.key} onClick={() => handleSetSection(s.key)}
+          {[
+            { key: 'resources' as ViewKey, label: 'Resources', icon: Library },
+            { key: 'glossary' as ViewKey, label: 'Glossary', icon: BookA },
+            { key: 'pending' as ViewKey, label: 'Pending', icon: Clock },
+          ].map(s => (
+            <button key={s.key} onClick={() => handleSetView(s.key)}
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                activeSection === s.key
+                activeView === s.key
                   ? 'border-[#D52B1E] text-[#D52B1E] bg-[#FFEFEF]/40'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
               <s.icon className="h-4 w-4" />{s.label}
+              {s.key === 'pending' && (pendingData?.length ?? 0) > 0 && (
+                <span className="ml-1 text-xs bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">
+                  {pendingData!.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
+        {activeView === 'resources' && (
+          <div className="px-4 py-3 border-b border-gray-100 bg-slate-50/50 space-y-3">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+              <button
+                onClick={() => handleSetCategory('all')}
+                className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeCategoryId === 'all'
+                    ? 'bg-[#D52B1E] text-white'
+                    : 'bg-white text-slate-600 border border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                All Resources
+              </button>
+              {MAJOR_CATEGORIES.map(category => (
+                <button
+                  key={category.id}
+                  onClick={() => handleSetCategory(category.id)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
+                    activeCategoryId === category.id
+                      ? 'bg-[#D52B1E] text-white'
+                      : 'bg-white text-slate-600 border border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+
+            {(activeCategoryId === 'general' || isKnownCategoryId.has(activeCategoryId)) && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-slate-400 uppercase tracking-wide">General sub-categories</span>
+                {categoryTabs.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => handleSetCategory(c.id)}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 transition-colors ${
+                      activeCategoryId === c.id
+                        ? 'border-[#D52B1E] bg-[#FFEFEF] text-[#D52B1E]'
+                        : 'border-gray-200 bg-white text-slate-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeCategoryId === 'regulatory' && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-slate-400 uppercase tracking-wide">Regulatory bodies</span>
+                {REGULATORY_BODIES.map(body => (
+                  <span key={body.id} className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-slate-500">
+                    {body.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {activeSubCategoryId && activeCategoryChildren.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-slate-400 uppercase tracking-wide">Sub-categories</span>
+                {activeCategoryChildren.map(sub => (
+                  <span key={sub.id} className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-slate-500">
+                    {sub.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="p-4 border-b border-gray-50">
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input placeholder={activeSection === 'glossary' ? 'Search terms\u2026' : 'Search resources\u2026'}
-              value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-sm rounded-lg" />
+            <Input
+              placeholder={activeView === 'glossary' ? 'Search terms…' : 'Search resources…'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-9 text-sm rounded-lg"
+            />
           </div>
         </div>
 
-        {isCurrentLoading ? (
-          <div className="py-16 flex items-center justify-center gap-2 text-slate-400">
-            <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Loading\u2026</span>
+        {sectionContent}
+      </motion.div>
+
+      {/* Category Management */}
+      <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">Category Management</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Create and manage resource categories and sub-categories.</p>
           </div>
-        ) : activeSection === 'glossary' ? (
-          <GlossaryTable entries={filteredGlossary} openMenu={openMenu} setOpenMenu={setOpenMenu}
-            onEdit={openEditGlossary} onDelete={handleDeleteGlossary} onTogglePublish={toggleGlossaryPublish}
-            deleting={deleteGlossTerm.isPending} />
-        ) : (
-          <ResourceTable items={items} categories={categories ?? []} openMenu={openMenu} setOpenMenu={setOpenMenu}
-            onEdit={openEdit} onDelete={handleDeleteResource} onTogglePublish={togglePublish}
-            deleting={deleteResource.isPending} />
-        )}
+          <Button
+            size="sm"
+            onClick={() => openCreateCategory()}
+            className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-xl gap-1.5 text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Category
+          </Button>
+        </div>
+
+        <CategoriesPanel
+          categories={categories ?? []}
+          openMenu={openMenu}
+          setOpenMenu={setOpenMenu}
+          onEdit={openEditCategory}
+          onDelete={handleDeleteCategory}
+          onCreateSub={openCreateCategory}
+          deleting={deleteCategory.isPending}
+        />
       </motion.div>
 
       {/* Resource Modal */}
@@ -439,16 +743,90 @@ export default function AdminResources() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="res-topic" className="block text-xs font-medium text-slate-600 mb-1">Topic</label>
-              <Input id="res-topic" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Fundamentals" className="h-9 text-sm" />
-            </div>
-            <div>
-              <label htmlFor="res-category" className="block text-xs font-medium text-slate-600 mb-1">Category</label>
-              <Select id="res-category" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
-                <option value="">— Select category —</option>
-                {(categories ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <label htmlFor="res-major" className="block text-xs font-medium text-slate-600 mb-1">Major Category</label>
+              <Select
+                id="res-major"
+                value={form.majorCategory}
+                onChange={e => setForm(f => ({
+                  ...f,
+                  majorCategory: e.target.value as MajorCategoryKey,
+                  categoryId: '',
+                  customSubCategory: '',
+                  regulatoryBodyId: '',
+                  docTypeId: '',
+                  customDocType: '',
+                }))}
+              >
+                <option value="general">General</option>
+                <option value="regulatory">Regulatory</option>
               </Select>
             </div>
+            <div>
+              <label htmlFor="res-rtype" className="block text-xs font-medium text-slate-600 mb-1">Resource Type</label>
+              <Select id="res-rtype" value={form.resourceType} onChange={e => setForm(f => ({ ...f, resourceType: e.target.value as AdminResourceType }))}>
+                {Object.entries(RESOURCE_TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          {form.majorCategory === 'general' && (
+            <div>
+              <label htmlFor="res-category" className="block text-xs font-medium text-slate-600 mb-1">General Sub-category</label>
+              <Select id="res-category" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value, customSubCategory: '' }))}>
+                <option value="">— Select sub-category —</option>
+                {categoryTabs.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                <option value="__custom__">Other / Not listed…</option>
+              </Select>
+              {form.categoryId === '__custom__' && (
+                <Input
+                  value={form.customSubCategory}
+                  onChange={e => setForm(f => ({ ...f, customSubCategory: e.target.value }))}
+                  placeholder="Enter custom sub-category…"
+                  className="h-9 text-sm mt-2"
+                />
+              )}
+            </div>
+          )}
+
+          {form.majorCategory === 'regulatory' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="res-reg-body" className="block text-xs font-medium text-slate-600 mb-1">Regulatory Body</label>
+                <Select id="res-reg-body" value={form.regulatoryBodyId} onChange={e => setForm(f => ({ ...f, regulatoryBodyId: e.target.value }))}>
+                  <option value="">— Select body —</option>
+                  {REGULATORY_BODIES.map(b => (
+                    <option key={b.id} value={b.id}>{b.name} — {b.fullName}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="res-doc-type" className="block text-xs font-medium text-slate-600 mb-1">Document Type</label>
+                <Select id="res-doc-type" value={form.docTypeId} onChange={e => setForm(f => ({ ...f, docTypeId: e.target.value, customDocType: '' }))}>
+                  <option value="">— Select doc type —</option>
+                  {DOCUMENT_TYPES.map(dt => (
+                    <option key={dt.id} value={dt.id}>{dt.label}</option>
+                  ))}
+                  <option value="__custom__">Other / Not listed…</option>
+                </Select>
+                {form.docTypeId === '__custom__' && (
+                  <Input
+                    value={form.customDocType}
+                    onChange={e => setForm(f => ({ ...f, customDocType: e.target.value }))}
+                    placeholder="Enter custom document type…"
+                    className="h-9 text-sm mt-2"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="res-topic" className="block text-xs font-medium text-slate-600 mb-1">Topic</label>
+            <Input id="res-topic" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} placeholder="e.g. Fundamentals" className="h-9 text-sm" />
           </div>
           <div>
             <label htmlFor="res-intro" className="block text-xs font-medium text-slate-600 mb-1">Brief Introduction</label>
@@ -462,7 +840,7 @@ export default function AdminResources() {
               <label className="flex items-center gap-2 cursor-pointer w-full h-9 text-sm border border-gray-200 rounded-lg px-3 hover:bg-gray-50 transition-colors">
                 <input type="file" accept="image/*" className="sr-only" onChange={e => setCoverImageFile(e.target.files?.[0] ?? null)} />
                 <Upload className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                <span className="truncate text-gray-500">{coverImageFile ? coverImageFile.name : form.coverImageUrl ? 'Replace image\u2026' : 'Choose image\u2026'}</span>
+                <span className="truncate text-gray-500">{coverImageDisplayName}</span>
               </label>
             </div>
             <div>
@@ -470,7 +848,7 @@ export default function AdminResources() {
               <label className="flex items-center gap-2 cursor-pointer w-full h-9 text-sm border border-gray-200 rounded-lg px-3 hover:bg-gray-50 transition-colors">
                 <input type="file" accept=".pdf,.doc,.docx" className="sr-only" onChange={e => setDocumentFile(e.target.files?.[0] ?? null)} />
                 <Upload className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                <span className="truncate text-gray-500">{documentFile ? documentFile.name : form.fileUrl ? 'Replace file\u2026' : 'Choose file\u2026'}</span>
+                <span className="truncate text-gray-500">{documentDisplayName}</span>
               </label>
             </div>
           </div>
@@ -530,14 +908,58 @@ export default function AdminResources() {
         </div>
       </Dialog>
 
-      {/* Bulk Import Modal */}
+      {/* Category Modal */}
+      <Dialog open={catModalOpen} onClose={() => setCatModalOpen(false)} title={editCatId ? 'Edit Category' : 'Add Category'} maxWidth="max-w-sm">
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="cat-name" className="block text-xs font-medium text-slate-600 mb-1">Name <span className="text-red-500">*</span></label>
+            <Input id="cat-name" value={catName} onChange={e => setCatName(e.target.value)} placeholder="e.g. Regulatory" className="h-9 text-sm" />
+          </div>
+          <div>
+            <label htmlFor="cat-parent" className="block text-xs font-medium text-slate-600 mb-1">Parent Category (leave blank for top-level)</label>
+            <Select id="cat-parent" value={catParentId} onChange={e => setCatParentId(e.target.value)}>
+              <option value="">— Top-level category —</option>
+              {(categories ?? []).filter(c => !c.parentId).map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex justify-end gap-3 pt-1">
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setCatModalOpen(false)}>Cancel</Button>
+            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg" disabled={!catName.trim()} onClick={saveCategory}>
+              {editCatId ? 'Save Changes' : 'Create Category'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Reject Reason Modal */}
+      <Dialog open={rejectModalOpen} onClose={() => setRejectModalOpen(false)} title="Reject Submission" maxWidth="max-w-sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">Optionally provide a reason for rejection. This may be shown to the submitter.</p>
+          <textarea
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+            placeholder="Reason for rejection (optional)..."
+            rows={3}
+            className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-[#D52B1E]"
+          />
+          <div className="flex justify-end gap-3 pt-1">
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setRejectModalOpen(false)}>Cancel</Button>
+            <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-lg gap-1.5" onClick={confirmReject} disabled={rejectResource.isPending}>
+              {rejectResource.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Reject
+            </Button>
+          </div>
+        </div>
+      </Dialog>
       <Dialog open={bulkImportOpen} onClose={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }} title="Bulk Import Glossary Terms" maxWidth="max-w-2xl">
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
             <strong>Accepted formats:</strong> CSV or Excel (exported as CSV). Header must include <strong>term</strong> and <strong>definition</strong> columns. Optional <strong>status</strong> column. Delimiters: comma, semicolon, or tab.
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-2">Choose CSV / Excel file</label>
+            <p className="block text-xs font-medium text-slate-600 mb-2">Choose CSV / Excel file</p>
             <label className="flex items-center gap-3 cursor-pointer w-full h-24 border-2 border-dashed border-gray-200 rounded-xl px-4 hover:bg-gray-50 transition-colors">
               <input type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="sr-only" onChange={handleBulkFile} />
               <Upload className="h-6 w-6 text-gray-400 shrink-0" />
@@ -554,7 +976,7 @@ export default function AdminResources() {
           )}
           {bulkPreview.length > 0 && (
             <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">Preview \u2014 {bulkPreview.length} term{bulkPreview.length !== 1 ? 's' : ''} found</p>
+              <p className="text-sm font-semibold text-slate-700 mb-2">Preview \u2014 {bulkPreview.length} term{bulkPreview.length === 1 ? '' : 's'} found</p>
               <div className="rounded-xl border border-gray-100 overflow-hidden max-h-64 overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
@@ -594,10 +1016,245 @@ export default function AdminResources() {
   )
 }
 
+/* ── Categories Panel sub-component ────────────────────────────────────── */
+interface CategoriesPanelProps {
+  readonly categories: AdminResourceCategory[]
+  readonly openMenu: string | null
+  readonly setOpenMenu: (id: string | null) => void
+  readonly onEdit: (cat: AdminResourceCategory) => void
+  readonly onDelete: (id: string) => Promise<void>
+  readonly onCreateSub: (parentId: string) => void
+  readonly deleting: boolean
+}
+
+function CategoriesPanel({ categories, openMenu, setOpenMenu, onEdit, onDelete, onCreateSub, deleting }: CategoriesPanelProps) {
+  const generalSubCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name))
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="border border-gray-100 rounded-xl overflow-hidden bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-red-50 to-white border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <FolderTree className="h-4 w-4 text-[#D52B1E]" />
+            <span className="font-semibold text-slate-800 text-sm">General</span>
+            <span className="text-[11px] font-medium text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
+              Group
+            </span>
+            <span className="text-xs text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">
+              {generalSubCategories.length} sub-categor{generalSubCategories.length === 1 ? 'y' : 'ies'}
+            </span>
+          </div>
+          <button
+            onClick={() => onCreateSub('')}
+            className="flex items-center gap-1 text-xs text-[#D52B1E] font-medium hover:underline"
+          >
+            <Plus className="h-3 w-3" /> Add General Sub-category
+          </button>
+        </div>
+
+        {generalSubCategories.length === 0 ? (
+          <div className="px-4 py-3 text-xs text-slate-400 italic">No general sub-categories yet.</div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {generalSubCategories.map(cat => (
+              <div key={cat.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <div className="flex items-center gap-2 text-sm text-slate-700">
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+                  {cat.name}
+                </div>
+                <div className="relative">
+                  <button onClick={() => setOpenMenu(openMenu === cat.id ? null : cat.id)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {openMenu === cat.id && (
+                    <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-100 rounded-xl shadow-xl z-10 py-1 text-sm">
+                      <button onClick={() => onEdit(cat)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
+                        <Edit className="h-3.5 w-3.5 text-blue-600" /> Edit
+                      </button>
+                      <hr className="my-1 border-gray-100" />
+                      <button onClick={() => onDelete(cat.id)} disabled={deleting} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600 disabled:opacity-50">
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="border border-gray-100 rounded-xl overflow-hidden bg-white shadow-sm">
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-white border-b border-gray-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <FolderTree className="h-4 w-4 text-[#D52B1E]" />
+            <span className="font-semibold text-slate-800 text-sm">Regulatory</span>
+            <span className="text-[11px] font-medium text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-full">Group</span>
+            <span className="text-xs text-slate-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full">FE-defined</span>
+            <span className="text-xs text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">{REGULATORY_BODIES.length} bodies</span>
+            <span className="text-xs text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">{DOCUMENT_TYPES.length} doc types</span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">Regulatory bodies and document types are currently frontend-defined until backend support is ready.</p>
+        </div>
+        <div className="px-4 py-3 space-y-3 text-sm">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">Bodies</p>
+            <div className="flex flex-wrap gap-2">
+              {REGULATORY_BODIES.map(body => (
+                <span key={body.id} className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-slate-600">
+                  {body.name}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">Document Types</p>
+            <div className="flex flex-wrap gap-2">
+              {DOCUMENT_TYPES.map(dt => (
+                <span key={dt.id} className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-slate-600">
+                  {dt.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Pending Submissions sub-component ──────────────────────────────────── */
+interface PendingTableProps {
+  readonly items: import('@/hooks/useAdmin').PendingResourceSubmission[]
+  readonly loading: boolean
+  readonly onApprove: (id: string) => Promise<unknown>
+  readonly onReject: (id: string) => void
+  readonly approving: boolean
+}
+
+function PendingTable({ items, loading, onApprove, onReject, approving }: PendingTableProps) {
+  if (loading) {
+    return (
+      <div className="py-16 flex items-center justify-center gap-2 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Loading pending submissions…</span>
+      </div>
+    )
+  }
+  if (items.length === 0) {
+    return (
+      <div className="py-16 text-center text-slate-400">
+        <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-300" />
+        <p className="text-sm font-medium text-slate-600">No pending submissions</p>
+        <p className="text-xs mt-1">All user-submitted resources have been reviewed.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+          <tr>
+            <th className="px-4 py-3 text-left">Resource</th>
+            <th className="px-4 py-3 text-left hidden md:table-cell">Category</th>
+            <th className="px-4 py-3 text-left hidden sm:table-cell">Submitted By</th>
+            <th className="px-4 py-3 text-left">Status</th>
+            <th className="px-4 py-3 text-left hidden md:table-cell">Date</th>
+            <th className="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {items.map(sub => (
+            <tr key={sub.id} className="hover:bg-slate-50/50">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-[#D52B1E] shrink-0" />
+                  <div>
+                    <p className="font-medium text-slate-800 line-clamp-1">{sub.title}</p>
+                    {sub.briefIntro && (
+                      <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{sub.briefIntro}</p>
+                    )}
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-3 hidden md:table-cell">
+                <div className="flex flex-col gap-0.5">
+                  {sub.category && (
+                    <Badge variant="outline" className="text-xs border-gray-200 text-slate-500 w-fit">
+                      {sub.category.name}
+                    </Badge>
+                  )}
+                  {sub.subCategory && (
+                    <Badge variant="outline" className="text-xs border-gray-100 text-slate-400 w-fit">
+                      {sub.subCategory.name}
+                    </Badge>
+                  )}
+                </div>
+              </td>
+              <td className="px-4 py-3 text-slate-500 text-xs hidden sm:table-cell">
+                <div className="flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 shrink-0" />
+                  {sub.submitter
+                    ? `${sub.submitter.firstName} ${sub.submitter.lastName}`
+                    : sub.authorName ?? '—'}
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${PENDING_STATUS_STYLE[sub.status] ?? ''}`}>
+                  {sub.status}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-slate-400 text-xs hidden md:table-cell">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(sub.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-right">
+                {sub.status === 'pending' && (
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => onApprove(sub.id)}
+                      disabled={approving}
+                      title="Approve"
+                      className="p-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 disabled:opacity-50 transition-colors"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onReject(sub.id)}
+                      title="Reject"
+                      className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                    {sub.fileUrl && (
+                      <a
+                        href={sub.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View file"
+                        className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                )}
+                {sub.status !== 'pending' && (
+                  <span className="text-xs text-slate-400 italic">Reviewed</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 /* ── Resource Table sub-component ───────────────────────────────────────── */
 interface ResourceTableProps {
   readonly items: AdminResource[]
-  readonly categories: { id: string; name: string }[]
   readonly openMenu: string | null
   readonly setOpenMenu: (id: string | null) => void
   readonly onEdit: (r: AdminResource) => void
@@ -621,6 +1278,7 @@ function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onToggl
         <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
           <tr>
             <th className="px-4 py-3 text-left">Resource</th>
+            <th className="px-4 py-3 text-left hidden md:table-cell">Type</th>
             <th className="px-4 py-3 text-left hidden md:table-cell">Category</th>
             <th className="px-4 py-3 text-left hidden sm:table-cell">Author</th>
             <th className="px-4 py-3 text-left hidden sm:table-cell">Views</th>
@@ -640,6 +1298,11 @@ function ResourceTable({ items, openMenu, setOpenMenu, onEdit, onDelete, onToggl
                   {r.isPremium && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
                 </div>
                 {r.topic && <p className="text-xs text-slate-400 mt-0.5 ml-6">{r.topic}</p>}
+              </td>
+              <td className="px-4 py-3 hidden md:table-cell">
+                <Badge variant="outline" className="text-xs border-gray-200 text-slate-500">
+                  {RESOURCE_TYPE_LABELS[r.resourceType]}
+                </Badge>
               </td>
               <td className="px-4 py-3 hidden md:table-cell">
                 {r.category

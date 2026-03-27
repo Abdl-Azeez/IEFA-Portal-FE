@@ -7,6 +7,8 @@ import type {
   GlossaryTerm,
   GlossaryFilters,
   PaginatedResponse,
+  SubmitUserResourceDto,
+  UserResourceSubmission,
 } from '@/types/resources'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,9 +102,16 @@ export const useTrackResourceDownload = () =>
     },
   })
 
+// Submit a user resource for admin approval
+export const useSubmitUserResource = () =>
+  useMutation({
+    mutationFn: async (dto: SubmitUserResourceDto) => {
+      const { data } = await api.post<UserResourceSubmission>('/resources/submissions', dto)
+      return data
+    },
+  })
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin mutations — also exported here for convenience
 // (mirrored in useAdmin.ts with the "admin" query key prefix)
 // ─────────────────────────────────────────────────────────────────────────────
-
-export { } // ensure file is treated as a module

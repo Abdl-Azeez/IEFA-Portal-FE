@@ -12,7 +12,13 @@ interface OptionData {
 function parseOptions(children: React.ReactNode): OptionData[] {
   const options: OptionData[] = [];
   React.Children.forEach(children, (child) => {
-    if (!React.isValidElement(child) || child.type !== "option") return;
+    if (!React.isValidElement(child)) return;
+    // Recurse into fragments so wrapped <option> groups are found
+    if (child.type === React.Fragment) {
+      options.push(...parseOptions((child.props as { children?: React.ReactNode }).children));
+      return;
+    }
+    if (child.type !== "option") return;
     const p = child.props as {
       value?: string;
       children?: React.ReactNode;
