@@ -46,61 +46,71 @@ import {
 
 // ─── Colour System ────────────────────────────────────────────────────────────
 export const COLORS = {
-  teal:        '#0D9488',
+  // Brand identity
+  brandRed:    '#E3261C',
+  deepRed:     '#A31612',
+  // Financial semantic
+  teal:        '#0F9D8A',
   tealLight:   '#14B8A6',
-  ocean:       '#0891B2',
-  oceanLight:  '#06B6D4',
+  emerald:     '#16A34A',
+  emeraldLight:'#22C55E',
+  gold:        '#D4A017',
+  goldLight:   '#F59E0B',
   purple:      '#7C3AED',
   purpleLight: '#8B5CF6',
-  gold:        '#D97706',
-  goldLight:   '#F59E0B',
+  ocean:       '#0891B2',
+  oceanLight:  '#06B6D4',
   crimson:     '#DC2626',
-  emerald:     '#059669',
+  controlledRed:'#DC2626',
+  // Surfaces
+  pageBg:      '#F8EFEF',
   cardBg:      '#FFFFFF',
-  cardBorder:  '#E5E7EB',
+  cardTint:    '#F6FCFA',
+  cardBorder:  '#E9E5E5',
   cardBorder2: '#D1D5DB',
-  pageBg:      '#FEF2F2',
-  textPrimary: '#111827',
-  textSecond:  '#6B7280',
-  textMuted:   '#9CA3AF',
+  // Typography
+  textPrimary: '#101828',
+  textSecond:  '#667085',
+  textMuted:   '#98A2B3',
+  // Chart
   projected:   '#F59E0B',
 } as const
 
 // ─── Nivo Shared Theme ────────────────────────────────────────────────────────
 const NIVO_THEME = {
   background: 'transparent',
-  text: { fill: '#6B7280', fontSize: 11, fontFamily: 'inherit' },
+  text: { fill: '#667085', fontSize: 11, fontFamily: 'inherit' },
   axis: {
-    ticks:  { text: { fill: '#6B7280', fontSize: 10 } },
-    legend: { text: { fill: '#6B7280', fontSize: 12 } },
+    ticks:  { text: { fill: '#667085', fontSize: 10 } },
+    legend: { text: { fill: '#667085', fontSize: 12, fontWeight: 500 } },
   },
-  grid:    { line: { stroke: '#E5E7EB', strokeWidth: 1 } },
+  grid:    { line: { stroke: '#E9E5E580', strokeWidth: 1 } },
   tooltip: {
     container: {
       background:   '#FFFFFF',
-      color:        '#111827',
+      color:        '#101828',
       fontSize:     12,
-      border:       '1px solid #E5E7EB',
-      borderRadius: 8,
-      padding:      '8px 12px',
-      boxShadow:    '0 4px 12px rgba(0,0,0,0.08)',
+      border:       '1px solid #E9E5E5',
+      borderRadius: 10,
+      padding:      '10px 14px',
+      boxShadow:    '0 4px 16px rgba(0,0,0,0.06)',
     },
   },
-  legends: { text: { fill: '#6B7280', fontSize: 11 } },
+  legends: { text: { fill: '#667085', fontSize: 11 } },
 }
 
 // ─── Recharts Tooltip Style ───────────────────────────────────────────────────
 const RECHARTS_TOOLTIP_STYLE = {
   contentStyle: {
     backgroundColor: '#FFFFFF',
-    border:          '1px solid #E5E7EB',
-    borderRadius:    8,
-    color:           '#111827',
+    border:          '1px solid #E9E5E5',
+    borderRadius:    10,
+    color:           '#101828',
     fontSize:        12,
-    boxShadow:       '0 4px 12px rgba(0,0,0,0.08)',
+    boxShadow:       '0 4px 16px rgba(0,0,0,0.06)',
   },
-  labelStyle: { color: '#0D9488', fontWeight: 600 as const },
-  itemStyle:  { color: '#111827' },
+  labelStyle: { color: '#0F9D8A', fontWeight: 600 as const },
+  itemStyle:  { color: '#101828' },
 }
 
 // ─── All Data ─────────────────────────────────────────────────────────────────
@@ -114,11 +124,11 @@ const ISLAMIC_DATA = {
       countriesCovered:  140,
     },
     assetsBySector: [
-      { id: 'Islamic Banking', label: 'Islamic Banking', value: 4318, share: 72, color: '#0D9488' },
-      { id: 'Sukuk',           label: 'Sukuk',           value: 1031, share: 17, color: '#0891B2' },
+      { id: 'Islamic Banking', label: 'Islamic Banking', value: 4318, share: 72, color: '#0F9D8A' },
+      { id: 'Sukuk',           label: 'Sukuk',           value: 1031, share: 17, color: '#16A34A' },
       { id: 'Islamic Funds',   label: 'Islamic Funds',   value: 308,  share: 5,  color: '#7C3AED' },
-      { id: 'Other IFIs',      label: 'Other IFIs',      value: 193,  share: 3,  color: '#D97706' },
-      { id: 'Takaful',         label: 'Takaful',         value: 136,  share: 2,  color: '#DC2626' },
+      { id: 'Other IFIs',      label: 'Other IFIs',      value: 193,  share: 3,  color: '#E3261C' },
+      { id: 'Takaful',         label: 'Takaful',         value: 136,  share: 2,  color: '#D4A017' },
     ],
     assetsGrowth: [
       { year: '2018', value: 2505, projected: false },
@@ -203,25 +213,25 @@ const ISLAMIC_DATA = {
       oicCountriesAssetShare: 98,
     },
     sectorBreakdown: [
-      { sector: 'Islamic Banking', totalAssets: 'US$4.3tn', sharePercent: 72, institutionsLabel: '681 Banks',          color: '#0D9488' },
-      { sector: 'Sukuk',           totalAssets: 'US$1.0tn', sharePercent: 17, institutionsLabel: '4,712 Outstanding',  color: '#0891B2' },
+      { sector: 'Islamic Banking', totalAssets: 'US$4.3tn', sharePercent: 72, institutionsLabel: '681 Banks',          color: '#0F9D8A' },
+      { sector: 'Sukuk',           totalAssets: 'US$1.0tn', sharePercent: 17, institutionsLabel: '4,712 Outstanding',  color: '#16A34A' },
       { sector: 'Islamic Funds',   totalAssets: 'US$308bn', sharePercent: 5,  institutionsLabel: '2,610 Outstanding',  color: '#7C3AED' },
-      { sector: 'Other IFIs',      totalAssets: 'US$193bn', sharePercent: 3,  institutionsLabel: '1,179 Institutions', color: '#D97706' },
-      { sector: 'Takaful',         totalAssets: 'US$136bn', sharePercent: 2,  institutionsLabel: '395 Operators',      color: '#DC2626' },
+      { sector: 'Other IFIs',      totalAssets: 'US$193bn', sharePercent: 3,  institutionsLabel: '1,179 Institutions', color: '#E3261C' },
+      { sector: 'Takaful',         totalAssets: 'US$136bn', sharePercent: 2,  institutionsLabel: '395 Operators',      color: '#D4A017' },
     ],
     institutionBreakdown: {
       fullyFledged: { count: 1376, shareOfAssets: 86, label: 'Fully-Fledged' },
       windows:      { count: 877,  shareOfAssets: 14, label: 'Windows'       },
     },
     regionalDistribution: [
-      { id: 'GCC',              label: 'GCC',              value: 39,   color: '#0D9488' },
-      { id: 'Other MENA',       label: 'Other MENA',       value: 39,   color: '#0891B2' },
+      { id: 'GCC',              label: 'GCC',              value: 39,   color: '#0F9D8A' },
+      { id: 'Other MENA',       label: 'Other MENA',       value: 39,   color: '#16A34A' },
       { id: 'Southeast Asia',   label: 'Southeast Asia',   value: 16,   color: '#7C3AED' },
-      { id: 'Europe',           label: 'Europe',           value: 3,    color: '#D97706' },
-      { id: 'South Asia',       label: 'South Asia',       value: 2,    color: '#DC2626' },
-      { id: 'Sub-Saharan Afr.', label: 'Sub-Saharan Afr.', value: 0.25, color: '#059669' },
-      { id: 'Americas',         label: 'Americas',         value: 0.22, color: '#9333EA' },
-      { id: 'Other Asia',       label: 'Other Asia',       value: 0.05, color: '#F59E0B' },
+      { id: 'Europe',           label: 'Europe',           value: 3,    color: '#D4A017' },
+      { id: 'South Asia',       label: 'South Asia',       value: 2,    color: '#E3261C' },
+      { id: 'Sub-Saharan Afr.', label: 'Sub-Saharan Afr.', value: 0.25, color: '#0891B2' },
+      { id: 'Americas',         label: 'Americas',         value: 0.22, color: '#8B5CF6' },
+      { id: 'Other Asia',       label: 'Other Asia',       value: 0.05, color: '#98A2B3' },
     ],
   },
 
@@ -264,12 +274,12 @@ const ISLAMIC_DATA = {
       { country: 'Bangladesh',   value: 50,   flag: '🇧🇩' },
     ],
     regionalAssets: [
-      { id: 'Other MENA',    label: 'Other MENA',    value: 2095, color: '#0891B2' },
-      { id: 'GCC',           label: 'GCC',           value: 1660, color: '#0D9488' },
+      { id: 'Other MENA',    label: 'Other MENA',    value: 2095, color: '#16A34A' },
+      { id: 'GCC',           label: 'GCC',           value: 1660, color: '#0F9D8A' },
       { id: 'Southeast Asia',label: 'Southeast Asia',value: 380,  color: '#7C3AED' },
-      { id: 'South Asia',    label: 'South Asia',    value: 92,   color: '#DC2626' },
-      { id: 'Europe',        label: 'Europe',        value: 85,   color: '#D97706' },
-      { id: 'Other',         label: 'Other',         value: 6,    color: '#6B7280' },
+      { id: 'South Asia',    label: 'South Asia',    value: 92,   color: '#E3261C' },
+      { id: 'Europe',        label: 'Europe',        value: 85,   color: '#D4A017' },
+      { id: 'Other',         label: 'Other',         value: 6,    color: '#98A2B3' },
     ],
   },
 
@@ -308,10 +318,10 @@ const ISLAMIC_DATA = {
       { country: 'Brunei Darussalam', value: 0.5, flag: '🇧🇳' },
     ],
     regionalAssets: [
-      { id: 'Other MENA',    label: 'Other MENA',    value: 73, color: '#0891B2' },
+      { id: 'Other MENA',    label: 'Other MENA',    value: 73, color: '#16A34A' },
       { id: 'Southeast Asia',label: 'Southeast Asia',value: 31, color: '#7C3AED' },
-      { id: 'GCC',           label: 'GCC',           value: 28, color: '#0D9488' },
-      { id: 'Other',         label: 'Other',         value: 3,  color: '#6B7280' },
+      { id: 'GCC',           label: 'GCC',           value: 28, color: '#0F9D8A' },
+      { id: 'Other',         label: 'Other',         value: 3,  color: '#98A2B3' },
     ],
     emergingMarkets: [
       {
@@ -389,11 +399,11 @@ const ISLAMIC_DATA = {
       { country: 'Pakistan',     value: 2,  flag: '🇵🇰' },
     ],
     regionalAssets: [
-      { id: 'GCC',           label: 'GCC',           value: 94, color: '#0D9488' },
+      { id: 'GCC',           label: 'GCC',           value: 94, color: '#0F9D8A' },
       { id: 'Southeast Asia',label: 'Southeast Asia',value: 51, color: '#7C3AED' },
-      { id: 'Other MENA',    label: 'Other MENA',    value: 37, color: '#0891B2' },
-      { id: 'Europe',        label: 'Europe',        value: 7,  color: '#D97706' },
-      { id: 'Other',         label: 'Other',         value: 3,  color: '#6B7280' },
+      { id: 'Other MENA',    label: 'Other MENA',    value: 37, color: '#16A34A' },
+      { id: 'Europe',        label: 'Europe',        value: 7,  color: '#D4A017' },
+      { id: 'Other',         label: 'Other',         value: 3,  color: '#98A2B3' },
     ],
     composition: [
       {
@@ -406,14 +416,14 @@ const ISLAMIC_DATA = {
       {
         title: 'Islamic Development Finance',
         icon: 'Globe2',
-        accent: '#0891B2',
+        accent: '#0F9D8A',
         description: 'Multilateral and bilateral development institutions including IsDB Group entities, ICD, and regional development banks operating on Shariah principles.',
         countries: '🌍 GCC-based institutions dominate',
       },
       {
         title: 'Islamic Leasing & Microfinance',
         icon: 'Layers',
-        accent: '#059669',
+        accent: '#16A34A',
         description: 'Ijarah-based leasing companies and Shariah-compliant microfinance institutions serving underbanked populations across Southeast Asia and Sub-Saharan Africa.',
         countries: '🇲🇾 🇧🇩 🇮🇩 Growing rapidly',
       },
@@ -457,12 +467,12 @@ const ISLAMIC_DATA = {
       { country: 'Kuwait',       value: 11,  flag: '🇰🇼' },
     ],
     regionalOutstanding: [
-      { id: 'GCC',           label: 'GCC',           value: 477, color: '#0D9488' },
+      { id: 'GCC',           label: 'GCC',           value: 477, color: '#0F9D8A' },
       { id: 'Southeast Asia',label: 'Southeast Asia',value: 452, color: '#7C3AED' },
-      { id: 'Europe',        label: 'Europe',        value: 35,  color: '#D97706' },
-      { id: 'South Asia',    label: 'South Asia',    value: 30,  color: '#DC2626' },
-      { id: 'Other MENA',    label: 'Other MENA',    value: 28,  color: '#0891B2' },
-      { id: 'Other',         label: 'Other',         value: 8,   color: '#6B7280' },
+      { id: 'Europe',        label: 'Europe',        value: 35,  color: '#D4A017' },
+      { id: 'South Asia',    label: 'South Asia',    value: 30,  color: '#E3261C' },
+      { id: 'Other MENA',    label: 'Other MENA',    value: 28,  color: '#16A34A' },
+      { id: 'Other',         label: 'Other',         value: 8,   color: '#98A2B3' },
     ],
   },
 
@@ -505,12 +515,12 @@ const ISLAMIC_DATA = {
       { country: 'Indonesia',     value: 3,   flag: '🇮🇩' },
     ],
     regionalAuM: [
-      { id: 'Other MENA',    label: 'Other MENA',    value: 103, color: '#0891B2' },
-      { id: 'GCC',           label: 'GCC',           value: 77,  color: '#0D9488' },
-      { id: 'Europe',        label: 'Europe',        value: 64,  color: '#D97706' },
+      { id: 'Other MENA',    label: 'Other MENA',    value: 103, color: '#16A34A' },
+      { id: 'GCC',           label: 'GCC',           value: 77,  color: '#0F9D8A' },
+      { id: 'Europe',        label: 'Europe',        value: 64,  color: '#D4A017' },
       { id: 'Southeast Asia',label: 'Southeast Asia',value: 40,  color: '#7C3AED' },
-      { id: 'Americas',      label: 'Americas',      value: 11,  color: '#DC2626' },
-      { id: 'Other',         label: 'Other',         value: 13,  color: '#6B7280' },
+      { id: 'Americas',      label: 'Americas',      value: 11,  color: '#E3261C' },
+      { id: 'Other',         label: 'Other',         value: 13,  color: '#98A2B3' },
     ],
     innovation: [
       {
@@ -609,26 +619,27 @@ function KPICard({
 
   return (
     <div
-      className="relative h-28 flex items-center gap-4 bg-white border border-gray-200 rounded-2xl px-5 transition-all duration-300 hover:shadow-lg group overflow-hidden cursor-default"
+      className="relative flex items-center gap-5 bg-white border rounded-xl px-6 py-5 transition-all duration-300 hover:shadow-md group overflow-hidden cursor-default"
+      style={{ borderColor: '#E9E5E5' }}
     >
-      {/* Hover glow border */}
+      {/* Accent top line */}
       <div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none"
-        style={{ boxShadow: `inset 0 0 0 1px ${accentColor}50` }}
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}40)` }}
       />
       {/* Icon */}
       <div
         className="shrink-0 h-12 w-12 rounded-xl flex items-center justify-center"
-        style={{ backgroundColor: `${accentColor}20` }}
+        style={{ backgroundColor: `${accentColor}12`, border: `1px solid ${accentColor}25` }}
       >
-        <Icon className="h-6 w-6" style={{ color: accentColor }} />
+        <Icon className="h-5 w-5" style={{ color: accentColor }} />
       </div>
       {/* Text */}
       <div className="min-w-0 flex-1">
-        <p aria-live="polite" className="text-3xl font-bold text-gray-900 leading-none mb-1 truncate">{displayValue}</p>
-        <p className="text-sm text-gray-500">{label}</p>
+        <p className="text-xs font-medium tracking-wide uppercase mb-1.5" style={{ color: '#667085' }}>{label}</p>
+        <p aria-live="polite" className="text-2xl font-bold leading-none mb-1 truncate" style={{ color: '#101828' }}>{displayValue}</p>
         {subtitle && (
-          <p className="text-xs mt-0.5 font-medium" style={{ color: accentColor }}>
+          <p className="text-[11px] mt-1 font-medium" style={{ color: '#98A2B3' }}>
             {subtitle}
           </p>
         )}
@@ -650,28 +661,28 @@ function SectionHeader({ icon: Icon, title, subtitle, accentColor }: Readonly<Se
       <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
         <div className="flex items-center gap-3">
           <div
-            className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ backgroundColor: `${accentColor}20` }}
+            className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
+            style={{ backgroundColor: `${accentColor}12`, border: `1px solid ${accentColor}25` }}
           >
             <Icon className="h-5 w-5" style={{ color: accentColor }} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-900 leading-tight">{title}</h2>
-            <p className="text-sm text-gray-500 leading-tight">{subtitle}</p>
+            <h2 className="text-xl font-bold leading-tight" style={{ color: '#101828' }}>{title}</h2>
+            <p className="text-sm leading-tight" style={{ color: '#667085' }}>{subtitle}</p>
           </div>
         </div>
-        <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 rounded-full px-3 py-1 shrink-0">
+        <span className="text-xs border rounded-full px-3 py-1 shrink-0" style={{ color: '#98A2B3', borderColor: '#E9E5E5', backgroundColor: '#F8EFEF' }}>
           Source: ICD-LSEG IFDR 2025
         </span>
       </div>
-      <div className="h-px" style={{ backgroundColor: `${accentColor}4D` }} />
+      <div className="h-px" style={{ background: `linear-gradient(90deg, ${accentColor}40, transparent)` }} />
     </div>
   )
 }
 
 function ProjectedBadge() {
   return (
-    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-xs rounded-full px-2 py-0.5 font-medium">
+    <span className="inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 font-medium" style={{ backgroundColor: '#D4A01715', color: '#D4A017', border: '1px solid #D4A01730' }}>
       📊 Projected
     </span>
   )
@@ -687,10 +698,10 @@ function SectionCard({ title, children, className = '' }: Readonly<SectionCardPr
   const hasContent = React.Children.count(children) > 0
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-2xl p-5 ${className}`} role="region" aria-label={title}>
-      <p className="text-gray-600 text-sm font-semibold mb-4">{title}</p>
+    <div className={`bg-white border rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`} style={{ borderColor: '#E9E5E5' }} role="region" aria-label={title}>
+      <p className="text-sm font-semibold mb-4" style={{ color: '#667085' }}>{title}</p>
       <p className="sr-only">{title}</p>
-      {hasContent ? children : <p className="py-8 text-center text-xs text-gray-400">No data available for this metric</p>}
+      {hasContent ? children : <p className="py-8 text-center text-xs" style={{ color: '#98A2B3' }}>No data available for this metric</p>}
     </div>
   )
 }
@@ -727,17 +738,17 @@ function CountryBar({
   }, [pct, delay])
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-600 flex items-center gap-1.5 min-w-0">
+        <span className="flex items-center gap-1.5 min-w-0" style={{ color: '#667085' }}>
           <span className="text-base leading-none shrink-0">{flag}</span>
-          <span className="truncate">{country}</span>
+          <span className="truncate font-medium">{country}</span>
         </span>
-        <span className="text-gray-500 text-xs font-medium shrink-0 ml-2">
+        <span className="text-xs font-semibold shrink-0 ml-2" style={{ color: '#101828' }}>
           {displayValue ?? (value >= 1000 ? `US$${(value / 1000).toFixed(1)}tn` : `${value}${unit === 'bn' ? 'bn' : unit}`.startsWith('US$') ? `${value}${unit}` : `US$${value}${unit === 'US$bn' ? 'bn' : unit}`)}
         </span>
       </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#E9E5E5' }}>
         <div
           className="h-full rounded-full"
           style={{
@@ -758,7 +769,8 @@ function DownloadButton() {
     <button
       aria-label="Download section data"
       onClick={() => console.log('Download triggered')}
-      className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-2 transition-colors duration-200"
+      className="flex items-center gap-1.5 text-xs hover:bg-gray-50 border rounded-lg px-3 py-2 transition-colors duration-200"
+      style={{ color: '#667085', borderColor: '#E9E5E5' }}
     >
       <Download className="h-3.5 w-3.5" />
       Download Data
@@ -849,8 +861,8 @@ function RechartsDarkTooltip({
   const point = payload[0].payload
 
   return (
-    <div className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-teal-700">{label}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>{label}</div>
       <div>{formatUsdValue(payload[0].value)}</div>
       {point?.projected && (
         <div className="mt-2">
@@ -871,8 +883,8 @@ function GlobalGlanceCountryTooltip({
   const match = ISLAMIC_DATA.globalGlance.topCountriesByAssets.find((item) => item.country === id)
 
   return (
-    <div className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-teal-700">
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>
         {match ? `${match.flag} ${match.country}` : id}
       </div>
       <div>{formatUsdValue(Number(value))}</div>
@@ -924,11 +936,11 @@ function GlobalOverviewPieTooltip({
   const isDominantRegion = datum.id === 'GCC' || datum.id === 'Other MENA'
 
   return (
-    <div className="rounded-xl border border-cyan-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-cyan-700">{datum.id}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>{datum.id}</div>
       <div>{datum.value}% share of global IF assets</div>
       {isDominantRegion && (
-        <div className="mt-1 text-gray-500">
+        <div className="mt-1" style={{ color: '#98A2B3' }}>
           GCC &amp; MENA together = {ISLAMIC_DATA.globalOverview.headline.gccMenaShare}% of global IF assets
         </div>
       )}
@@ -997,7 +1009,7 @@ function CircularProgressRing({
   return (
     <div className="relative flex h-40 items-center justify-center">
       <svg width="140" height="140" viewBox="0 0 140 140" className="-rotate-90">
-        <circle cx="70" cy="70" r={radius} fill="none" stroke={COLORS.cardBorder} strokeWidth={strokeWidth} />
+        <circle cx="70" cy="70" r={radius} fill="none" stroke="#E9E5E5" strokeWidth={strokeWidth} />
         <circle
           cx="70"
           cy="70"
@@ -1175,8 +1187,8 @@ function BankingGrowthTooltip({
   }
 
   return (
-    <div className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-teal-700">{label}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>{label}</div>
       <div>{formatUsdValue(item.value)}</div>
       {item.payload?.projected && (
         <div className="mt-2">
@@ -1193,8 +1205,8 @@ function BankingRegionTooltip({
   datum: { id: string | number; value: number }
 }>) {
   return (
-    <div className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-teal-700">{datum.id}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>{datum.id}</div>
       <div>{formatUsdValue(datum.value)}</div>
     </div>
   )
@@ -1276,7 +1288,7 @@ function BankingCountryRow({
       />
       {badge && (
         <div className="mt-2 flex justify-end">
-          <span className="rounded-full bg-teal-900 px-2 py-0.5 text-xs text-teal-700">{badge}</span>
+          <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.teal}10`, color: COLORS.teal }}>{badge}</span>
         </div>
       )}
     </div>
@@ -1302,8 +1314,8 @@ function TakafulGrowthTooltip({
   }
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-amber-600">{label}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.gold }}>{label}</div>
       <div>{formatUsdValue(item.value)}</div>
       {item.payload?.projected && (
         <div className="mt-2">
@@ -1320,8 +1332,8 @@ function TakafulRegionTooltip({
   datum: { id: string | number; value: number }
 }>) {
   return (
-    <div className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-amber-600">{datum.id}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.gold }}>{datum.id}</div>
       <div>{formatUsdValue(datum.value)}</div>
     </div>
   )
@@ -1358,8 +1370,8 @@ function TakafulMarketCard({
 }>) {
   return (
     <div
-      className="animate-in slide-in-from-right-6 duration-500 w-56 shrink-0 rounded-xl border border-gray-200 bg-gray-100 p-4 transition-colors hover:border-amber-600"
-      style={{ animationDelay: `${index * 120}ms` }}
+      className="animate-in slide-in-from-right-6 duration-500 w-56 shrink-0 rounded-xl border p-4 transition-colors"
+      style={{ borderColor: COLORS.cardBorder, backgroundColor: COLORS.cardTint, animationDelay: `${index * 120}ms` }}
     >
       <div className="mb-3 flex items-center gap-2 text-gray-900">
         <span className="text-2xl leading-none">{market.flag}</span>
@@ -1394,10 +1406,10 @@ function OifiGrowthTooltip({
   const isDipYear = item.payload?.year === '2021' || item.payload?.year === '2022'
 
   return (
-    <div className="rounded-xl border border-purple-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-purple-700">{label}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.purple }}>{label}</div>
       <div>{formatUsdValue(item.value)}</div>
-      {isDipYear && <div className="mt-1 italic text-gray-400">(Post-COVID market adjustment)</div>}
+      {isDipYear && <div className="mt-1 italic" style={{ color: '#98A2B3' }}>(Post-COVID market adjustment)</div>}
       {item.payload?.projected && (
         <div className="mt-2">
           <ProjectedBadge />
@@ -1413,8 +1425,8 @@ function OifiRegionTooltip({
   datum: { id: string | number; value: number }
 }>) {
   return (
-    <div className="rounded-xl border border-purple-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-purple-700">{datum.id}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.purple }}>{datum.id}</div>
       <div>{formatUsdValue(datum.value)}</div>
     </div>
   )
@@ -1486,10 +1498,10 @@ function GlobalGlanceDonutTooltip({
   datum: { id: string | number; value: number; data: { share: number } }
 }>) {
   return (
-    <div className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-      <div className="mb-1 font-semibold text-teal-700">{datum.id}</div>
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-lg" style={{ borderColor: '#E9E5E5', backgroundColor: '#FFFFFF', color: '#101828' }}>
+      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>{datum.id}</div>
       <div>{formatUsdValue(datum.value)}</div>
-      <div className="mt-1 text-gray-500">{datum.data.share}% of total assets</div>
+      <div className="mt-1" style={{ color: '#98A2B3' }}>{datum.data.share}% of total assets</div>
     </div>
   )
 }
@@ -1506,13 +1518,13 @@ function EcosystemMetricRow({
   delay?: number
 }>) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-gray-200 py-2 last:border-b-0 last:pb-0 first:pt-0">
-      <span className="text-xs text-gray-500">{label}</span>
+    <div className="flex items-center justify-between gap-3 py-2 last:border-b-0 last:pb-0 first:pt-0" style={{ borderBottom: '1px solid #E9E5E5' }}>
+      <span className="text-xs" style={{ color: '#667085' }}>{label}</span>
       <AnimatedMetricNumber
         value={value}
         suffix={suffix}
         delay={delay}
-        className="text-sm font-bold text-gray-900"
+        className="text-sm font-bold"
       />
     </div>
   )
@@ -1528,13 +1540,13 @@ function SpotlightStat({
   delay: number
 }>) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 text-center">
+    <div className="rounded-lg border px-3 py-4 text-center" style={{ borderColor: '#E9E5E5', backgroundColor: COLORS.cardTint }}>
       <AnimatedMetricNumber
         value={value}
         delay={delay}
-        className="block text-2xl font-bold text-gray-900"
+        className="block text-2xl font-bold"
       />
-      <div className="mt-1 text-xs text-gray-500">{label}</div>
+      <div className="mt-1 text-xs" style={{ color: '#667085' }}>{label}</div>
     </div>
   )
 }
@@ -1556,11 +1568,11 @@ function IFDIRankCard({
 }>) {
   let rankColor: string = 'text-gray-400'
   if (rank === 1) {
-    rankColor = 'text-amber-600'
+    rankColor = 'text-[#D4A017]'
   } else if (rank === 2) {
     rankColor = 'text-gray-600'
   } else if (rank === 3) {
-    rankColor = 'text-orange-600'
+    rankColor = 'text-[#E3261C]'
   }
 
   return (
@@ -1630,14 +1642,14 @@ function TabGlobalGlance() {
           label="Year-on-Year Asset Growth"
           value={globalGlance.headline.yoyGrowth}
           subtitle="Strongest growth in 5 years"
-          accentColor={COLORS.goldLight}
+          accentColor={COLORS.emerald}
         />
         <KPICard
           icon={Building2}
           label="Total Islamic Financial Institutions"
           value={globalGlance.headline.totalInstitutions}
           subtitle={`Across ${globalGlance.headline.countriesCovered} countries globally`}
-          accentColor={COLORS.purple}
+          accentColor={COLORS.gold}
           animated
         />
       </div>
@@ -1647,7 +1659,7 @@ function TabGlobalGlance() {
           title="Islamic Finance Assets Growth (US$bn, 2018–2029)"
           className="relative lg:col-span-3"
         >
-          <div className="absolute right-5 top-5 rounded-full bg-teal-900 px-2 py-1 text-xs text-teal-700">
+          <div className="absolute right-5 top-5 rounded-full px-2 py-1 text-xs" style={{ backgroundColor: `${COLORS.teal}10`, color: COLORS.teal }}>
             🚀 {globalGlance.highlights.chartAnnotation}
           </div>
           <div className="h-[320px]">
@@ -1751,13 +1763,13 @@ function TabGlobalGlance() {
 
       <SectionCard title="Top 10 Countries by Total Islamic Finance Assets (US$bn, 2024)">
         <div className="mb-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-teal-900/40 px-3 py-1 text-xs text-teal-700">
+          <span className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: `${COLORS.teal}10`, color: COLORS.teal }}>
             🥇 {globalGlance.highlights.leadingCountry} leads at {formatUsdValue(globalGlance.highlights.leadingCountryValue)}
           </span>
-          <span className="rounded-full bg-cyan-950/60 px-3 py-1 text-xs text-cyan-700">
+          <span className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: `${COLORS.emerald}10`, color: COLORS.emerald }}>
             🌍 Top 3 = {globalGlance.highlights.topThreeSharePercent}% of global assets
           </span>
-          <span className="rounded-full bg-purple-950/60 px-3 py-1 text-xs text-purple-700">
+          <span className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>
             📈 {globalGlance.highlights.topTenGrowthNote}
           </span>
         </div>
@@ -1814,8 +1826,8 @@ function TabGlobalGlance() {
       </SectionCard>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SectionCard title="⚖️ Governance" className="border-teal-900/70">
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-teal-400">
+        <SectionCard title="⚖️ Governance" className="">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: COLORS.teal }}>
             <Shield className="h-4 w-4" />
             Governance
           </div>
@@ -1853,8 +1865,8 @@ function TabGlobalGlance() {
           </div>
         </SectionCard>
 
-        <SectionCard title="🌱 Sustainability" className="border-emerald-900/70">
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-emerald-400">
+        <SectionCard title="🌱 Sustainability" className="">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: COLORS.emerald }}>
             <Leaf className="h-4 w-4" />
             Sustainability
           </div>
@@ -1872,15 +1884,15 @@ function TabGlobalGlance() {
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-gray-100">
               <div
-                className="h-full rounded-full bg-emerald-500 transition-all duration-1000"
-                style={{ width: `${(globalGlance.ecosystem.sustainability[2].raw / globalGlance.headline.countriesCovered) * 100}%` }}
+                className="h-full rounded-full transition-all duration-1000"
+                style={{ backgroundColor: COLORS.emerald, width: `${(globalGlance.ecosystem.sustainability[2].raw / globalGlance.headline.countriesCovered) * 100}%` }}
               />
             </div>
           </div>
         </SectionCard>
 
-        <SectionCard title="📡 Awareness" className="border-amber-900/70">
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-600">
+        <SectionCard title="📡 Awareness" className="">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: COLORS.gold }}>
             <Radio className="h-4 w-4" />
             Awareness
           </div>
@@ -1896,8 +1908,8 @@ function TabGlobalGlance() {
           </div>
         </SectionCard>
 
-        <SectionCard title="🎓 Knowledge" className="border-purple-900/70">
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-purple-400">
+        <SectionCard title="🎓 Knowledge" className="">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: COLORS.purple }}>
             <BookOpen className="h-4 w-4" />
             Knowledge
           </div>
@@ -1977,7 +1989,7 @@ function TabGlobalOverview() {
         icon={LayoutDashboard}
         title="Global Overview"
         subtitle="How the Islamic finance industry is structured by sector, institution type, and region"
-        accentColor={COLORS.ocean}
+        accentColor={COLORS.teal}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1986,7 +1998,7 @@ function TabGlobalOverview() {
           label="Total Islamic Finance Assets"
           value={globalOverview.headline.totalAssets}
           subtitle={`${globalOverview.headline.yoyGrowth} Year-on-Year Growth`}
-          accentColor={COLORS.ocean}
+          accentColor={COLORS.teal}
         />
         <KPICard
           icon={MapPin}
@@ -2001,7 +2013,7 @@ function TabGlobalOverview() {
           label="Major Sectors & Asset Classes"
           value={globalOverview.headline.majorSectors}
           subtitle="Banking · Sukuk · Funds · OIFIs · Takaful"
-          accentColor={COLORS.purple}
+          accentColor={COLORS.gold}
           animated
         />
       </div>
@@ -2018,7 +2030,7 @@ function TabGlobalOverview() {
             }
           />
         ))}
-        <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 text-teal-700">
+        <div className="rounded-xl border p-4" style={{ borderColor: `${COLORS.teal}30`, backgroundColor: `${COLORS.teal}08`, color: COLORS.teal }}>
           <div className="flex flex-col gap-4 font-semibold lg:flex-row lg:items-center">
             <div className="w-full lg:w-1/4">TOTAL</div>
             <div className="w-full lg:w-1/6 text-lg font-bold">{globalOverview.headline.totalAssetsExact}</div>
@@ -2044,7 +2056,7 @@ function TabGlobalOverview() {
                 color={COLORS.teal}
                 label="of IFI Assets"
               />
-              <div className="text-center text-sm font-semibold text-teal-700">
+              <div className="text-center text-sm font-semibold" style={{ color: COLORS.teal }}>
                 {globalOverview.institutionBreakdown.fullyFledged.count.toLocaleString()} Fully-Fledged Islamic Banks
               </div>
             </div>
@@ -2061,7 +2073,7 @@ function TabGlobalOverview() {
                 color={COLORS.ocean}
                 label="of IFI Assets"
               />
-              <div className="text-center text-sm font-semibold text-cyan-700">
+              <div className="text-center text-sm font-semibold" style={{ color: COLORS.ocean }}>
                 {globalOverview.institutionBreakdown.windows.count.toLocaleString()} Islamic Banking Windows
               </div>
             </div>
@@ -2148,7 +2160,7 @@ function TabGlobalOverview() {
               </div>
             ))}
           </div>
-          <div className="mt-3 rounded-xl border border-teal-200 bg-teal-950 p-3 text-center text-sm text-teal-700">
+          <div className="mt-3 rounded-lg border p-3 text-center text-sm" style={{ borderColor: `${COLORS.teal}30`, backgroundColor: `${COLORS.teal}06`, color: COLORS.teal }}>
             🌍 OIC Countries represent {globalOverview.headline.oicCountriesAssetShare}% of total global Islamic finance assets
           </div>
         </div>
@@ -2198,26 +2210,26 @@ function TabIslamicBanking() {
           label="Asset Growth in 2024"
           value={islamicBanking.headline.growth}
           subtitle="Strongest annual growth in recent years"
-          accentColor={COLORS.goldLight}
+          accentColor={COLORS.emerald}
         />
         <KPICard
           icon={Building2}
           label="Banks Including Islamic Windows"
           value={islamicBanking.headline.totalBanks}
           subtitle={`Present in ${islamicBanking.headline.marketsCount} markets globally`}
-          accentColor={COLORS.ocean}
+          accentColor={COLORS.gold}
           animated
         />
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <BankingInsightPill className="border-teal-500/30 bg-teal-500/15 text-teal-700" delay={800}>
+        <BankingInsightPill className="border-[#0F9D8A]/20 bg-[#0F9D8A]/8 text-[#0F9D8A]" delay={800}>
           🏦 Islamic banking = {islamicBanking.headline.globalBankingShare} of global banking assets
         </BankingInsightPill>
-        <BankingInsightPill className="border-amber-200 bg-amber-50 text-amber-700" delay={900}>
+        <BankingInsightPill className="border-[#D4A017]/20 bg-[#D4A017]/8 text-[#D4A017]" delay={900}>
           📍 Sub-Saharan Africa: {islamicBanking.headline.subSaharanAfricaBanks} banks across {islamicBanking.headline.subSaharanAfricaCountries} countries
         </BankingInsightPill>
-        <BankingInsightPill className="border-cyan-500/30 bg-cyan-500/15 text-cyan-700" delay={1000}>
+        <BankingInsightPill className="border-[#16A34A]/20 bg-[#16A34A]/8 text-[#16A34A]" delay={1000}>
           🔀 Windows account for {islamicBanking.headline.windowsBankShare} of banks but only {islamicBanking.headline.windowsAssetShare} of assets
         </BankingInsightPill>
       </div>
@@ -2301,10 +2313,10 @@ function TabIslamicBanking() {
             </div>
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-teal-500/30 bg-teal-500/10 p-3 text-xs text-teal-700">
+            <div className="rounded-xl border p-3 text-xs" style={{ borderColor: `${COLORS.teal}30`, backgroundColor: `${COLORS.teal}10`, color: COLORS.teal }}>
               MENA dominates: {formatUsdValue(islamicBanking.headline.menaDominanceValue)} ({islamicBanking.headline.menaDominanceShare})
             </div>
-            <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-3 text-xs text-purple-700">
+            <div className="rounded-xl border p-3 text-xs" style={{ borderColor: `${COLORS.purple}30`, backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>
               Southeast Asia growing: {formatUsdValue(islamicBanking.headline.southeastAsiaValue)}
             </div>
           </div>
@@ -2331,7 +2343,7 @@ function TabIslamicBanking() {
         <div className="mb-3 flex items-center justify-between text-xs">
           <span className="text-gray-500">2018: {formatUsdValue(timelineData[0].value)}</span>
           <span className="text-gray-400">→</span>
-          <span className="font-bold text-teal-700">2024: {formatUsdValue(timelineData[timelineData.length - 1].value)} (+156%)</span>
+          <span className="font-bold" style={{ color: COLORS.teal }}>2024: {formatUsdValue(timelineData[timelineData.length - 1].value)} (+156%)</span>
         </div>
         <div className="h-[180px]">
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -2372,7 +2384,7 @@ function TabIslamicBanking() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="mt-2 border-t border-amber-500/20 pt-2 text-center text-xs text-amber-600">
+        <div className="mt-2 border-t pt-2 text-center text-xs" style={{ borderColor: `${COLORS.gold}20`, color: COLORS.gold }}>
           2029 Projection: {formatUsdValue(islamicBanking.assetsGrowth[islamicBanking.assetsGrowth.length - 1].value)} (CAGR ~8%)
         </div>
       </SectionCard>
@@ -2411,39 +2423,39 @@ function TabTakaful() {
           label="Total Takaful Assets"
           value={takaful.headline.totalAssets}
           subtitle={`${takaful.headline.shareOfIfAssets} of total Islamic finance assets`}
-          accentColor={COLORS.gold}
+          accentColor={COLORS.teal}
         />
         <KPICard
           icon={TrendingUp}
           label="Fastest Growing IF Sector in 2024"
           value={takaful.headline.growth}
           subtitle="Surpassed all other IF sectors in growth rate"
-          accentColor={COLORS.goldLight}
+          accentColor={COLORS.emerald}
         />
         <KPICard
           icon={Users}
           label="Takaful Operators Globally"
           value={takaful.headline.totalOperators}
           subtitle={`Active across ${takaful.headline.activeCountries} countries`}
-          accentColor={COLORS.emerald}
+          accentColor={COLORS.gold}
           animated
         />
       </div>
 
-      <div className="animate-in slide-in-from-top-3 duration-500 rounded-xl border border-amber-800/50 bg-amber-950/50 p-4 text-amber-600">
+      <div className="animate-in slide-in-from-top-3 duration-500 rounded-xl border p-4" style={{ borderColor: `${COLORS.gold}30`, backgroundColor: `${COLORS.gold}06`, color: COLORS.gold }}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15">
-              <Shield className="h-5 w-5 text-amber-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${COLORS.gold}12` }}>
+              <Shield className="h-5 w-5" style={{ color: COLORS.gold }} />
             </div>
             <div className="text-sm font-semibold">
               🚀 Takaful is the fastest growing sector in Islamic finance — {takaful.headline.growth} growth in 2024, projecting {takaful.headline.projectedAssets2029} by 2029
             </div>
           </div>
           <div className="hidden items-end gap-1 sm:flex">
-            <span className="h-3 w-2 rounded-t bg-amber-600/60" />
-            <span className="h-5 w-2 rounded-t bg-amber-500/75" />
-            <span className="h-7 w-2 rounded-t bg-amber-400" />
+            <span className="h-3 w-2 rounded-t" style={{ backgroundColor: `${COLORS.gold}60` }} />
+            <span className="h-5 w-2 rounded-t" style={{ backgroundColor: `${COLORS.gold}90` }} />
+            <span className="h-7 w-2 rounded-t" style={{ backgroundColor: COLORS.gold }} />
           </div>
         </div>
       </div>
@@ -2507,10 +2519,10 @@ function TabTakaful() {
             </ResponsiveContainer>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-600">
+            <span className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: `${COLORS.gold}10`, color: COLORS.gold }}>
               {takaful.headline.growthSince2018Multiple} growth since 2018 (US$45bn → US$136bn)
             </span>
-            <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs text-amber-600">
+            <span className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: `${COLORS.gold}10`, color: COLORS.gold }}>
               Projected to reach {takaful.headline.projectedAssets2029} by 2029
             </span>
           </div>
@@ -2538,7 +2550,7 @@ function TabTakaful() {
               </div>
             </div>
           </div>
-          <div className="mt-3 rounded-xl border border-amber-800 bg-amber-950 p-2 text-center text-xs text-amber-600">
+          <div className="mt-3 rounded-lg border p-2 text-center text-xs" style={{ borderColor: `${COLORS.gold}30`, backgroundColor: `${COLORS.gold}06`, color: COLORS.gold }}>
             🇮🇷 Iran alone accounts for {takaful.headline.iranGlobalShare} of all Takaful assets globally
           </div>
         </SectionCard>
@@ -2561,11 +2573,11 @@ function TabTakaful() {
               />
               {index === 0 && (
                 <div className="mt-2 flex justify-end">
-                  <span className="rounded-full bg-amber-950 px-2 py-0.5 text-xs text-amber-600">🏆 Global Takaful Leader</span>
+                  <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.gold}10`, color: COLORS.gold }}>🏆 Global Takaful Leader</span>
                 </div>
               )}
               {(index === 1 || index === 2) && (
-                <div className="mt-2 text-right text-xs text-amber-600">
+                <div className="mt-2 text-right text-xs" style={{ color: COLORS.gold }}>
                   Top 3 markets account for {takaful.headline.topThreeShare} of Takaful assets
                 </div>
               )}
@@ -2619,7 +2631,7 @@ function TabOtherIFIs() {
           label="Total Other IFI Assets"
           value={otherIFIs.headline.totalAssets}
           subtitle={`${otherIFIs.headline.shareOfIfAssets} of total Islamic finance assets`}
-          accentColor={COLORS.purple}
+          accentColor={COLORS.teal}
         />
         <KPICard
           icon={Activity}
@@ -2633,18 +2645,18 @@ function TabOtherIFIs() {
           label="Total Institutions"
           value={otherIFIs.headline.totalOIFIs}
           subtitle="Across all global regions"
-          accentColor={COLORS.purpleLight}
+          accentColor={COLORS.gold}
           animated
         />
       </div>
 
-      <div className="animate-in fade-in slide-in-from-top-3 duration-500 rounded-xl border border-purple-800/50 bg-purple-950/50 p-4">
+      <div className="animate-in fade-in slide-in-from-top-3 duration-500 rounded-xl border p-4" style={{ borderColor: `${COLORS.purple}30`, backgroundColor: `${COLORS.purple}06` }}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15">
-              <Landmark className="h-5 w-5 text-purple-400" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${COLORS.purple}12` }}>
+              <Landmark className="h-5 w-5" style={{ color: COLORS.purple }} />
             </div>
-            <div className="text-sm text-purple-700">
+            <div className="text-sm" style={{ color: COLORS.purple }}>
               Other IFIs maintain the most consistent growth trajectory in Islamic finance, acting as a stabilizing layer through global rate shocks and post-COVID restructuring.
             </div>
           </div>
@@ -2698,10 +2710,10 @@ function TabOtherIFIs() {
                 />
               </LineChart>
             </ResponsiveContainer>
-            <div className="pointer-events-none absolute left-[44%] top-[63%] rounded-full bg-red-500/10 px-2 py-1 text-[11px] text-red-300 animate-in fade-in duration-500" style={{ animationDelay: '1000ms' }}>
+            <div className="pointer-events-none absolute left-[44%] top-[63%] rounded-full px-2 py-1 text-[11px] animate-in fade-in duration-500" style={{ animationDelay: '1000ms', backgroundColor: `${COLORS.controlledRed}10`, color: COLORS.controlledRed }}>
               Dip reflects post-COVID institutional restructuring
             </div>
-            <div className="pointer-events-none absolute right-[24%] top-[26%] text-xs text-emerald-400 animate-in fade-in duration-500" style={{ animationDelay: '1400ms' }}>
+            <div className="pointer-events-none absolute right-[24%] top-[26%] text-xs animate-in fade-in duration-500" style={{ animationDelay: '1400ms', color: COLORS.emerald }}>
               Recovery path
             </div>
           </div>
@@ -2729,7 +2741,7 @@ function TabOtherIFIs() {
               </div>
             </div>
           </div>
-          <div className="mt-3 rounded-xl border border-purple-800 bg-purple-950 p-2 text-center text-xs text-purple-700">
+          <div className="mt-3 rounded-lg border p-2 text-center text-xs" style={{ borderColor: `${COLORS.purple}30`, backgroundColor: `${COLORS.purple}06`, color: COLORS.purple }}>
             GCC holds US${otherIFIs.headline.gccValue}bn ({otherIFIs.headline.gccShare}), followed by Southeast Asia at US${otherIFIs.headline.southeastAsiaValue}bn ({otherIFIs.headline.southeastAsiaShare})
           </div>
         </SectionCard>
@@ -2750,7 +2762,7 @@ function TabOtherIFIs() {
               />
               {index === 0 && (
                 <div className="mt-2 flex justify-end">
-                  <span className="rounded-full bg-purple-950 px-2 py-0.5 text-xs text-purple-700">#1 OIFI hub</span>
+                  <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>#1 OIFI hub</span>
                 </div>
               )}
               {country.country === 'Switzerland' && (
@@ -2863,10 +2875,10 @@ function TabSukuk() {
     const item = payload[0].payload
 
     return (
-      <div className="rounded-xl border border-cyan-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-        <div className="mb-1 font-semibold text-cyan-700">{label}</div>
+      <div className="rounded-xl border bg-white px-3 py-2 text-xs text-gray-800 shadow-xl" style={{ borderColor: COLORS.cardBorder }}>
+        <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>{label}</div>
         <div>{formatUsdValue(payload[0].value)}</div>
-        {item?.isMilestone && <div className="mt-1 text-amber-600">Historic trillion milestone reached</div>}
+        {item?.isMilestone && <div className="mt-1" style={{ color: COLORS.gold }}>Historic trillion milestone reached</div>}
         {item?.isProjected && (
           <div className="mt-2">
             <ProjectedBadge />
@@ -2882,38 +2894,38 @@ function TabSukuk() {
         icon={TrendingUp}
         title="Sukuk"
         subtitle="Global sukuk outstanding, issuance trends &amp; regional distribution"
-        accentColor={COLORS.ocean}
+        accentColor={COLORS.emerald}
       />
 
       <div
-        className="animate-in fade-in slide-in-from-top-6 duration-700 rounded-2xl border p-6 mb-4 bg-gradient-to-r from-[#0891B2]/20 via-[#0D9488]/20 to-[#0891B2]/20"
-        style={{ borderColor: `${COLORS.ocean}99` }}
+        className="animate-in fade-in slide-in-from-top-6 duration-700 rounded-xl border p-6 mb-4"
+        style={{ borderColor: `${COLORS.teal}40`, background: `linear-gradient(135deg, ${COLORS.teal}08 0%, ${COLORS.emerald}08 50%, ${COLORS.teal}08 100%)` }}
       >
         <div className="flex flex-col items-center text-center w-full">
-          <Trophy className="h-16 w-16 text-amber-600 animate-bounce [animation-iteration-count:1]" />
-          <p className="text-amber-600 font-black text-2xl tracking-widest uppercase mt-3">
+          <Trophy className="h-14 w-14 animate-bounce [animation-iteration-count:1]" style={{ color: COLORS.gold }} />
+          <p className="font-black text-2xl tracking-widest uppercase mt-3" style={{ color: COLORS.gold }}>
             Historic Milestone Achieved
           </p>
-          <p className="text-gray-600 text-lg mt-1">Global Sukuk Market Crosses</p>
+          <p className="text-lg mt-1" style={{ color: '#667085' }}>Global Sukuk Market Crosses</p>
           <p
-            className="text-gray-900 font-black text-5xl animate-pulse"
-            style={{ textShadow: '0 0 18px rgba(8,145,178,0.45)' }}
+            className="font-black text-5xl"
+            style={{ color: '#101828', textShadow: `0 0 18px ${COLORS.teal}30` }}
           >
             {milestoneLabel}
           </p>
-          <p className="text-gray-500 text-base mt-1">in Outstanding Value - 2024</p>
-          <p className="text-gray-400 text-sm mt-2">
+          <p className="text-base mt-1" style={{ color: '#667085' }}>in Outstanding Value - 2024</p>
+          <p className="text-sm mt-2" style={{ color: '#98A2B3' }}>
             Global issuance rose {sukuk.headline.globalIssuanceGrowth} to US${sukuk.headline.globalIssuance2024}bn in 2024 · Governments account for {sukuk.headline.govtShareOfIssuance} of issuances
           </p>
 
           <div className="mt-4 grid w-full max-w-4xl grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border border-teal-200 bg-white/80 px-3 py-2 text-sm text-teal-700">
+            <div className="rounded-lg border bg-white/80 px-3 py-2 text-sm" style={{ borderColor: `${COLORS.teal}30`, color: COLORS.teal }}>
               {sukuk.headline.globalIssuanceGrowth} ↑ Global Issuance Growth
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm text-gray-900">
+            <div className="rounded-lg border bg-white/80 px-3 py-2 text-sm" style={{ borderColor: '#E9E5E5', color: '#101828' }}>
               US${sukuk.headline.globalIssuance2024}bn Total 2024 Issuance
             </div>
-            <div className="rounded-xl border border-cyan-200 bg-white/80 px-3 py-2 text-sm text-cyan-700">
+            <div className="rounded-lg border bg-white/80 px-3 py-2 text-sm" style={{ borderColor: `${COLORS.emerald}30`, color: COLORS.emerald }}>
               {sukuk.headline.govtShareOfIssuance} Government Issuers
             </div>
           </div>
@@ -2926,7 +2938,7 @@ function TabSukuk() {
           label="Sukuk Outstanding Value"
           value={sukuk.headline.totalOutstanding}
           subtitle="Historic first trillion milestone"
-          accentColor={COLORS.ocean}
+          accentColor={COLORS.teal}
         />
         <KPICard
           icon={ArrowUpRight}
@@ -2940,7 +2952,7 @@ function TabSukuk() {
           label="Sukuk Outstanding Instruments"
           value={sukuk.headline.numberOutstanding}
           subtitle="Across all global markets"
-          accentColor={COLORS.purple}
+          accentColor={COLORS.gold}
           animated
         />
         <KPICard
@@ -2948,7 +2960,7 @@ function TabSukuk() {
           label="2024 Global Issuance"
           value={`US$${sukuk.headline.globalIssuance2024}bn`}
           subtitle="11% increase from 2023"
-          accentColor={COLORS.goldLight}
+          accentColor={COLORS.purple}
         />
       </div>
 
@@ -2959,8 +2971,8 @@ function TabSukuk() {
               <BarChart data={sukukBarData} margin={{ top: 30, right: 18, left: 6, bottom: 8 }}>
                 <defs>
                   <linearGradient id="sukukGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0891B2" />
-                    <stop offset="100%" stopColor="#065F73" />
+                    <stop offset="0%" stopColor="#16A34A" />
+                    <stop offset="100%" stopColor="#0F9D8A" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke={COLORS.cardBorder} strokeDasharray="3 3" />
@@ -2992,7 +3004,7 @@ function TabSukuk() {
                     return (
                       <Cell
                         key={entry.year}
-                        fill={isProjected ? '#D97706' : isMilestone ? '#0891B2' : 'url(#sukukGradient)'}
+                        fill={isProjected ? '#D4A017' : isMilestone ? '#16A34A' : 'url(#sukukGradient)'}
                         fillOpacity={isProjected ? 0.4 : 1}
                         stroke={isMilestone ? '#F59E0B' : isProjected ? '#F59E0B' : 'transparent'}
                         strokeWidth={isMilestone ? 2 : isProjected ? 1.5 : 0}
@@ -3004,10 +3016,10 @@ function TabSukuk() {
               </BarChart>
             </ResponsiveContainer>
 
-            <div className="pointer-events-none absolute left-[68%] top-[10%] rounded-full bg-amber-500/15 px-2 py-1 text-[11px] font-bold text-amber-600">
+            <div className="pointer-events-none absolute left-[68%] top-[10%] rounded-full px-2 py-1 text-[11px] font-bold" style={{ backgroundColor: `${COLORS.gold}15`, color: COLORS.gold }}>
               🏆 US$1tn
             </div>
-            <div className="pointer-events-none absolute right-[2%] top-[0%] rounded-full bg-amber-500/15 px-2 py-1 text-[11px] text-amber-600">
+            <div className="pointer-events-none absolute right-[2%] top-[0%] rounded-full px-2 py-1 text-[11px]" style={{ backgroundColor: `${COLORS.gold}15`, color: COLORS.gold }}>
               📊 Projected: {formatUsdValue(projectedYear.value)}
             </div>
           </div>
@@ -3064,20 +3076,20 @@ function TabSukuk() {
 
                 {country.country === 'Malaysia' && (
                   <div className="mt-2 space-y-1 text-right">
-                    <span className="rounded-full bg-cyan-950 px-2 py-0.5 text-xs text-cyan-700">🥇 World's Largest Sukuk Market</span>
-                    <div className="text-xs text-cyan-700">Malaysia accounts for {sukuk.headline.malaysiaGlobalShare} of all global sukuk outstanding</div>
+                    <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.emerald}10`, color: COLORS.emerald }}>🥇 World's Largest Sukuk Market</span>
+                    <div className="text-xs" style={{ color: COLORS.teal }}>Malaysia accounts for {sukuk.headline.malaysiaGlobalShare} of all global sukuk outstanding</div>
                   </div>
                 )}
 
                 {country.country === 'Saudi Arabia' && (
                   <div className="mt-2 space-y-1 text-right">
-                    <span className="rounded-full bg-teal-950 px-2 py-0.5 text-xs text-teal-700">🥈 GCC Leader - US${sukuk.headline.saudiIssuance2024}bn issued in 2024 alone</span>
-                    <div className="text-xs text-teal-700">{sukuk.headline.saudiIssuanceGrowth} surge in 2024 issuance driven by Vision 2030 financing</div>
+                    <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.teal}10`, color: COLORS.teal }}>🥈 GCC Leader - US${sukuk.headline.saudiIssuance2024}bn issued in 2024 alone</span>
+                    <div className="text-xs" style={{ color: COLORS.teal }}>{sukuk.headline.saudiIssuanceGrowth} surge in 2024 issuance driven by Vision 2030 financing</div>
                   </div>
                 )}
 
                 {country.country === 'Indonesia' && (
-                  <div className="mt-2 text-right text-xs text-purple-700">🏆 World's #1 Green Sukuk Issuer</div>
+                  <div className="mt-2 text-right text-xs" style={{ color: COLORS.purple }}>🏆 World's #1 Green Sukuk Issuer</div>
                 )}
 
                 {country.country === 'UAE' && (
@@ -3099,12 +3111,12 @@ function TabSukuk() {
 
       <SectionCard title="2024 Sukuk Issuance Highlights">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-xl border border-gray-200 bg-gray-100 p-5 transition-colors hover:border-cyan-600" style={{ animationDelay: '0ms' }}>
-            <div className="mb-3 flex items-center gap-2 text-amber-600">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-xl border p-5 transition-colors" style={{ animationDelay: '0ms', borderColor: COLORS.cardBorder, backgroundColor: COLORS.cardTint }}>
+            <div className="mb-3 flex items-center gap-2" style={{ color: COLORS.gold }}>
               <TrendingUp className="h-5 w-5" />
               <span className="text-sm font-semibold">Saudi Arabia Surge</span>
             </div>
-            <div className="text-2xl font-bold text-amber-600">US${sukuk.headline.saudiIssuance2024}bn</div>
+            <div className="text-2xl font-bold" style={{ color: COLORS.gold }}>US${sukuk.headline.saudiIssuance2024}bn</div>
             <div className="mt-1 text-xs text-gray-600">Saudi Arabia 2024 Issuance</div>
             <p className="mt-3 text-xs leading-relaxed text-gray-500">
               {sukuk.headline.saudiIssuanceGrowth} surge from 2023. Saudi government raised US$42.3bn including US$17bn for debt refinancing.
@@ -3112,42 +3124,42 @@ function TabSukuk() {
             <div className="mt-4">
               <div className="mb-1 text-[11px] text-gray-400">Share of global issuance</div>
               <div className="h-2 overflow-hidden rounded-full bg-white">
-                <div className="h-full rounded-full bg-amber-400" style={{ width: `${(sukuk.headline.saudiIssuance2024 / sukuk.headline.globalIssuance2024) * 100}%` }} />
+                <div className="h-full rounded-full" style={{ width: `${(sukuk.headline.saudiIssuance2024 / sukuk.headline.globalIssuance2024) * 100}%`, backgroundColor: COLORS.gold }} />
               </div>
             </div>
           </div>
 
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-xl border border-gray-200 bg-gray-100 p-5 transition-colors hover:border-cyan-600" style={{ animationDelay: '120ms' }}>
-            <div className="mb-3 flex items-center gap-2 text-cyan-400">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-xl border p-5 transition-colors" style={{ animationDelay: '120ms', borderColor: COLORS.cardBorder, backgroundColor: COLORS.cardTint }}>
+            <div className="mb-3 flex items-center gap-2" style={{ color: COLORS.teal }}>
               <Shield className="h-5 w-5" />
               <span className="text-sm font-semibold">Government Dominance</span>
             </div>
-            <div className="text-2xl font-bold text-cyan-400">{sukuk.headline.govtShareOfIssuance}</div>
+            <div className="text-2xl font-bold" style={{ color: COLORS.teal }}>{sukuk.headline.govtShareOfIssuance}</div>
             <div className="mt-1 text-xs text-gray-600">Government Share of Issuance</div>
             <p className="mt-3 text-xs leading-relaxed text-gray-500">
               Sovereigns dominate driven by fiscal deficits and refinancing needs. {corporateShare}% from corporates and agencies.
             </p>
             <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-white">
-              <div className="h-full bg-cyan-500" style={{ width: `${govtShare}%` }} />
+              <div className="h-full" style={{ width: `${govtShare}%`, backgroundColor: COLORS.teal }} />
               <div className="h-full bg-gray-300" style={{ width: `${corporateShare}%` }} />
             </div>
           </div>
 
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-xl border border-gray-200 bg-gray-100 p-5 transition-colors hover:border-cyan-600" style={{ animationDelay: '240ms' }}>
-            <div className="mb-3 flex items-center gap-2 text-amber-600">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-xl border p-5 transition-colors" style={{ animationDelay: '240ms', borderColor: COLORS.cardBorder, backgroundColor: COLORS.cardTint }}>
+            <div className="mb-3 flex items-center gap-2" style={{ color: COLORS.gold }}>
               <AlertTriangle className="h-5 w-5" />
               <span className="text-sm font-semibold">Maturity Wall</span>
             </div>
-            <div className="text-2xl font-bold text-amber-600">US${sukuk.headline.maturingIn2025}bn</div>
+            <div className="text-2xl font-bold" style={{ color: COLORS.gold }}>US${sukuk.headline.maturingIn2025}bn</div>
             <div className="mt-1 text-xs text-gray-600">Sukuk Maturing in 2025</div>
             <p className="mt-3 text-xs leading-relaxed text-gray-500">
               {sukuk.headline.globalMaturityBy2030} of outstanding sukuk mature by 2030. Expected to keep issuance elevated as refinancing needs grow.
             </p>
             <div className="mt-4 flex items-center gap-2">
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
-                <div className="h-full animate-pulse rounded-full bg-amber-500" style={{ width: `${(sukuk.headline.maturingIn2025 / sukuk.headline.globalIssuance2024) * 100}%` }} />
+                <div className="h-full animate-pulse rounded-full" style={{ width: `${(sukuk.headline.maturingIn2025 / sukuk.headline.globalIssuance2024) * 100}%`, backgroundColor: COLORS.gold }} />
               </div>
-              <span className="text-[11px] text-amber-600">Elevated refinancing cycle</span>
+              <span className="text-[11px]" style={{ color: COLORS.gold }}>Elevated refinancing cycle</span>
             </div>
           </div>
         </div>
@@ -3192,10 +3204,10 @@ function TabIslamicFunds() {
     }
 
     return (
-      <div className="rounded-xl border border-purple-200 bg-white px-3 py-2 text-xs text-gray-800 shadow-xl">
-        <div className="mb-1 font-semibold text-purple-700">{label}</div>
+      <div className="rounded-xl border bg-white px-3 py-2 text-xs text-gray-800 shadow-xl" style={{ borderColor: `${COLORS.purple}30` }}>
+        <div className="mb-1 font-semibold" style={{ color: COLORS.purple }}>{label}</div>
         <div>{formatUsdValue(item.value)}</div>
-        {label === '2022' && <div className="mt-1 italic text-red-300">(Global interest rate hike impact)</div>}
+        {label === '2022' && <div className="mt-1 italic" style={{ color: COLORS.controlledRed }}>(Global interest rate hike impact)</div>}
         {item.payload?.projected && (
           <div className="mt-2">
             <ProjectedBadge />
@@ -3220,7 +3232,7 @@ function TabIslamicFunds() {
           label="Total Islamic Funds AuM"
           value={funds.headline.totalAuM}
           subtitle={`${funds.headline.shareOfIfAssets} of total Islamic finance assets`}
-          accentColor={COLORS.purple}
+          accentColor={COLORS.teal}
         />
         <KPICard
           icon={TrendingUp}
@@ -3234,19 +3246,19 @@ function TabIslamicFunds() {
           label="Islamic Funds Outstanding"
           value={funds.headline.fundsOutstanding}
           subtitle="Across equity, sukuk, mixed & ESG funds"
-          accentColor={COLORS.ocean}
+          accentColor={COLORS.gold}
           animated
         />
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <BankingInsightPill className="border-purple-500/30 bg-purple-500/10 text-purple-700" delay={0}>
+        <BankingInsightPill className="border-[#7C3AED]/20 bg-[#7C3AED]/8 text-[#7C3AED]" delay={0}>
           🇬🇧 UK ranks 3rd globally - leading non-OIC Islamic fund market
         </BankingInsightPill>
-        <BankingInsightPill className="border-teal-500/30 bg-teal-500/10 text-teal-700" delay={120}>
+        <BankingInsightPill className="border-[#0F9D8A]/20 bg-[#0F9D8A]/8 text-[#0F9D8A]" delay={120}>
           🇺🇸 United States in top 10 - US${funds.headline.usValue}bn in Islamic AuM
         </BankingInsightPill>
-        <BankingInsightPill className="border-amber-500/30 bg-amber-500/10 text-amber-600" delay={240}>
+        <BankingInsightPill className="border-[#D4A017]/20 bg-[#D4A017]/8 text-[#D4A017]" delay={240}>
           📉 2022 dip (US$263bn to US$243bn) reflects global rate hike impact
         </BankingInsightPill>
       </div>
@@ -3298,13 +3310,13 @@ function TabIslamicFunds() {
               </AreaChart>
             </ResponsiveContainer>
 
-            <div className="pointer-events-none absolute left-[38%] top-[20%] text-xs text-red-300">
+            <div className="pointer-events-none absolute left-[38%] top-[20%] text-xs" style={{ color: COLORS.controlledRed }}>
               📉 -US${funds.headline.dipFrom2021}bn (Global rate cycle impact)
             </div>
-            <div className="pointer-events-none absolute left-[56%] top-[12%] text-xs text-emerald-400">
+            <div className="pointer-events-none absolute left-[56%] top-[12%] text-xs" style={{ color: COLORS.emerald }}>
               ↗ Recovery: +US${funds.headline.recoveryFrom2022}bn (2022→2024)
             </div>
-            <div className="pointer-events-none absolute right-[2%] top-[4%] text-xs text-amber-600">
+            <div className="pointer-events-none absolute right-[2%] top-[4%] text-xs" style={{ color: COLORS.gold }}>
               📊 Projected: US${funds.headline.projected2029}bn by 2029
             </div>
           </div>
@@ -3332,7 +3344,7 @@ function TabIslamicFunds() {
               </div>
             </div>
           </div>
-          <div className="mt-3 rounded-xl border border-purple-800 bg-purple-950 p-3 text-center text-xs text-purple-700">
+          <div className="mt-3 rounded-lg border p-3 text-center text-xs" style={{ borderColor: `${COLORS.purple}30`, backgroundColor: `${COLORS.purple}06`, color: COLORS.purple }}>
             🌍 Europe (US$64bn) outranks Southeast Asia (US$40bn) in Islamic funds — driven by Luxembourg and UK domiciliation
           </div>
         </SectionCard>
@@ -3354,32 +3366,32 @@ function TabIslamicFunds() {
 
               {country.country === 'Iran' && (
                 <div className="mt-2 text-right">
-                  <span className="rounded-full bg-purple-950 px-2 py-0.5 text-xs text-purple-700">🥇 Largest AuM — Domestic market-driven</span>
+                  <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>🥇 Largest AuM — Domestic market-driven</span>
                 </div>
               )}
               {country.country === 'UAE' && (
                 <div className="mt-2 text-right">
-                  <span className="rounded-full bg-purple-950 px-2 py-0.5 text-xs text-purple-700">🥈 GCC Hub — Major fund domicile</span>
+                  <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>🥈 GCC Hub — Major fund domicile</span>
                 </div>
               )}
               {country.country === 'United Kingdom' && (
                 <>
                   <div className="mt-2 text-right">
-                    <span className="rounded-full bg-purple-950 px-2 py-0.5 text-xs text-purple-700">🥉 🌍 Highest-ranked non-OIC country globally</span>
+                    <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>🥉 🌍 Highest-ranked non-OIC country globally</span>
                   </div>
-                  <div className="mx-4 mt-1 rounded-lg border border-purple-200 bg-purple-950/50 p-2 text-xs text-purple-700">
+                  <div className="mx-4 mt-1 rounded-lg border p-2 text-xs" style={{ borderColor: `${COLORS.purple}20`, backgroundColor: `${COLORS.purple}06`, color: COLORS.purple }}>
                     The UK's US${funds.headline.ukValue}bn Islamic fund market is driven by Shariah-compliant pension funds, ETFs, and the growing Muslim investor base accessing HSBC Islamic Global Equity Index.
                   </div>
                 </>
               )}
               {country.country === 'Malaysia' && (
                 <div className="mt-2 text-right">
-                  <span className="rounded-full bg-purple-950 px-2 py-0.5 text-xs text-purple-700">4️⃣ SEA Hub — Largest Islamic fund market in Southeast Asia</span>
+                  <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>4️⃣ SEA Hub — Largest Islamic fund market in Southeast Asia</span>
                 </div>
               )}
               {country.country === 'United States' && (
                 <div className="mt-2 text-right">
-                  <span className="rounded-full bg-purple-950 px-2 py-0.5 text-xs text-purple-700">7️⃣ 🇺🇸 Non-OIC — Growing ESG-Islamic fund overlap</span>
+                  <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${COLORS.purple}10`, color: COLORS.purple }}>7️⃣ 🇺🇸 Non-OIC — Growing ESG-Islamic fund overlap</span>
                 </div>
               )}
 
@@ -3436,13 +3448,13 @@ export const SUB_TABS: Array<{
   icon: React.ElementType
   accentColor: string
 }> = [
-  { id: 'Global Glance',   label: 'Global Glance',   icon: Globe2,          accentColor: COLORS.teal   },
-  { id: 'Global Overview', label: 'Global Overview', icon: LayoutDashboard, accentColor: COLORS.ocean  },
-  { id: 'Islamic Banking', label: 'Islamic Banking', icon: Building2,       accentColor: COLORS.teal   },
-  { id: 'Takaful',         label: 'Takaful',         icon: Shield,          accentColor: COLORS.gold   },
-  { id: 'Other IFIs',      label: 'Other IFIs',      icon: Landmark,        accentColor: COLORS.purple },
-  { id: 'Sukuk',           label: 'Sukuk',           icon: TrendingUp,      accentColor: COLORS.ocean  },
-  { id: 'Islamic Funds',   label: 'Islamic Funds',   icon: PieChart,        accentColor: COLORS.purple },
+  { id: 'Global Glance',   label: 'Global Glance',   icon: Globe2,          accentColor: COLORS.teal    },
+  { id: 'Global Overview', label: 'Global Overview', icon: LayoutDashboard, accentColor: COLORS.teal    },
+  { id: 'Islamic Banking', label: 'Islamic Banking', icon: Building2,       accentColor: COLORS.teal    },
+  { id: 'Takaful',         label: 'Takaful',         icon: Shield,          accentColor: COLORS.gold    },
+  { id: 'Other IFIs',      label: 'Other IFIs',      icon: Landmark,        accentColor: COLORS.purple  },
+  { id: 'Sukuk',           label: 'Sukuk',           icon: TrendingUp,      accentColor: COLORS.emerald },
+  { id: 'Islamic Funds',   label: 'Islamic Funds',   icon: PieChart,        accentColor: COLORS.purple  },
 ]
 
 export const TAB_COMPONENTS: Record<string, React.ComponentType> = {
