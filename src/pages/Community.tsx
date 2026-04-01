@@ -62,10 +62,13 @@ function apiDiscussionToPost(
   const catName = d.category?.name ?? "General Discussion";
   const authorName =
     [d.author?.firstName, d.author?.lastName].filter(Boolean).join(" ") ||
+    d.author?.username ||
+    d.author?.email ||
     "Unknown";
   const replies =
     d.interactions?.filter((i) => i.type === "comment").length ?? 0;
-  const likes = d.interactions?.filter((i) => i.type === "like").length ?? 0;
+  const totalLikes = d.interactions?.filter((i) => i.type === "like").length ?? 0;
+  const hasLiked = d.hasLiked ?? false;
   return {
     id: d.id,
     title: d.title,
@@ -78,11 +81,12 @@ function apiDiscussionToPost(
     updatedAt: new Date(d.updatedAt),
     replies,
     views: d.viewCount ?? 0,
-    likes,
+    // Keep likes as a neutral baseline; UI adds +1 only when local liked state is active.
+    likes: Math.max(totalLikes - (hasLiked ? 1 : 0), 0),
     shares: 0,
     isAnswered: false,
     isPinned: d.isPinned ?? false,
-    isSaved: d.isBookmarked ?? false,
+    isSaved: d.hasBookmarked ?? d.isBookmarked ?? false,
     isReported: !!(d.flaggedAt || d.flagged),
     tags: undefined,
   };
@@ -216,6 +220,12 @@ export default function Community() {
         showBookmarkedOnly: filters.savedOnly,
       })
       .then((data) => {
+        setLikedPosts(data.filter((d) => d.hasLiked).map((d) => d.id));
+        setSavedPosts(
+          data
+            .filter((d) => d.hasBookmarked ?? d.isBookmarked)
+            .map((d) => d.id),
+        );
         setDiscussionPosts(data.map((d) => apiDiscussionToPost(d, apiCategories)));
         setApiError(null);
       })
@@ -510,6 +520,9 @@ export default function Community() {
       setDiscussionPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isReported: true } : p)),
       );
+      setBookmarkedDiscussions((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, isReported: true } : p)),
+      );
       toast.success("Post reported. Thank you for helping keep the community safe.");
     } catch (err) {
       console.error("Failed to report post:", err);
@@ -557,6 +570,7 @@ export default function Community() {
     setInitialLikeForDetail(initialIsLiked);
     setInitialLikeIdForDetail(initialLikeInteractionId);
 
+    const stats = full?.authorStats;
     const posterProfile: UserProfile = {
       id: full?.author?.id ?? post.posterId,
       name: [full?.author?.firstName, full?.author?.lastName].filter(Boolean).join(" ") || post.poster,
@@ -564,10 +578,10 @@ export default function Community() {
       displayPicture: full?.author?.profilePhotoUrl || post.posterAvatar || "",
       bio: "",
       joinedDate: full?.author?.createdAt ? new Date(full.author.createdAt) : new Date(),
-      totalPosts: 0,
-      totalViews: full?.viewCount ?? post.views,
-      totalReplies: freshReplyCount,
-      totalLikes: freshLikeCount,
+      totalPosts: stats?.posts ?? 0,
+      totalViews: stats?.views ?? full?.viewCount ?? post.views,
+      totalReplies: stats?.replies ?? freshReplyCount,
+      totalLikes: stats?.likes ?? freshLikeCount,
       isVerified: full?.author?.isVerified ?? false,
       isModerator: full?.author?.isModerator ?? false,
       rating: 4.5,
@@ -576,6 +590,8 @@ export default function Community() {
     const detailedPost: DetailedDiscussionPost = {
       ...post,
       content: fullContent,
+      isSaved: full?.hasBookmarked ?? full?.isBookmarked ?? post.isSaved,
+      isReported: full ? !!(full.flaggedAt || full.flagged) : post.isReported,
       likes: freshLikeCount,
       replies: freshReplyCount,
       views: full?.viewCount ?? post.views,
@@ -681,18 +697,36 @@ export default function Community() {
   const handleFlagToggle = useCallback(async (postId: string, currentlyFlagged: boolean) => {
     try {
       if (currentlyFlagged) {
-        await communityService.updateDiscussion(postId, { flagged: false });
+        await communityService.unflagDiscussion(postId);
       } else {
         await communityService.flagDiscussion(postId);
       }
       setDiscussionPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isReported: !currentlyFlagged } : p)),
       );
+      setBookmarkedDiscussions((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, isReported: !currentlyFlagged } : p)),
+      );
+      setFlaggedDiscussions((prev) =>
+        {
+          if (currentlyFlagged) {
+            return prev.filter((p) => p.id !== postId);
+          }
+          const existing = prev.find((p) => p.id === postId);
+          if (existing) {
+            return prev.map((p) => (p.id === postId ? { ...p, isReported: true } : p));
+          }
+          const fromBookmarked = bookmarkedDiscussions.find((p) => p.id === postId);
+          const fromDiscussions = discussionPosts.find((p) => p.id === postId);
+          const sourcePost = fromBookmarked ?? fromDiscussions;
+          return sourcePost ? [{ ...sourcePost, isReported: true }, ...prev] : prev;
+        },
+      );
       // Also update selectedPost if open in detail view
     } catch (err) {
       console.error("Failed to flag/unflag discussion:", err);
     }
-  }, []);
+  }, [bookmarkedDiscussions, discussionPosts]);
 
   const handleToggleJoinRequests = useCallback(async (group: CommunityGroupAPI) => {
     if (expandedRequestGroupId === group.id) {
@@ -1515,6 +1549,12 @@ export default function Community() {
                           {post.isPinned && (
                             <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pinned</Badge>
                           )}
+                          {isModerator && post.isReported && (
+                            <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 flex items-center gap-1">
+                              <Flag className="h-3 w-3" />
+                              Flagged
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-[#737692] line-clamp-2">{post.description}</p>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t">
@@ -1531,8 +1571,39 @@ export default function Community() {
                           </div>
                           <div className="flex items-center gap-4 text-[#737692]">
                             <div className="flex items-center gap-1 text-sm"><Eye className="h-4 w-4" /><span>{post.views}</span></div>
-                            <div className="flex items-center gap-1 text-sm"><Heart className="h-4 w-4" /><span>{post.likes}</span></div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleLikePost(post.id);
+                              }}
+                              className="flex items-center gap-1 text-sm hover:text-red-600 transition-colors"
+                              title={likedPosts.includes(post.id) ? "Unlike" : "Like"}
+                            >
+                              <Heart className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-current text-red-500" : ""}`} />
+                              <span>{post.likes + (likedPosts.includes(post.id) ? 1 : 0)}</span>
+                            </button>
                             <div className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /><span>{post.replies}</span></div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isModerator) {
+                                  handleFlagToggle(post.id, !!post.isReported);
+                                } else if (!post.isReported) {
+                                  handleReport(post.id);
+                                }
+                              }}
+                              disabled={!isModerator && !!post.isReported}
+                              title={isModerator
+                                ? (post.isReported ? 'Unflag this post' : 'Flag this post')
+                                : (post.isReported ? 'Already reported' : 'Report this post')}
+                              className={`p-1 rounded transition-colors ${
+                                post.isReported
+                                  ? 'text-orange-600'
+                                  : 'text-[#737692] hover:text-red-600'
+                              } ${!isModerator && post.isReported ? 'cursor-default' : ''}`}
+                            >
+                              <Flag className={`h-4 w-4 ${post.isReported ? 'fill-current' : ''}`} />
+                            </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleSavePost(post.id); setBookmarkedDiscussions((prev) => prev.filter((p) => p.id !== post.id)); }}
                               className="p-1 rounded text-[#D52B1E] hover:text-red-700 transition-colors"

@@ -17,6 +17,8 @@ export interface CommunityCategoryAPI {
 export interface DiscussionAuthorAPI {
   id: string;
   email: string;
+  username?: string | null;
+  lmsStudentId?: string | number | null;
   firstName: string;
   lastName: string;
   phone: string | null;
@@ -29,11 +31,19 @@ export interface DiscussionAuthorAPI {
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+  profile?: Record<string, unknown> | null;
+}
+
+export interface DiscussionAuthorStatsAPI {
+  posts: number;
+  replies: number;
+  views: number;
+  likes: number;
 }
 
 export interface DiscussionInteractionAPI {
   id: string;
-  user: DiscussionAuthorAPI;
+  user?: DiscussionAuthorAPI;
   type: "like" | "comment";
   content: string | null;
   createdAt: string;
@@ -63,10 +73,14 @@ export interface DiscussionAPI {
   updatedAt: string;
   /** Populated only on detail view */
   isBookmarked?: boolean;
+  hasLiked?: boolean;
+  hasBookmarked?: boolean;
   status?: string;
   flagged?: boolean;
   /** ISO timestamp set by API when flagged; null/undefined when not flagged */
   flaggedAt?: string | null;
+  /** Author lifetime stats — only present on detail endpoint */
+  authorStats?: DiscussionAuthorStatsAPI;
 }
 
 export interface GroupJoinRequestAPI {
@@ -293,6 +307,11 @@ export const communityService = {
   flagDiscussion: (discussionId: string) =>
     api
       .post<DiscussionAPI>(`/community/discussions/${discussionId}/flag`)
+      .then((r) => r.data),
+
+  unflagDiscussion: (discussionId: string) =>
+    api
+      .post<DiscussionAPI>(`/community/discussions/${discussionId}/unflag`)
       .then((r) => r.data),
 
   reportDiscussion: async (discussionId: string, _reason?: string) => {

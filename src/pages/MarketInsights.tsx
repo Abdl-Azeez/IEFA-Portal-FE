@@ -16,6 +16,7 @@ import {
   Newspaper,
   RefreshCw,
 } from "lucide-react";
+import GlobalIslamicMarket from "./GlobalIslamicMarket";
 import {
   Card,
   CardContent,
@@ -557,8 +558,14 @@ export function MarketInsights() {
       </motion.div>
 
       {/* Market Tabs */}
-      <Tabs defaultValue="global" className="space-y-6">
+      <Tabs defaultValue="global-islamic" className="space-y-6">
         <TabsList className="bg-white border border-gray-100 rounded-xl p-1.5 h-auto shadow-sm flex flex-wrap gap-1">
+          <TabsTrigger
+            value="global-islamic"
+            className="rounded-xl px-4 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm text-[#737692] hover:text-gray-800 transition-all"
+          >
+            Global Islamic Market
+          </TabsTrigger>
           <TabsTrigger
             value="global"
             className="rounded-xl px-4 py-2 text-sm font-medium data-[state=active]:bg-[#D52B1E] data-[state=active]:text-white data-[state=active]:shadow-sm text-[#737692] hover:text-gray-800 transition-all"
@@ -594,489 +601,508 @@ export function MarketInsights() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Global Islamic Market Tab */}
+        <TabsContent value="global-islamic" className="mt-0">
+          <GlobalIslamicMarket />
+        </TabsContent>
+
         <TabsContent value="global" className="space-y-6 mt-0">
           {/* Market Overview Cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {marketOverview.map((market, index) => (
-          <MarketCard key={market.title} {...market} delay={index * 0.1} />
-        ))}
-      </div>
+            {marketOverview.map((market, index) => (
+              <MarketCard key={market.title} {...market} delay={index * 0.1} />
+            ))}
+          </div>
 
-      {/* Stock Performance Section */}
-      <motion.div variants={itemVariants}>
-        <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl text-[#000000]">
-                  Stock Performance
-                </CardTitle>
-                <CardDescription className="text-[#737692]">
-                  Real-time market performance by category
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="Top Gainers" className="w-full">
-              <TabsList className="bg-transparent h-auto p-0 mb-6 gap-0">
-                {["Top Gainers", "Top Losers", "Most Active"].map((tab) => (
-                  <TabsTrigger
-                    key={tab}
-                    value={tab}
-                    className="bg-transparent px-0 mr-8 pb-2 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent"
-                  >
-                    {tab}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+          {/* Stock Performance Section */}
+          <motion.div variants={itemVariants}>
+            <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl text-[#000000]">
+                      Stock Performance
+                    </CardTitle>
+                    <CardDescription className="text-[#737692]">
+                      Real-time market performance by category
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="Top Gainers" className="w-full">
+                  <TabsList className="bg-transparent h-auto p-0 mb-6 gap-0">
+                    {["Top Gainers", "Top Losers", "Most Active"].map((tab) => (
+                      <TabsTrigger
+                        key={tab}
+                        value={tab}
+                        className="bg-transparent px-0 mr-8 pb-2 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent"
+                      >
+                        {tab}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
 
-              {performanceData.map((perf) => (
-                <TabsContent
-                  key={perf.title}
-                  value={perf.title}
-                  className="mt-0"
-                >
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {perf.data.map((stock, index) => (
-                      <PerformanceCard
-                        key={stock.symbol}
-                        stock={stock}
-                        index={index}
+                  {performanceData.map((perf) => (
+                    <TabsContent
+                      key={perf.title}
+                      value={perf.title}
+                      className="mt-0"
+                    >
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {perf.data.map((stock, index) => (
+                          <PerformanceCard
+                            key={stock.symbol}
+                            stock={stock}
+                            index={index}
+                          />
+                        ))}
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Major Indices */}
+            <motion.div className="lg:col-span-2" variants={itemVariants}>
+              <Card className="transition-all duration-300 hover:shadow-xl">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-[#000000]">
+                        Major Indices
+                      </CardTitle>
+                      <CardDescription className="text-[#737692]">
+                        Shariah-compliant market indices
+                      </CardDescription>
+                    </div>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{
+                        duration: 20,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                    >
+                      <PieChart className="h-8 w-8 text-primary" />
+                    </motion.div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {indices.map((index, idx) => (
+                      <IndexCard
+                        key={index.name}
+                        {...index}
+                        delay={0.4 + idx * 0.1}
                       />
                     ))}
                   </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          </CardContent>
-        </Card>
-      </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Major Indices */}
-        <motion.div className="lg:col-span-2" variants={itemVariants}>
-          <Card className="transition-all duration-300 hover:shadow-xl">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-[#000000]">
-                    Major Indices
-                  </CardTitle>
+            {/* Market Chart Placeholder */}
+            <motion.div variants={itemVariants}>
+              <Card className="transition-all duration-300 hover:shadow-xl h-full">
+                <CardHeader>
+                  <CardTitle className="text-[#000000]">Market Trend</CardTitle>
                   <CardDescription className="text-[#737692]">
-                    Shariah-compliant market indices
+                    30-day performance
                   </CardDescription>
-                </div>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 20,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                >
-                  <PieChart className="h-8 w-8 text-primary" />
-                </motion.div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {indices.map((index, idx) => (
-                  <IndexCard
-                    key={index.name}
-                    {...index}
-                    delay={0.4 + idx * 0.1}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Market Chart Placeholder */}
-        <motion.div variants={itemVariants}>
-          <Card className="transition-all duration-300 hover:shadow-xl h-full">
-            <CardHeader>
-              <CardTitle className="text-[#000000]">Market Trend</CardTitle>
-              <CardDescription className="text-[#737692]">
-                30-day performance
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[280px] flex items-center justify-center bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 rounded-lg relative overflow-hidden">
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/20 to-primary/0"
-                  animate={{ x: ["-100%", "100%"] }}
-                  transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                />
-                <div className="relative z-10 text-center">
-                  <motion.div
-                    animate={{
-                      y: [0, -10, 0],
-                      rotate: [0, 5, -5, 0],
-                    }}
-                    transition={{ duration: 4, repeat: Infinity }}
-                  >
-                    <TrendingUp className="h-16 w-16 mx-auto text-primary mb-3" />
-                  </motion.div>
-                  <p className="text-sm text-[#737692] font-medium">
-                    Chart Visualization
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Top Performers and Sector Distribution */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Top Performers */}
-        <motion.div variants={itemVariants}>
-          <Card className="transition-all duration-300 hover:shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-[#000000]">Top Performers</CardTitle>
-              <CardDescription className="text-[#737692]">
-                Best performing stocks today
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {topPerformers.map((stock, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.7 + index * 0.1 }}
-                    whileHover={{ x: 8, scale: 1.02 }}
-                    className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-transparent rounded-lg border border-green-100 hover:border-green-200 transition-all duration-200 cursor-pointer"
-                  >
-                    <div>
-                      <h4 className="font-semibold text-[#000000]">
-                        {stock.name}
-                      </h4>
-                      <p className="text-sm text-[#737692]">{stock.sector}</p>
-                    </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[280px] flex items-center justify-center bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 rounded-lg relative overflow-hidden">
                     <motion.div
-                      whileHover={{ scale: 1.1 }}
-                      className="flex items-center gap-2"
-                    >
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                      <span className="text-lg font-bold text-green-600">
-                        {stock.change}
-                      </span>
-                    </motion.div>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Sector Distribution */}
-        <motion.div variants={itemVariants}>
-          <Card className="transition-all duration-300 hover:shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-[#000000]">
-                Sector Distribution
-              </CardTitle>
-              <CardDescription className="text-[#737692]">
-                Market composition by sector
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {sectors.map((sector, index) => (
-                  <div key={sector.name} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-[#000000]">
-                        {sector.name}
-                      </span>
-                      <span className="text-[#737692]">
-                        {sector.percentage}%
-                      </span>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/20 to-primary/0"
+                      animate={{ x: ["-100%", "100%"] }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 3,
+                        ease: "linear",
+                      }}
+                    />
+                    <div className="relative z-10 text-center">
                       <motion.div
-                        className={`h-full ${sector.color} rounded-full`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${sector.percentage}%` }}
-                        transition={{
-                          delay: 0.9 + index * 0.1,
-                          duration: 1,
-                          ease: "easeOut",
+                        animate={{
+                          y: [0, -10, 0],
+                          rotate: [0, 5, -5, 0],
                         }}
-                      />
+                        transition={{ duration: 4, repeat: Infinity }}
+                      >
+                        <TrendingUp className="h-16 w-16 mx-auto text-primary mb-3" />
+                      </motion.div>
+                      <p className="text-sm text-[#737692] font-medium">
+                        Chart Visualization
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
 
-              {/* Pie Chart Visualization */}
-              <div className="mt-6 flex items-center justify-center">
-                <div className="relative w-40 h-40">
-                  <motion.div
-                    className="absolute inset-0 rounded-full border-8 border-primary/20"
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 60,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                  />
-                  <motion.div
-                    className="absolute inset-0 flex items-center justify-center"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 1.2, type: "spring" }}
-                  >
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-[#000000]">100%</p>
-                      <p className="text-xs text-[#737692]">Total</p>
-                    </div>
-                  </motion.div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Market Summary */}
-      <motion.div variants={itemVariants}>
-        <Card className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border-primary/20">
-          <CardHeader>
-            <CardTitle className="text-[#000000]">Market Summary</CardTitle>
-            <CardDescription className="text-[#737692]">
-              Key highlights and analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              {/* Fear & Greed — live */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.3 }}
-                whileHover={{ y: -4 }}
-                className={`p-4 bg-gradient-to-br ${fearGreed ? getFearGreedBg(fearGreed.value_classification) : "from-gray-50 to-gray-100/30 border-gray-100"} border rounded-lg text-center hover:shadow-md transition-all duration-200`}
-              >
-                <div className="flex items-center justify-center gap-1.5 text-xs text-[#737692] mb-1">
-                  <Activity className="h-3.5 w-3.5" />
-                  Fear & Greed Index
-                </div>
-                {dashLoading || !fearGreed ? (
-                  <div className="h-7 w-20 bg-gray-200 animate-pulse rounded mx-auto" />
-                ) : (
-                  <>
-                    <p
-                      className={`text-2xl font-bold ${getFearGreedColor(fearGreed.value_classification)}`}
-                    >
-                      {fearGreed.value}
-                    </p>
-                    <p
-                      className={`text-sm font-semibold ${getFearGreedColor(fearGreed.value_classification)}`}
-                    >
-                      {fearGreed.value_classification}
-                    </p>
-                  </>
-                )}
-              </motion.div>
-
-              {[
-                {
-                  label: "Volatility Index",
-                  value: "Low",
-                  color: "text-blue-600",
-                },
-                {
-                  label: "Volume Trend",
-                  value: "Increasing",
-                  color: "text-purple-600",
-                },
-              ].map((item, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.4 + index * 0.1 }}
-                  whileHover={{ y: -4 }}
-                  className="p-4 bg-white rounded-lg text-center hover:shadow-md transition-all duration-200"
-                >
-                  <p className="text-sm text-[#737692] mb-1">{item.label}</p>
-                  <p className={`text-xl font-bold ${item.color}`}>
-                    {item.value}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Local News from IEFA */}
-      {(dashLoading || localNews.length > 0) && (
-        <motion.div variants={itemVariants}>
-          <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Newspaper className="h-5 w-5 text-[#D52B1E]" />
-                <div>
+          {/* Top Performers and Sector Distribution */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Top Performers */}
+            <motion.div variants={itemVariants}>
+              <Card className="transition-all duration-300 hover:shadow-xl">
+                <CardHeader>
                   <CardTitle className="text-[#000000]">
-                    Latest Local News
+                    Top Performers
                   </CardTitle>
                   <CardDescription className="text-[#737692]">
-                    Recent local market articles
+                    Best performing stocks today
                   </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {dashLoading ? (
-                <div className="space-y-3">
-                  {[1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="animate-pulse flex gap-4 p-4 rounded-xl border border-gray-100"
-                    >
-                      <div className="h-16 w-16 rounded-lg bg-gray-200 shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-3/4" />
-                        <div className="h-3 bg-gray-100 rounded w-full" />
-                        <div className="h-3 bg-gray-100 rounded w-1/2" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {localNews.map(
-                    (article: MarketInsightLocalNews, idx: number) => (
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {topPerformers.map((stock, index) => (
                       <motion.div
-                        key={article.id}
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.08 }}
-                        whileHover={{ x: 4 }}
-                        className="flex gap-4 p-4 rounded-xl border border-gray-100 hover:border-[#D52B1E]/30 hover:bg-[#D52B1E]/[0.02] transition-all duration-200 cursor-pointer"
+                        key={index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.7 + index * 0.1 }}
+                        whileHover={{ x: 8, scale: 1.02 }}
+                        className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-transparent rounded-lg border border-green-100 hover:border-green-200 transition-all duration-200 cursor-pointer"
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                            {article.isFeatured && (
-                              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                                Featured
-                              </span>
-                            )}
-                            {article.tags?.slice(0, 2).map((t) => (
-                              <span
-                                key={t.id}
-                                className="text-[10px] font-medium text-[#D52B1E] bg-[#D52B1E]/10 px-1.5 py-0.5 rounded-full"
-                              >
-                                {t.name}
-                              </span>
-                            ))}
-                          </div>
-                          <h4 className="font-semibold text-[#000000] text-sm leading-snug mb-1 line-clamp-2">
-                            {article.title}
+                        <div>
+                          <h4 className="font-semibold text-[#000000]">
+                            {stock.name}
                           </h4>
-                          {article.excerpt && (
-                            <p className="text-xs text-[#737692] line-clamp-2">
-                              {article.excerpt}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-1 mt-2 text-[10px] text-[#737692]">
-                            <Clock className="h-3 w-3" />
-                            {fmtDate(article.publishedAt ?? article.createdAt)}
-                            {typeof article.viewCount === "number" && (
-                              <span className="ml-2">
-                                {article.viewCount} views
-                              </span>
-                            )}
-                          </div>
+                          <p className="text-sm text-[#737692]">
+                            {stock.sector}
+                          </p>
+                        </div>
+                        <motion.div
+                          whileHover={{ scale: 1.1 }}
+                          className="flex items-center gap-2"
+                        >
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                          <span className="text-lg font-bold text-green-600">
+                            {stock.change}
+                          </span>
+                        </motion.div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Sector Distribution */}
+            <motion.div variants={itemVariants}>
+              <Card className="transition-all duration-300 hover:shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-[#000000]">
+                    Sector Distribution
+                  </CardTitle>
+                  <CardDescription className="text-[#737692]">
+                    Market composition by sector
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {sectors.map((sector, index) => (
+                      <div key={sector.name} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-[#000000]">
+                            {sector.name}
+                          </span>
+                          <span className="text-[#737692]">
+                            {sector.percentage}%
+                          </span>
+                        </div>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <motion.div
+                            className={`h-full ${sector.color} rounded-full`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${sector.percentage}%` }}
+                            transition={{
+                              delay: 0.9 + index * 0.1,
+                              duration: 1,
+                              ease: "easeOut",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pie Chart Visualization */}
+                  <div className="mt-6 flex items-center justify-center">
+                    <div className="relative w-40 h-40">
+                      <motion.div
+                        className="absolute inset-0 rounded-full border-8 border-primary/20"
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          duration: 60,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                      />
+                      <motion.div
+                        className="absolute inset-0 flex items-center justify-center"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 1.2, type: "spring" }}
+                      >
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-[#000000]">
+                            100%
+                          </p>
+                          <p className="text-xs text-[#737692]">Total</p>
                         </div>
                       </motion.div>
-                    ),
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* External Market News Feed */}
-      {(dashLoading || externalNews.length > 0) && (
-        <motion.div variants={itemVariants}>
-          <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-[#D52B1E]" />
-                <div>
-                  <CardTitle className="text-[#000000]">
-                    Market News Feed
-                  </CardTitle>
-                  <CardDescription className="text-[#737692]">
-                    Latest market news from external sources
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {dashLoading ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className="animate-pulse p-4 rounded-xl border border-gray-100 space-y-2"
-                    >
-                      <div className="h-3 bg-gray-200 rounded w-1/3" />
-                      <div className="h-4 bg-gray-200 rounded w-full" />
-                      <div className="h-3 bg-gray-100 rounded w-3/4" />
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Market Summary */}
+          <motion.div variants={itemVariants}>
+            <Card className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border-primary/20">
+              <CardHeader>
+                <CardTitle className="text-[#000000]">Market Summary</CardTitle>
+                <CardDescription className="text-[#737692]">
+                  Key highlights and analysis
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {/* Fear & Greed — live */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.3 }}
+                    whileHover={{ y: -4 }}
+                    className={`p-4 bg-gradient-to-br ${fearGreed ? getFearGreedBg(fearGreed.value_classification) : "from-gray-50 to-gray-100/30 border-gray-100"} border rounded-lg text-center hover:shadow-md transition-all duration-200`}
+                  >
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-[#737692] mb-1">
+                      <Activity className="h-3.5 w-3.5" />
+                      Fear & Greed Index
+                    </div>
+                    {dashLoading || !fearGreed ? (
+                      <div className="h-7 w-20 bg-gray-200 animate-pulse rounded mx-auto" />
+                    ) : (
+                      <>
+                        <p
+                          className={`text-2xl font-bold ${getFearGreedColor(fearGreed.value_classification)}`}
+                        >
+                          {fearGreed.value}
+                        </p>
+                        <p
+                          className={`text-sm font-semibold ${getFearGreedColor(fearGreed.value_classification)}`}
+                        >
+                          {fearGreed.value_classification}
+                        </p>
+                      </>
+                    )}
+                  </motion.div>
+
+                  {[
+                    {
+                      label: "Volatility Index",
+                      value: "Low",
+                      color: "text-blue-600",
+                    },
+                    {
+                      label: "Volume Trend",
+                      value: "Increasing",
+                      color: "text-purple-600",
+                    },
+                  ].map((item, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.4 + index * 0.1 }}
+                      whileHover={{ y: -4 }}
+                      className="p-4 bg-white rounded-lg text-center hover:shadow-md transition-all duration-200"
+                    >
+                      <p className="text-sm text-[#737692] mb-1">
+                        {item.label}
+                      </p>
+                      <p className={`text-xl font-bold ${item.color}`}>
+                        {item.value}
+                      </p>
+                    </motion.div>
                   ))}
                 </div>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {externalNews.map(
-                    (article: MarketInsightExternalNews, idx: number) => (
-                      <motion.a
-                        key={article.id + idx}
-                        href={article.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.06 }}
-                        whileHover={{
-                          y: -3,
-                          boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
-                        }}
-                        className="p-4 rounded-xl border border-gray-100 hover:border-green-200 bg-white hover:bg-green-50/30 transition-all duration-200 flex flex-col gap-2 group"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full truncate max-w-[70%]">
-                            {article.source}
-                          </span>
-                          <ExternalLink className="h-3.5 w-3.5 text-gray-400 group-hover:text-green-600 transition-colors shrink-0" />
-                        </div>
-                        <p className="text-sm font-semibold text-[#000000] leading-snug line-clamp-3">
-                          {article.title}
-                        </p>
-                        {article.pubDate && (
-                          <div className="flex items-center gap-1 text-[10px] text-[#737692] mt-auto">
-                            <Clock className="h-3 w-3" />
-                            {fmtDate(article.pubDate)}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Local News from IEFA */}
+          {(dashLoading || localNews.length > 0) && (
+            <motion.div variants={itemVariants}>
+              <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Newspaper className="h-5 w-5 text-[#D52B1E]" />
+                    <div>
+                      <CardTitle className="text-[#000000]">
+                        Latest Local News
+                      </CardTitle>
+                      <CardDescription className="text-[#737692]">
+                        Recent local market articles
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {dashLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2].map((i) => (
+                        <div
+                          key={i}
+                          className="animate-pulse flex gap-4 p-4 rounded-xl border border-gray-100"
+                        >
+                          <div className="h-16 w-16 rounded-lg bg-gray-200 shrink-0" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-3/4" />
+                            <div className="h-3 bg-gray-100 rounded w-full" />
+                            <div className="h-3 bg-gray-100 rounded w-1/2" />
                           </div>
-                        )}
-                      </motion.a>
-                    ),
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {localNews.map(
+                        (article: MarketInsightLocalNews, idx: number) => (
+                          <motion.div
+                            key={article.id}
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.08 }}
+                            whileHover={{ x: 4 }}
+                            className="flex gap-4 p-4 rounded-xl border border-gray-100 hover:border-[#D52B1E]/30 hover:bg-[#D52B1E]/[0.02] transition-all duration-200 cursor-pointer"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                {article.isFeatured && (
+                                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                                    Featured
+                                  </span>
+                                )}
+                                {article.tags?.slice(0, 2).map((t) => (
+                                  <span
+                                    key={t.id}
+                                    className="text-[10px] font-medium text-[#D52B1E] bg-[#D52B1E]/10 px-1.5 py-0.5 rounded-full"
+                                  >
+                                    {t.name}
+                                  </span>
+                                ))}
+                              </div>
+                              <h4 className="font-semibold text-[#000000] text-sm leading-snug mb-1 line-clamp-2">
+                                {article.title}
+                              </h4>
+                              {article.excerpt && (
+                                <p className="text-xs text-[#737692] line-clamp-2">
+                                  {article.excerpt}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-1 mt-2 text-[10px] text-[#737692]">
+                                <Clock className="h-3 w-3" />
+                                {fmtDate(
+                                  article.publishedAt ?? article.createdAt,
+                                )}
+                                {typeof article.viewCount === "number" && (
+                                  <span className="ml-2">
+                                    {article.viewCount} views
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ),
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* External Market News Feed */}
+          {(dashLoading || externalNews.length > 0) && (
+            <motion.div variants={itemVariants}>
+              <Card className="transition-all duration-300 hover:shadow-xl border-0 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-[#D52B1E]" />
+                    <div>
+                      <CardTitle className="text-[#000000]">
+                        Market News Feed
+                      </CardTitle>
+                      <CardDescription className="text-[#737692]">
+                        Latest market news from external sources
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {dashLoading ? (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="animate-pulse p-4 rounded-xl border border-gray-100 space-y-2"
+                        >
+                          <div className="h-3 bg-gray-200 rounded w-1/3" />
+                          <div className="h-4 bg-gray-200 rounded w-full" />
+                          <div className="h-3 bg-gray-100 rounded w-3/4" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {externalNews.map(
+                        (article: MarketInsightExternalNews, idx: number) => (
+                          <motion.a
+                            key={article.id + idx}
+                            href={article.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.06 }}
+                            whileHover={{
+                              y: -3,
+                              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                            }}
+                            className="p-4 rounded-xl border border-gray-100 hover:border-green-200 bg-white hover:bg-green-50/30 transition-all duration-200 flex flex-col gap-2 group"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full truncate max-w-[70%]">
+                                {article.source}
+                              </span>
+                              <ExternalLink className="h-3.5 w-3.5 text-gray-400 group-hover:text-green-600 transition-colors shrink-0" />
+                            </div>
+                            <p className="text-sm font-semibold text-[#000000] leading-snug line-clamp-3">
+                              {article.title}
+                            </p>
+                            {article.pubDate && (
+                              <div className="flex items-center gap-1 text-[10px] text-[#737692] mt-auto">
+                                <Clock className="h-3 w-3" />
+                                {fmtDate(article.pubDate)}
+                              </div>
+                            )}
+                          </motion.a>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </TabsContent>
 
         {/* NGX Market Tab */}
