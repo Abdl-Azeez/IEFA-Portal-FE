@@ -113,6 +113,10 @@ const RECHARTS_TOOLTIP_STYLE = {
   itemStyle:  { color: '#101828' },
 }
 
+const DONUT_MARGIN_STANDARD = { top: 52, right: 12, bottom: 72, left: 12 } as const
+const DONUT_MARGIN_WIDE = { top: 52, right: 20, bottom: 72, left: 20 } as const
+const DONUT_MARGIN_WITH_LEGEND = { top: 52, right: 8, bottom: 64, left: 8 } as const
+
 // ─── All Data ─────────────────────────────────────────────────────────────────
 const ISLAMIC_DATA = {
   globalGlance: {
@@ -798,8 +802,8 @@ function useAnimatedNumber(target: number, delay = 0) {
     let interval: ReturnType<typeof setInterval> | undefined
 
     timer = setTimeout(() => {
-      const duration = 1200
-      const steps = 48
+      const duration = 900
+      const steps = 36
       const stepValue = target / steps
       let current = 0
 
@@ -1034,6 +1038,7 @@ function CircularProgressRing({
 function SectorBreakdownRow({
   sector,
   index,
+  maxShare,
   isOpen,
   onToggle,
 }: Readonly<{
@@ -1045,10 +1050,13 @@ function SectorBreakdownRow({
     color: string
   }
   index: number
+  maxShare: number
   isOpen: boolean
   onToggle: () => void
 }>) {
   const [progressWidth, setProgressWidth] = useState(0)
+  const relativeToLeader = Math.round((sector.sharePercent / maxShare) * 100)
+  const isLeader = sector.sharePercent === maxShare
 
   useEffect(() => {
     const timer = setTimeout(() => setProgressWidth(sector.sharePercent), index * 100)
@@ -1099,16 +1107,38 @@ function SectorBreakdownRow({
           </div>
         </div>
         {isOpen && (
-          <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
-            <svg viewBox="0 0 320 42" className="h-12 w-full">
-              <path
-                d="M0 26 C24 10, 48 10, 72 24 S120 38, 148 20 S200 6, 228 22 S274 36, 320 12"
-                fill="none"
-                stroke={sector.color}
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-            </svg>
+          <div
+            className="mt-4 rounded-xl border p-3"
+            style={{ borderColor: `${sector.color}33`, backgroundColor: `${sector.color}08` }}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border bg-white/80 p-3" style={{ borderColor: `${sector.color}22` }}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: sector.color }}>
+                  Portfolio Weight
+                </div>
+                <div className="mt-1 text-sm text-gray-700">
+                  {sector.sharePercent}% of total Islamic finance assets
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${sector.sharePercent}%`,
+                      background: `linear-gradient(90deg, ${sector.color} 0%, ${lightenHex(sector.color)} 100%)`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg border bg-white/80 p-3" style={{ borderColor: `${sector.color}22` }}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: sector.color }}>
+                  Market Position
+                </div>
+                <div className="mt-1 text-sm text-gray-700">
+                  {isLeader ? 'Largest sector by assets' : `${relativeToLeader}% of the leader sector size`}
+                </div>
+                <div className="mt-2 text-xs text-gray-500">{sector.institutionsLabel}</div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1140,7 +1170,7 @@ function RegionDominanceSegment({
     <button
       type="button"
       aria-label={`${region.label} ${region.value}% share`}
-      className="relative min-w-[2px] origin-bottom transition-all duration-300"
+      className="relative min-w-[2px] origin-bottom transition-transform duration-200"
       style={{
         width: `${width}%`,
         transform: isHovered ? 'scaleY(1.12)' : 'scaleY(1)',
@@ -1530,27 +1560,6 @@ function EcosystemMetricRow({
   )
 }
 
-function SpotlightStat({
-  label,
-  value,
-  delay,
-}: Readonly<{
-  label: string
-  value: number
-  delay: number
-}>) {
-  return (
-    <div className="rounded-lg border px-3 py-4 text-center" style={{ borderColor: '#E9E5E5', backgroundColor: COLORS.cardTint }}>
-      <AnimatedMetricNumber
-        value={value}
-        delay={delay}
-        className="block text-2xl font-bold"
-      />
-      <div className="mt-1 text-xs" style={{ color: '#667085' }}>{label}</div>
-    </div>
-  )
-}
-
 function IFDIRankCard({
   country,
   flag,
@@ -1727,7 +1736,7 @@ function TabGlobalGlance() {
         </SectionCard>
 
         <SectionCard title="Assets by Sector (2024)" className="relative lg:col-span-2">
-          <div className="relative h-[320px]">
+          <div className="relative h-[336px]">
             <ResponsivePie
               data={globalGlance.assetsBySector}
               innerRadius={0.65}
@@ -1736,7 +1745,7 @@ function TabGlobalGlance() {
               activeOuterRadiusOffset={8}
               colors={{ datum: 'data.color' }}
               theme={NIVO_THEME}
-              margin={{ top: 20, right: 20, bottom: 80, left: 20 }}
+              margin={DONUT_MARGIN_WITH_LEGEND}
               arcLabelsSkipAngle={10}
               arcLabelsTextColor={COLORS.textPrimary}
               arcLabel={formatGlobalGlanceSectorArcLabel}
@@ -1896,15 +1905,28 @@ function TabGlobalGlance() {
             <Radio className="h-4 w-4" />
             Awareness
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {globalGlance.ecosystem.awareness.map((metric, index) => (
-              <SpotlightStat
-                key={metric.label}
-                label={metric.label}
-                value={metric.value}
-                delay={index * 200}
-              />
-            ))}
+          <div className="space-y-3">
+            {(() => {
+              const maxAwareness = Math.max(...globalGlance.ecosystem.awareness.map((m) => m.value))
+              return globalGlance.ecosystem.awareness.map((metric, index) => (
+                <div key={metric.label} className="animate-in fade-in slide-in-from-left-2 duration-500" style={{ animationDelay: `${index * 120}ms` }}>
+                  <div className="mb-1 flex items-baseline justify-between gap-2">
+                    <span className="text-xs" style={{ color: COLORS.textSecond }}>{metric.label}</span>
+                    <AnimatedMetricNumber value={metric.value} delay={index * 200} className="text-base font-bold tabular-nums" />
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${(metric.value / maxAwareness) * 100}%`,
+                        background: `linear-gradient(90deg, ${COLORS.gold} 0%, ${COLORS.goldLight} 100%)`,
+                        transitionDelay: `${index * 150}ms`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))
+            })()}
           </div>
         </SectionCard>
 
@@ -1913,15 +1935,28 @@ function TabGlobalGlance() {
             <BookOpen className="h-4 w-4" />
             Knowledge
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {globalGlance.ecosystem.knowledge.map((metric, index) => (
-              <SpotlightStat
-                key={metric.label}
-                label={metric.label}
-                value={metric.value}
-                delay={index * 200 + 200}
-              />
-            ))}
+          <div className="space-y-3">
+            {(() => {
+              const maxKnowledge = Math.max(...globalGlance.ecosystem.knowledge.map((m) => m.value))
+              return globalGlance.ecosystem.knowledge.map((metric, index) => (
+                <div key={metric.label} className="animate-in fade-in slide-in-from-left-2 duration-500" style={{ animationDelay: `${index * 120}ms` }}>
+                  <div className="mb-1 flex items-baseline justify-between gap-2">
+                    <span className="text-xs" style={{ color: COLORS.textSecond }}>{metric.label}</span>
+                    <AnimatedMetricNumber value={metric.value} delay={index * 200 + 200} className="text-base font-bold tabular-nums" />
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${(metric.value / maxKnowledge) * 100}%`,
+                        background: `linear-gradient(90deg, ${COLORS.purple} 0%, ${COLORS.purpleLight} 100%)`,
+                        transitionDelay: `${index * 150}ms`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))
+            })()}
           </div>
           <div className="mt-4 text-xs italic text-gray-400">
             {globalGlance.ecosystem.knowledgeLeader.country} leads with {globalGlance.ecosystem.knowledgeLeader.providers.toLocaleString()} IF education providers
@@ -2019,17 +2054,21 @@ function TabGlobalOverview() {
       </div>
 
       <SectionCard title="Islamic Finance Industry Breakdown by Sector (2024)">
-        {globalOverview.sectorBreakdown.map((sector, index) => (
-          <SectorBreakdownRow
-            key={sector.sector}
-            sector={sector}
-            index={index}
-            isOpen={expandedSector === sector.sector}
-            onToggle={() =>
-              setExpandedSector((current) => (current === sector.sector ? null : sector.sector))
-            }
-          />
-        ))}
+        {(() => {
+          const maxSectorShare = Math.max(...globalOverview.sectorBreakdown.map((item) => item.sharePercent))
+          return globalOverview.sectorBreakdown.map((sector, index) => (
+            <SectorBreakdownRow
+              key={sector.sector}
+              sector={sector}
+              index={index}
+              maxShare={maxSectorShare}
+              isOpen={expandedSector === sector.sector}
+              onToggle={() =>
+                setExpandedSector((current) => (current === sector.sector ? null : sector.sector))
+              }
+            />
+          ))
+        })()}
         <div className="rounded-xl border p-4" style={{ borderColor: `${COLORS.teal}30`, backgroundColor: `${COLORS.teal}08`, color: COLORS.teal }}>
           <div className="flex flex-col gap-4 font-semibold lg:flex-row lg:items-center">
             <div className="w-full lg:w-1/4">TOTAL</div>
@@ -2093,7 +2132,7 @@ function TabGlobalOverview() {
               cornerRadius={3}
               colors={{ datum: 'data.color' }}
               theme={NIVO_THEME}
-              margin={{ top: 10, right: 20, bottom: 90, left: 20 }}
+              margin={DONUT_MARGIN_WIDE}
               arcLabelsSkipAngle={8}
               arcLabel={formatGlobalOverviewArcLabel}
               arcLabelsTextColor={COLORS.textPrimary}
@@ -2135,11 +2174,13 @@ function TabGlobalOverview() {
 
       <SectionCard title="Regional Islamic Finance Asset Share">
         <div className="relative">
-          {hoveredRegion && (
-            <div className="mb-3 inline-flex rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 shadow-lg">
-              {formatOverviewHoverText(hoveredRegionData)}
+          <div className="mb-3 min-h-[34px]">
+            <div
+              className={`inline-flex rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 shadow-lg transition-opacity duration-150 ${hoveredRegion ? 'opacity-100' : 'opacity-0'}`}
+            >
+              {hoveredRegion ? formatOverviewHoverText(hoveredRegionData) : ' '}
             </div>
-          )}
+          </div>
           <div className="flex gap-px overflow-hidden rounded-xl bg-white/20">
             {globalOverview.regionalDistribution.map((region, index) => (
               <RegionDominanceSegment
@@ -2299,7 +2340,7 @@ function TabIslamicBanking() {
               cornerRadius={4}
               colors={{ datum: 'data.color' }}
               theme={NIVO_THEME}
-              margin={{ top: 10, right: 10, bottom: 90, left: 10 }}
+              margin={DONUT_MARGIN_STANDARD}
               arcLabel={formatBankingRegionArcLabel}
               arcLabelsSkipAngle={12}
               arcLabelsTextColor={COLORS.textPrimary}
@@ -2537,7 +2578,7 @@ function TabTakaful() {
               cornerRadius={4}
               colors={{ datum: 'data.color' }}
               theme={NIVO_THEME}
-              margin={{ top: 10, right: 10, bottom: 90, left: 10 }}
+              margin={DONUT_MARGIN_STANDARD}
               arcLabel={formatTakafulRegionArcLabel}
               arcLabelsSkipAngle={15}
               arcLabelsTextColor={COLORS.textPrimary}
@@ -2728,7 +2769,7 @@ function TabOtherIFIs() {
               cornerRadius={4}
               colors={{ datum: 'data.color' }}
               theme={NIVO_THEME}
-              margin={{ top: 10, right: 10, bottom: 90, left: 10 }}
+              margin={DONUT_MARGIN_STANDARD}
               arcLabel={formatOifiRegionArcLabel}
               arcLabelsSkipAngle={15}
               arcLabelsTextColor={COLORS.textPrimary}
@@ -2834,8 +2875,8 @@ function TabSukuk() {
   const maxCountryValue = sukuk.topCountries[0].value
 
   useEffect(() => {
-    const duration = 2000
-    const steps = 80
+    const duration = 900
+    const steps = 45
     const increment = 1031 / steps
     let current = 0
     const timer = setInterval(() => {
@@ -3034,7 +3075,7 @@ function TabSukuk() {
               cornerRadius={4}
               colors={{ datum: 'data.color' }}
               theme={NIVO_THEME}
-              margin={{ top: 10, right: 10, bottom: 90, left: 10 }}
+              margin={DONUT_MARGIN_STANDARD}
               arcLabel={(d) => `US$${d.value}bn`}
               arcLabelsSkipAngle={12}
               arcLabelsTextColor={COLORS.textPrimary}
@@ -3332,7 +3373,7 @@ function TabIslamicFunds() {
               cornerRadius={4}
               colors={{ datum: 'data.color' }}
               theme={NIVO_THEME}
-              margin={{ top: 10, right: 10, bottom: 90, left: 10 }}
+              margin={DONUT_MARGIN_STANDARD}
               arcLabel={(d) => `US$${d.value}bn`}
               arcLabelsSkipAngle={15}
               arcLabelsTextColor={COLORS.textPrimary}
