@@ -47,71 +47,71 @@ import {
 // ─── Colour System ────────────────────────────────────────────────────────────
 export const COLORS = {
   // Brand identity
-  brandRed:    '#E3261C',
-  deepRed:     '#A31612',
+  brandRed: "#E3261C",
+  deepRed: "#A31612",
   // Financial semantic
-  teal:        '#0F9D8A',
-  tealLight:   '#14B8A6',
-  emerald:     '#16A34A',
-  emeraldLight:'#22C55E',
-  gold:        '#D4A017',
-  goldLight:   '#F59E0B',
-  purple:      '#7C3AED',
-  purpleLight: '#8B5CF6',
-  ocean:       '#0891B2',
-  oceanLight:  '#06B6D4',
-  crimson:     '#DC2626',
-  controlledRed:'#DC2626',
+  teal: "#D52B1E ",
+  tealLight: "#A31613",
+  emerald: "#16A34A",
+  emeraldLight: "#22C55E",
+  gold: "#D4A017",
+  goldLight: "#F59E0B",
+  purple: "#7C3AED",
+  purpleLight: "#8B5CF6",
+  ocean: "#0891B2",
+  oceanLight: "#06B6D4",
+  crimson: "#DC2626",
+  controlledRed: "#DC2626",
   // Surfaces
-  pageBg:      '#F8EFEF',
-  cardBg:      '#FFFFFF',
-  cardTint:    '#F6FCFA',
-  cardBorder:  '#E9E5E5',
-  cardBorder2: '#D1D5DB',
+  pageBg: "#F8EFEF",
+  cardBg: "#FFFFFF",
+  cardTint: "#F6FCFA",
+  cardBorder: "#E9E5E5",
+  cardBorder2: "#D1D5DB",
   // Typography
-  textPrimary: '#101828',
-  textSecond:  '#667085',
-  textMuted:   '#98A2B3',
+  textPrimary: "#101828",
+  textSecond: "#667085",
+  textMuted: "#98A2B3",
   // Chart
-  projected:   '#F59E0B',
-} as const
+  projected: "#F59E0B",
+} as const;
 
 // ─── Nivo Shared Theme ────────────────────────────────────────────────────────
 const NIVO_THEME = {
-  background: 'transparent',
-  text: { fill: '#667085', fontSize: 11, fontFamily: 'inherit' },
+  background: "transparent",
+  text: { fill: "#667085", fontSize: 11, fontFamily: "inherit" },
   axis: {
-    ticks:  { text: { fill: '#667085', fontSize: 10 } },
-    legend: { text: { fill: '#667085', fontSize: 12, fontWeight: 500 } },
+    ticks: { text: { fill: "#667085", fontSize: 10 } },
+    legend: { text: { fill: "#667085", fontSize: 12, fontWeight: 500 } },
   },
-  grid:    { line: { stroke: '#E9E5E580', strokeWidth: 1 } },
+  grid: { line: { stroke: "#E9E5E580", strokeWidth: 1 } },
   tooltip: {
     container: {
-      background:   '#FFFFFF',
-      color:        '#101828',
-      fontSize:     12,
-      border:       '1px solid #E9E5E5',
+      background: "#FFFFFF",
+      color: "#101828",
+      fontSize: 12,
+      border: "1px solid #E9E5E5",
       borderRadius: 10,
-      padding:      '10px 14px',
-      boxShadow:    '0 4px 16px rgba(0,0,0,0.06)',
+      padding: "10px 14px",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
     },
   },
-  legends: { text: { fill: '#667085', fontSize: 11 } },
-}
+  legends: { text: { fill: "#667085", fontSize: 11 } },
+};
 
 // ─── Recharts Tooltip Style ───────────────────────────────────────────────────
 const RECHARTS_TOOLTIP_STYLE = {
   contentStyle: {
-    backgroundColor: '#FFFFFF',
-    border:          '1px solid #E9E5E5',
-    borderRadius:    10,
-    color:           '#101828',
-    fontSize:        12,
-    boxShadow:       '0 4px 16px rgba(0,0,0,0.06)',
+    backgroundColor: "#FFFFFF",
+    border: "1px solid #E9E5E5",
+    borderRadius: 10,
+    color: "#101828",
+    fontSize: 12,
+    boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
   },
-  labelStyle: { color: '#0F9D8A', fontWeight: 600 as const },
-  itemStyle:  { color: '#101828' },
-}
+  labelStyle: { color: "#0F9D8A", fontWeight: 600 as const },
+  itemStyle: { color: "#101828" },
+};
 
 const DONUT_MARGIN_STANDARD = {
   top: 52,
@@ -143,7 +143,7 @@ const ISLAMIC_DATA = {
         label: "Islamic Banking",
         value: 4318,
         share: 72,
-        color: "#0F9D8A",
+        color: "#A31612",
       },
       { id: "Sukuk", label: "Sukuk", value: 1031, share: 17, color: "#16A34A" },
       {
@@ -256,7 +256,7 @@ const ISLAMIC_DATA = {
         totalAssets: "US$4.3tn",
         sharePercent: 72,
         institutionsLabel: "681 Banks",
-        color: "#0F9D8A",
+        color: "#A31612",
       },
       {
         sector: "Sukuk",
