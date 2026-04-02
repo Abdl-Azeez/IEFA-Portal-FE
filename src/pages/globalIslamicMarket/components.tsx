@@ -22,8 +22,9 @@ import {
   MapPin,
   Layers,
 } from 'lucide-react'
-import { ResponsivePie } from '@nivo/pie'
-import { ResponsiveBar } from '@nivo/bar'
+import { BarItem, ResponsiveBar } from "@nivo/bar";
+import { ResponsiveFunnel } from "@nivo/funnel";
+import { ResponsiveSunburst } from "@nivo/sunburst";
 import {
   Area,
   AreaChart,
@@ -35,14 +36,19 @@ import {
   Line,
   LineChart,
   PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
   RadialBar,
   RadialBarChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
+  Treemap,
   XAxis,
   YAxis,
-} from 'recharts'
+} from "recharts";
 
 // ─── Colour System ────────────────────────────────────────────────────────────
 export const COLORS = {
@@ -50,7 +56,7 @@ export const COLORS = {
   brandRed: "#E3261C",
   deepRed: "#A31612",
   // Financial semantic
-  teal: "#D52B1E ",
+  teal: "#D52B1E",
   tealLight: "#A31613",
   emerald: "#16A34A",
   emeraldLight: "#22C55E",
@@ -112,20 +118,6 @@ const RECHARTS_TOOLTIP_STYLE = {
   labelStyle: { color: "#0F9D8A", fontWeight: 600 as const },
   itemStyle: { color: "#101828" },
 };
-
-const DONUT_MARGIN_STANDARD = {
-  top: 52,
-  right: 12,
-  bottom: 72,
-  left: 12,
-} as const;
-const DONUT_MARGIN_WIDE = { top: 52, right: 20, bottom: 72, left: 20 } as const;
-const DONUT_MARGIN_WITH_LEGEND = {
-  top: 52,
-  right: 8,
-  bottom: 64,
-  left: 8,
-} as const;
 
 // ─── All Data ─────────────────────────────────────────────────────────────────
 const ISLAMIC_DATA = {
@@ -219,7 +211,7 @@ const ISLAMIC_DATA = {
         { label: "ESG Islamic Funds Outstanding", value: "US$9.7bn", raw: 9.7 },
         { label: "Countries with S. Guidelines", value: "50", raw: 50 },
         { label: "Avg Sustainability Reporting", value: "49%", raw: 49 },
-        { label: "Total CSR Funds Disbursed", value: "US$1.65bn", raw: 1.65 },
+        { label: "Total CSR Funds Disbursed", value: "US$1.7bn", raw: 1.7 },
       ],
       awareness: [
         { label: "In-Person Events", value: 1031 },
@@ -916,6 +908,24 @@ function CountryBar({
 }: Readonly<CountryBarProps>) {
   const [width, setWidth] = useState(0);
   const pct = Math.max((value / maxValue) * 100, minWidthPercent);
+  let resolvedDisplayValue = displayValue;
+
+  if (!resolvedDisplayValue) {
+    if (value >= 1000) {
+      resolvedDisplayValue = `US$${(value / 1000).toFixed(1)}tn`;
+    } else {
+      let normalizedUnit = unit;
+      if (unit === "bn") {
+        normalizedUnit = "bn";
+      }
+
+      if (normalizedUnit.startsWith("US$")) {
+        resolvedDisplayValue = `${value}${normalizedUnit}`;
+      } else {
+        resolvedDisplayValue = `US$${value}${normalizedUnit}`;
+      }
+    }
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setWidth(pct), 200 + delay);
@@ -926,22 +936,19 @@ function CountryBar({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-sm">
         <span
-          className="flex items-center gap-1.5 min-w-0"
+          className="flex min-w-0 flex-1 items-center gap-1.5 pr-3"
           style={{ color: "#667085" }}
         >
           <span className="text-base leading-none shrink-0">{flag}</span>
-          <span className="truncate font-medium">{country}</span>
+          <span className="font-medium leading-tight whitespace-normal break-words">
+            {country}
+          </span>
         </span>
         <span
           className="text-xs font-semibold shrink-0 ml-2"
           style={{ color: "#101828" }}
         >
-          {displayValue ??
-            (value >= 1000
-              ? `US$${(value / 1000).toFixed(1)}tn`
-              : `${value}${unit === "bn" ? "bn" : unit}`.startsWith("US$")
-                ? `${value}${unit}`
-                : `US$${value}${unit === "US$bn" ? "bn" : unit}`)}
+          {resolvedDisplayValue}
         </span>
       </div>
       <div
@@ -987,6 +994,728 @@ function formatUsdValue(value: number) {
   }
 
   return `US$${value.toFixed(1)}bn`;
+}
+
+// ─── Sunburst Distribution Chart ─────────────────────────────────────────────
+function WaffleDistributionChart({
+  items,
+  formatter,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+}>) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  const sunburstData = {
+    id: "root",
+    color: "#ffffff",
+    children: items.map((item) => ({
+      id: item.label,
+      value: item.value,
+      color: item.color,
+    })),
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="h-[340px] rounded-xl border border-gray-200 bg-white">
+        <ResponsiveSunburst
+          data={sunburstData}
+          margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+          id="id"
+          value="value"
+          cornerRadius={4}
+          borderWidth={2}
+          borderColor="#ffffff"
+          colors={(node) => node.data.color as string}
+          childColor={{ from: "color", modifiers: [["brighter", 0.3]] }}
+          enableArcLabels
+          arcLabel={(node) => {
+            const pct = (node.value / total) * 100;
+            return pct >= 3 ? formatter(node.value) : "";
+          }}
+          arcLabelsSkipAngle={15}
+          arcLabelsTextColor="#ffffff"
+          motionConfig="gentle"
+          transitionMode="pushIn"
+          theme={NIVO_THEME}
+          tooltip={({ id, value, color }) => (
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #E9E5E5",
+                borderRadius: 10,
+                padding: "10px 14px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+                fontSize: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    backgroundColor: color,
+                    display: "inline-block",
+                  }}
+                />
+                <strong>{id}</strong>
+              </div>
+              <div style={{ marginTop: 4, color: "#667085" }}>
+                {formatter(value)} ({((value / total) * 100).toFixed(1)}% of
+                total)
+              </div>
+            </div>
+          )}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/70 px-3 py-2 text-xs"
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-gray-600">
+              {item.label}
+            </span>
+            <span className="shrink-0 font-semibold text-gray-900">
+              {formatter(item.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RadialDistributionChart({
+  items,
+  formatter,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+}>) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const sortedItems = [...items].sort((a, b) => b.value - a.value);
+  const maxValue = Math.max(...items.map((item) => item.value));
+
+  return (
+    <div className="space-y-4">
+      <div className="h-[320px] rounded-xl border border-gray-200 bg-white p-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={sortedItems}
+            layout="vertical"
+            margin={{ top: 8, right: 40, bottom: 8, left: 8 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              horizontal={false}
+              stroke="#E9E5E580"
+            />
+            <XAxis
+              type="number"
+              domain={[0, Math.ceil(maxValue * 1.15)]}
+              tick={{ fill: "#667085", fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={100}
+              tick={{ fill: "#667085", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <RechartsTooltip
+              cursor={{ fill: "rgba(0,0,0,0.04)" }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0].payload as {
+                  label: string;
+                  value: number;
+                  color: string;
+                };
+                return (
+                  <div
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #E9E5E5",
+                      borderRadius: 10,
+                      padding: "10px 14px",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          backgroundColor: d.color,
+                          display: "inline-block",
+                        }}
+                      />
+                      <strong>{d.label}</strong>
+                    </div>
+                    <div style={{ marginTop: 4, color: "#667085" }}>
+                      {formatter(d.value)}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+            <Bar
+              dataKey="value"
+              radius={[0, 6, 6, 0]}
+              isAnimationActive
+              animationDuration={800}
+              animationEasing="ease-out"
+            >
+              {sortedItems.map((item) => (
+                <Cell
+                  key={item.id}
+                  fill={item.color}
+                  opacity={activeId && activeId !== item.id ? 0.3 : 1}
+                  cursor="pointer"
+                  onClick={() =>
+                    setActiveId((current) =>
+                      current === item.id ? null : item.id,
+                    )
+                  }
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() =>
+              setActiveId((current) => (current === item.id ? null : item.id))
+            }
+            className="flex items-center gap-2 rounded-lg border bg-gray-50/70 px-3 py-2 text-xs transition-all"
+            style={{
+              borderColor:
+                activeId === item.id ? item.color : COLORS.cardBorder,
+              opacity: activeId && activeId !== item.id ? 0.45 : 1,
+            }}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-gray-600">
+              {item.label}
+            </span>
+            <span className="shrink-0 font-semibold text-gray-900">
+              {formatter(item.value)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AreaCircleDistributionChart({
+  items,
+  formatter,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+}>) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const maxValue = Math.max(...items.map((item) => item.value));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-center gap-4 rounded-xl border border-gray-200 bg-white p-4">
+        {items.map((item) => {
+          const size = Math.max(
+            46,
+            Math.round(Math.sqrt(item.value / maxValue) * 150),
+          );
+          const isMuted = activeId ? activeId !== item.id : false;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() =>
+                setActiveId((current) => (current === item.id ? null : item.id))
+              }
+              className="flex flex-col items-center gap-2"
+              style={{ opacity: isMuted ? 0.35 : 1 }}
+              title={`${item.label}: ${formatter(item.value)}`}
+            >
+              <div
+                className="flex items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  backgroundColor: item.color,
+                }}
+              >
+                {size >= 72 ? formatter(item.value) : ""}
+              </div>
+              <span className="max-w-[110px] text-center text-xs text-gray-600">
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() =>
+              setActiveId((current) => (current === item.id ? null : item.id))
+            }
+            className="flex items-center gap-2 rounded-lg border bg-gray-50/70 px-3 py-2 text-xs"
+            style={{
+              borderColor:
+                activeId === item.id ? item.color : COLORS.cardBorder,
+            }}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-gray-600">
+              {item.label}
+            </span>
+            <span className="shrink-0 font-semibold text-gray-900">
+              {formatter(item.value)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LollipopDistributionChart({
+  items,
+  formatter,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+}>) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const maxValue = Math.max(...items.map((item) => item.value));
+
+  return (
+    <div className="space-y-3">
+      {items.map((item) => {
+        const pct = (item.value / maxValue) * 100;
+        const isMuted = activeId ? activeId !== item.id : false;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() =>
+              setActiveId((current) => (current === item.id ? null : item.id))
+            }
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-3 text-left"
+            style={{ opacity: isMuted ? 0.35 : 1 }}
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-gray-700">
+                {item.label}
+              </span>
+              <span className="text-xs font-semibold text-gray-900">
+                {formatter(item.value)}
+              </span>
+            </div>
+            <div className="relative h-2 rounded-full bg-gray-100">
+              <div
+                className="absolute left-0 top-1/2 h-[2px] -translate-y-1/2"
+                style={{ width: `${pct}%`, backgroundColor: item.color }}
+              />
+              <span
+                className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border-2 border-white shadow"
+                style={{
+                  left: `calc(${pct}% - 7px)`,
+                  backgroundColor: item.color,
+                }}
+              />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── GIM Treemap ─────────────────────────────────────────────────────────────
+function GimTreemap({
+  items,
+  formatter,
+  height = 260,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+  height?: number;
+}>) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<{
+    id: string;
+    label: string;
+    value: number;
+    color: string;
+  } | null>(null);
+
+  const data = items.map((item) => ({
+    id: item.id,
+    name: item.label,
+    value: item.value,
+    color: item.color,
+    muted: activeId ? activeId !== item.id : false,
+  }));
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="relative rounded-xl border border-gray-200 bg-white p-1"
+        style={{ height }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <Treemap
+            data={data}
+            dataKey="value"
+            aspectRatio={1}
+            stroke="#FFFFFF"
+            isAnimationActive
+            onMouseEnter={(node: any) => {
+              if (!node || node.depth !== 1) {
+                setHoveredNode(null);
+                return;
+              }
+              setHoveredNode({
+                id: String(node.id ?? node.name),
+                label: String(node.name ?? node.id),
+                value: Number(node.value ?? 0),
+                color: String(node.color ?? COLORS.textMuted),
+              });
+            }}
+            onMouseLeave={() => setHoveredNode(null)}
+            content={(node: any) => {
+              if (!node || node.depth !== 1) {
+                return <g />;
+              }
+              const {
+                x = 0,
+                y = 0,
+                width: w = 0,
+                height: h = 0,
+                name = "",
+                value = 0,
+                color = COLORS.textMuted,
+                muted = false,
+              } = node;
+              if (w < 10 || h < 10) {
+                return <g />;
+              }
+              const midX = Math.round(x + w / 2);
+              const showName = w > 36 && h > 22;
+              const showValue = w > 60 && h > 44;
+              return (
+                <g key={`cell-${x}-${y}`}>
+                  <rect
+                    x={x + 2}
+                    y={y + 2}
+                    width={w - 4}
+                    height={h - 4}
+                    fill={color}
+                    fillOpacity={muted ? 0.25 : 1}
+                    rx={8}
+                  />
+                  {showName && (
+                    <text
+                      x={midX}
+                      y={y + h / 2 + (showValue ? -9 : 5)}
+                      // fill="#000"
+                      stroke="#eee5e5"
+                      fontSize={Math.min(12, Math.max(9, Math.floor(w / 9)))}
+                      // fontWeight={600}
+                      textAnchor="middle"
+                      fontFamily="inherit"
+                    >
+                      {name}
+                    </text>
+                  )}
+                  {showValue && (
+                    <text
+                      x={midX}
+                      y={y + h / 2 + 9}
+                      // fill="#000"
+                      stroke={COLORS.textPrimary}
+                      fontSize={Math.min(11, Math.max(9, Math.floor(w / 10)))}
+                      textAnchor="middle"
+                      fontFamily="inherit"
+                    >
+                      {formatter(value)}
+                    </text>
+                  )}
+                </g>
+              );
+            }}
+          />
+        </ResponsiveContainer>
+        {hoveredNode && (
+          <div className="pointer-events-none absolute right-3 top-3 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 text-xs shadow-lg">
+            <div className="font-semibold" style={{ color: hoveredNode.color }}>
+              {hoveredNode.label}
+            </div>
+            <div className="text-gray-800">{formatter(hoveredNode.value)}</div>
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() =>
+              setActiveId((current) => (current === item.id ? null : item.id))
+            }
+            className="flex items-center gap-2 rounded-lg border bg-gray-50/70 px-3 py-2 text-xs"
+            style={{
+              borderColor:
+                activeId === item.id ? item.color : COLORS.cardBorder,
+            }}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-gray-600">
+              {item.label}
+            </span>
+            <span className="shrink-0 font-semibold text-gray-900">
+              {formatter(item.value)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GimFunnelChart({
+  items,
+  formatter,
+  height = 260,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+  height?: number;
+}>) {
+  const sortedItems = [...items].sort((a, b) => b.value - a.value);
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="rounded-xl border border-gray-200 bg-white p-2"
+        style={{ height }}
+      >
+        <ResponsiveFunnel
+          data={sortedItems.map((item) => ({
+            id: item.id,
+            label: item.label,
+            value: item.value,
+          }))}
+          margin={{ top: 20, right: 24, bottom: 20, left: 24 }}
+          valueFormat=" >-.2f"
+          colors={sortedItems.map((item) => item.color)}
+          borderWidth={2}
+          borderColor={{ from: "color", modifiers: [["darker", 0.18]] }}
+          labelColor={{ from: "color", modifiers: [["darker", 2.4]] }}
+          beforeSeparatorLength={36}
+          beforeSeparatorOffset={10}
+          afterSeparatorLength={36}
+          afterSeparatorOffset={10}
+          currentPartSizeExtension={12}
+          currentBorderWidth={3}
+          motionConfig="gentle"
+          shapeBlending={0.7}
+          theme={NIVO_THEME}
+          tooltip={({ part }) => (
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #E9E5E5",
+                borderRadius: 10,
+                padding: "10px 14px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+                fontSize: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    backgroundColor: part.color,
+                    display: "inline-block",
+                  }}
+                />
+                <strong>{part.data.label}</strong>
+              </div>
+              <div style={{ marginTop: 4, color: "#667085" }}>
+                {formatter(Number(part.data.value))}
+              </div>
+            </div>
+          )}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {sortedItems.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center gap-2 rounded-lg border bg-gray-50/70 px-3 py-2 text-xs"
+            style={{ borderColor: item.color }}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-gray-600">
+              {item.label}
+            </span>
+            <span className="shrink-0 font-semibold text-gray-900">
+              {formatter(item.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GimChordChart({
+  items,
+  formatter,
+  height = 260,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+  height?: number;
+  sourceLabel?: string;
+}>) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const radarData = items.map((item) => ({
+    region: item.label,
+    value: item.value,
+    color: item.color,
+    id: item.id,
+  }));
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="rounded-xl border border-gray-200 bg-white"
+        style={{ height }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart
+            data={radarData}
+            margin={{ top: 16, right: 40, bottom: 16, left: 40 }}
+          >
+            <PolarGrid stroke="#E9E5E580" />
+            <PolarAngleAxis
+              dataKey="region"
+              tick={{ fill: COLORS.textSecond, fontSize: 11 }}
+            />
+            <PolarRadiusAxis
+              angle={30}
+              domain={[0, Math.max(...items.map((i) => i.value))]}
+              tick={{ fill: COLORS.textMuted, fontSize: 9 }}
+              tickCount={4}
+              tickFormatter={(v: number) => formatter(v)}
+            />
+            <Radar
+              dataKey="value"
+              stroke={COLORS.teal}
+              fill={COLORS.teal}
+              fillOpacity={0.18}
+              strokeWidth={2}
+              dot={(props: any) => {
+                const item = radarData[props.index];
+                const isActive = activeId === null || activeId === item?.id;
+                return (
+                  <circle
+                    key={props.index}
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={activeId === item?.id ? 6 : 4}
+                    fill={item?.color ?? COLORS.teal}
+                    fillOpacity={isActive ? 1 : 0.25}
+                    stroke="#fff"
+                    strokeWidth={1.5}
+                    style={{ cursor: "pointer" }}
+                    onClick={() =>
+                      setActiveId((cur) =>
+                        cur === item?.id ? null : (item?.id ?? null),
+                      )
+                    }
+                  />
+                );
+              }}
+            />
+            <RechartsTooltip
+              formatter={(value) => [formatter(Number(value ?? 0)), "Assets"]}
+              contentStyle={RECHARTS_TOOLTIP_STYLE.contentStyle}
+              labelStyle={{ color: COLORS.textPrimary, fontWeight: 600 }}
+              itemStyle={RECHARTS_TOOLTIP_STYLE.itemStyle}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() =>
+              setActiveId((cur) => (cur === item.id ? null : item.id))
+            }
+            className="flex items-center gap-2 rounded-lg border bg-gray-50/70 px-3 py-2 text-xs transition-all"
+            style={{
+              borderColor:
+                activeId === item.id ? item.color : COLORS.cardBorder,
+              opacity: activeId && activeId !== item.id ? 0.45 : 1,
+            }}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-gray-600">
+              {item.label}
+            </span>
+            <span className="shrink-0 font-semibold text-gray-900">
+              {formatter(item.value)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function useAnimatedNumber(target: number, delay = 0) {
@@ -1111,14 +1840,6 @@ function GlobalGlanceCountryTooltip({
   );
 }
 
-function GlobalGlancePieTooltipRenderer(
-  props: Readonly<{
-    datum: { id: string | number; value: number; data: { share: number } };
-  }>,
-) {
-  return <GlobalGlanceDonutTooltip datum={props.datum} />;
-}
-
 function GlobalGlanceBarTooltipRenderer(
   props: Readonly<{ id: string | number; value: string | number }>,
 ) {
@@ -1147,67 +1868,34 @@ function getGlobalGlanceCountryColor(index: number | string) {
   return COLORS.purple;
 }
 
-function formatGlobalGlanceSectorArcLabel(datum: { data: { share: number } }) {
-  return `${datum.data.share}%`;
-}
-
 function formatGlobalGlanceBarLabel(datum: { value: string | number | null }) {
   return formatUsdValue(Number(datum.value ?? 0));
 }
 
-function GlobalOverviewPieTooltip({
-  datum,
-}: Readonly<{
-  datum: { id: string | number; value: number };
-}>) {
-  const isDominantRegion = datum.id === "GCC" || datum.id === "Other MENA";
+function GlobalGlanceCountryBarComponent(props: any) {
+  const isSmallBar = Number(props?.bar?.width ?? 0) < 88;
 
   return (
-    <div
-      className="rounded-lg border px-3 py-2 text-xs shadow-lg"
-      style={{
-        borderColor: "#E9E5E5",
-        backgroundColor: "#FFFFFF",
-        color: "#101828",
-      }}
-    >
-      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>
-        {datum.id}
-      </div>
-      <div>{datum.value}% share of global IF assets</div>
-      {isDominantRegion && (
-        <div className="mt-1" style={{ color: "#98A2B3" }}>
-          GCC &amp; MENA together ={" "}
-          {ISLAMIC_DATA.globalOverview.headline.gccMenaShare}% of global IF
-          assets
-        </div>
+    <>
+      <BarItem
+        {...props}
+        shouldRenderLabel={props.shouldRenderLabel && !isSmallBar}
+      />
+      {props.shouldRenderLabel && isSmallBar && (
+        <text
+          x={Number(props.bar.x) + Number(props.bar.width) + 8}
+          y={Number(props.bar.y) + Number(props.bar.height) / 2}
+          textAnchor="start"
+          dominantBaseline="middle"
+          fill={COLORS.textPrimary}
+          fontSize={11}
+          fontWeight={600}
+        >
+          {props.label}
+        </text>
       )}
-    </div>
+    </>
   );
-}
-
-function GlobalOverviewPieTooltipRenderer(
-  props: Readonly<{ datum: { id: string | number; value: number } }>,
-) {
-  return <GlobalOverviewPieTooltip datum={props.datum} />;
-}
-
-function formatGlobalOverviewArcLabel(datum: { value: number }) {
-  return datum.value >= 1 ? `${datum.value}%` : "";
-}
-
-function formatOverviewHoverText(
-  region: { label: string; value: number } | undefined,
-) {
-  if (!region) {
-    return "";
-  }
-
-  return `${region.label}: ${region.value}% share`;
-}
-
-function colorWithAlpha(hex: string, alpha: string) {
-  return `${hex}${alpha}`;
 }
 
 function lightenHex(hex: string, amount = 36) {
@@ -1217,18 +1905,6 @@ function lightenHex(hex: string, amount = 36) {
   const green = Math.min(255, ((value >> 8) & 0x00ff) + amount);
   const blue = Math.min(255, (value & 0x0000ff) + amount);
   return `rgb(${red}, ${green}, ${blue})`;
-}
-
-function getOverviewRegionColor(
-  regionId: string,
-  selectedRegion: string | null,
-  baseColor: string,
-) {
-  if (!selectedRegion || selectedRegion === regionId) {
-    return baseColor;
-  }
-
-  return colorWithAlpha(baseColor, "44");
 }
 
 function CircularProgressRing({
@@ -1439,53 +2115,6 @@ function SectorBreakdownRow({
   );
 }
 
-function RegionDominanceSegment({
-  region,
-  index,
-  isHovered,
-  onHover,
-  onLeave,
-}: Readonly<{
-  region: { id: string; label: string; value: number; color: string };
-  index: number;
-  isHovered: boolean;
-  onHover: () => void;
-  onLeave: () => void;
-}>) {
-  const [width, setWidth] = useState(0);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setWidth(region.value), index * 150);
-    return () => clearTimeout(timer);
-  }, [index, region.value]);
-
-  return (
-    <button
-      type="button"
-      aria-label={`${region.label} ${region.value}% share`}
-      className="relative min-w-[2px] origin-bottom transition-transform duration-200"
-      style={{
-        width: `${width}%`,
-        transform: isHovered ? "scaleY(1.12)" : "scaleY(1)",
-      }}
-      onMouseEnter={onHover}
-      onMouseLeave={onLeave}
-      onFocus={onHover}
-      onBlur={onLeave}
-    >
-      <div
-        className="h-12 rounded-sm"
-        style={{ backgroundColor: region.color }}
-      />
-      {region.value >= 2 && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-white">
-          {region.value}%
-        </div>
-      )}
-    </button>
-  );
-}
-
 function formatBankingGrowthTick(value: number) {
   if (value >= 1000) {
     return `${(value / 1000).toFixed(1)}T`;
@@ -1534,38 +2163,6 @@ function BankingGrowthTooltip({
       )}
     </div>
   );
-}
-
-function BankingRegionTooltip({
-  datum,
-}: Readonly<{
-  datum: { id: string | number; value: number };
-}>) {
-  return (
-    <div
-      className="rounded-lg border px-3 py-2 text-xs shadow-lg"
-      style={{
-        borderColor: "#E9E5E5",
-        backgroundColor: "#FFFFFF",
-        color: "#101828",
-      }}
-    >
-      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>
-        {datum.id}
-      </div>
-      <div>{formatUsdValue(datum.value)}</div>
-    </div>
-  );
-}
-
-function BankingRegionTooltipRenderer(
-  props: Readonly<{ datum: { id: string | number; value: number } }>,
-) {
-  return <BankingRegionTooltip datum={props.datum} />;
-}
-
-function formatBankingRegionArcLabel(datum: { value: number }) {
-  return `${((datum.value / 4318) * 100).toFixed(0)}%`;
 }
 
 function getBankingCountryColor(index: number) {
@@ -1690,41 +2287,9 @@ function TakafulGrowthTooltip({
   );
 }
 
-function TakafulRegionTooltip({
-  datum,
-}: Readonly<{
-  datum: { id: string | number; value: number };
-}>) {
-  return (
-    <div
-      className="rounded-lg border px-3 py-2 text-xs shadow-lg"
-      style={{
-        borderColor: "#E9E5E5",
-        backgroundColor: "#FFFFFF",
-        color: "#101828",
-      }}
-    >
-      <div className="mb-1 font-semibold" style={{ color: COLORS.gold }}>
-        {datum.id}
-      </div>
-      <div>{formatUsdValue(datum.value)}</div>
-    </div>
-  );
-}
-
-function TakafulRegionTooltipRenderer(
-  props: Readonly<{ datum: { id: string | number; value: number } }>,
-) {
-  return <TakafulRegionTooltip datum={props.datum} />;
-}
-
-function formatTakafulRegionArcLabel(datum: { value: number }) {
-  return `US$${datum.value}bn`;
-}
-
 function formatTakafulCountryDisplay(value: number) {
   if (value < 1) {
-    return "< US$1bn";
+    return `US$${value.toFixed(1)}bn`;
   }
 
   return `US$${value}bn`;
@@ -1821,38 +2386,6 @@ function OifiGrowthTooltip({
   );
 }
 
-function OifiRegionTooltip({
-  datum,
-}: Readonly<{
-  datum: { id: string | number; value: number };
-}>) {
-  return (
-    <div
-      className="rounded-lg border px-3 py-2 text-xs shadow-lg"
-      style={{
-        borderColor: "#E9E5E5",
-        backgroundColor: "#FFFFFF",
-        color: "#101828",
-      }}
-    >
-      <div className="mb-1 font-semibold" style={{ color: COLORS.purple }}>
-        {datum.id}
-      </div>
-      <div>{formatUsdValue(datum.value)}</div>
-    </div>
-  );
-}
-
-function OifiRegionTooltipRenderer(
-  props: Readonly<{ datum: { id: string | number; value: number } }>,
-) {
-  return <OifiRegionTooltip datum={props.datum} />;
-}
-
-function formatOifiRegionArcLabel(datum: { value: number }) {
-  return `US$${datum.value}bn`;
-}
-
 function OifiHighlightCard({
   country,
   flag,
@@ -1915,31 +2448,6 @@ function getCompositionIcon(iconName: string) {
     return Globe2;
   }
   return Layers;
-}
-
-function GlobalGlanceDonutTooltip({
-  datum,
-}: Readonly<{
-  datum: { id: string | number; value: number; data: { share: number } };
-}>) {
-  return (
-    <div
-      className="rounded-lg border px-3 py-2 text-xs shadow-lg"
-      style={{
-        borderColor: "#E9E5E5",
-        backgroundColor: "#FFFFFF",
-        color: "#101828",
-      }}
-    >
-      <div className="mb-1 font-semibold" style={{ color: COLORS.teal }}>
-        {datum.id}
-      </div>
-      <div>{formatUsdValue(datum.value)}</div>
-      <div className="mt-1" style={{ color: "#98A2B3" }}>
-        {datum.data.share}% of total assets
-      </div>
-    </div>
-  );
 }
 
 function EcosystemMetricRow({
@@ -2196,39 +2704,16 @@ function TabGlobalGlance() {
           title="Assets by Sector (2024)"
           className="relative lg:col-span-2"
         >
-          <div className="relative h-[336px]">
-            <ResponsivePie
-              data={globalGlance.assetsBySector}
-              innerRadius={0.65}
-              padAngle={0.7}
-              cornerRadius={4}
-              activeOuterRadiusOffset={8}
-              colors={{ datum: "data.color" }}
-              theme={NIVO_THEME}
-              margin={DONUT_MARGIN_WITH_LEGEND}
-              arcLabelsSkipAngle={10}
-              arcLabelsTextColor={COLORS.textPrimary}
-              arcLabel={formatGlobalGlanceSectorArcLabel}
-              tooltip={GlobalGlancePieTooltipRenderer}
-              legends={[
-                {
-                  anchor: "bottom",
-                  direction: "row",
-                  translateY: 70,
-                  itemWidth: 90,
-                  itemHeight: 18,
-                  symbolShape: "circle",
-                  symbolSize: 8,
-                },
-              ]}
-            />
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <div className="text-lg font-bold text-gray-900">
-                {globalGlance.headline.totalAssets}
-              </div>
-              <div className="text-xs text-gray-500">Total Assets</div>
-            </div>
-          </div>
+          <GimFunnelChart
+            items={globalGlance.assetsBySector.map((item) => ({
+              id: String(item.id),
+              label: String(item.id),
+              value: item.share,
+              color: item.color,
+            }))}
+            formatter={(v) => `${v}%`}
+            height={260}
+          />
         </SectionCard>
       </div>
 
@@ -2282,7 +2767,7 @@ function TabGlobalGlance() {
             keys={["value"]}
             indexBy="country"
             layout="horizontal"
-            margin={{ top: 10, right: 80, bottom: 30, left: 120 }}
+            margin={{ top: 10, right: 112, bottom: 30, left: 120 }}
             padding={0.28}
             valueScale={{ type: "linear" }}
             indexScale={{ type: "band", round: true }}
@@ -2290,6 +2775,7 @@ function TabGlobalGlance() {
             theme={NIVO_THEME}
             label={formatGlobalGlanceBarLabel}
             labelTextColor={COLORS.textPrimary}
+            barComponent={GlobalGlanceCountryBarComponent}
             enableGridY={false}
             borderRadius={6}
             axisTop={null}
@@ -2312,6 +2798,31 @@ function TabGlobalGlance() {
           />
         </div>
       </SectionCard>
+
+      <div className="mb-1 flex flex-col items-center gap-2 text-center">
+        <span
+          className="rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide"
+          style={{
+            borderColor: `${COLORS.teal}30`,
+            color: COLORS.teal,
+            backgroundColor: `${COLORS.teal}0F`,
+          }}
+        >
+          Ecosystem Snapshot
+        </span>
+        <h3
+          className="text-lg font-bold leading-tight"
+          style={{ color: COLORS.textPrimary }}
+        >
+          Islamic Finance industry's supporting ecosystem in 2024
+        </h3>
+        <div
+          className="h-px w-full max-w-xl"
+          style={{
+            background: `linear-gradient(90deg, transparent 0%, ${COLORS.teal}55 50%, transparent 100%)`,
+          }}
+        />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <SectionCard title="⚖️ Governance" className="">
@@ -2558,18 +3069,6 @@ function TabGlobalGlance() {
 function TabGlobalOverview() {
   const globalOverview = ISLAMIC_DATA.globalOverview;
   const [expandedSector, setExpandedSector] = useState<string | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
-  const hoveredRegionData = globalOverview.regionalDistribution.find(
-    (item) => item.id === hoveredRegion,
-  );
-
-  const processedRegionalDistribution = globalOverview.regionalDistribution.map(
-    (region) => ({
-      ...region,
-      color: getOverviewRegionColor(region.id, selectedRegion, region.color),
-    }),
-  );
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -2713,102 +3212,29 @@ function TabGlobalOverview() {
         </SectionCard>
 
         <SectionCard title="Regional Distribution of IF Assets (%, 2024)">
-          <div className="relative h-[300px]">
-            <ResponsivePie
-              data={processedRegionalDistribution}
-              innerRadius={0.6}
-              padAngle={0.8}
-              cornerRadius={3}
-              colors={{ datum: "data.color" }}
-              theme={NIVO_THEME}
-              margin={DONUT_MARGIN_WIDE}
-              arcLabelsSkipAngle={8}
-              arcLabel={formatGlobalOverviewArcLabel}
-              arcLabelsTextColor={COLORS.textPrimary}
-              tooltip={GlobalOverviewPieTooltipRenderer}
-              onClick={(datum) =>
-                setSelectedRegion((current) =>
-                  current === String(datum.id) ? null : String(datum.id),
-                )
-              }
-            />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">
-                  {globalOverview.headline.regionsCount} Regions
-                </div>
-                <div className="text-xs text-gray-500">Asset distribution</div>
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2">
-            {globalOverview.regionalDistribution.map((region) => {
-              const isActive = selectedRegion === region.id;
-              return (
-                <button
-                  key={region.id}
-                  type="button"
-                  onClick={() =>
-                    setSelectedRegion((current) =>
-                      current === region.id ? null : region.id,
-                    )
-                  }
-                  className="flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors"
-                  style={{
-                    borderColor: isActive ? region.color : COLORS.cardBorder,
-                    color: isActive ? COLORS.textPrimary : COLORS.textSecond,
-                    backgroundColor: isActive
-                      ? colorWithAlpha(region.color, "22")
-                      : "transparent",
-                  }}
-                >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: region.color }}
-                  />
-                  {region.label}
-                </button>
-              );
-            })}
-          </div>
+          <WaffleDistributionChart
+            items={globalOverview.regionalDistribution.map((r) => ({
+              id: r.id,
+              label: r.label,
+              value: r.value,
+              color: r.color,
+            }))}
+            formatter={(v) => `${v >= 1 ? v : v.toFixed(2)}%`}
+          />
         </SectionCard>
       </div>
 
       <SectionCard title="Regional Islamic Finance Asset Share">
         <div className="relative">
-          <div className="mb-3 min-h-[34px]">
-            <div
-              className={`inline-flex rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 shadow-lg transition-opacity duration-150 ${hoveredRegion ? "opacity-100" : "opacity-0"}`}
-            >
-              {hoveredRegion ? formatOverviewHoverText(hoveredRegionData) : " "}
-            </div>
-          </div>
-          <div className="flex gap-px overflow-hidden rounded-xl bg-white/20">
-            {globalOverview.regionalDistribution.map((region, index) => (
-              <RegionDominanceSegment
-                key={region.id}
-                region={region}
-                index={index}
-                isHovered={hoveredRegion === region.id}
-                onHover={() => setHoveredRegion(region.id)}
-                onLeave={() => setHoveredRegion(null)}
-              />
-            ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {globalOverview.regionalDistribution.map((region) => (
-              <div
-                key={region.id}
-                className="flex items-center gap-2 text-xs text-gray-500"
-              >
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: region.color }}
-                />
-                <span>{region.label}</span>
-              </div>
-            ))}
-          </div>
+          <LollipopDistributionChart
+            items={globalOverview.regionalDistribution.map((region) => ({
+              id: region.id,
+              label: region.label,
+              value: region.value,
+              color: region.color,
+            }))}
+            formatter={(value) => `${value >= 1 ? value : value.toFixed(2)}%`}
+          />
           <div
             className="mt-3 rounded-lg border p-3 text-center text-sm"
             style={{
@@ -3003,29 +3429,16 @@ function TabIslamicBanking() {
           title="Islamic Banking Assets by Region (US$bn, 2024)"
           className="lg:col-span-2"
         >
-          <div className="relative h-[340px]">
-            <ResponsivePie
-              data={islamicBanking.regionalAssets}
-              innerRadius={0.62}
-              padAngle={0.6}
-              cornerRadius={4}
-              colors={{ datum: "data.color" }}
-              theme={NIVO_THEME}
-              margin={DONUT_MARGIN_STANDARD}
-              arcLabel={formatBankingRegionArcLabel}
-              arcLabelsSkipAngle={12}
-              arcLabelsTextColor={COLORS.textPrimary}
-              tooltip={BankingRegionTooltipRenderer}
-            />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">
-                  {islamicBanking.headline.totalAssets}
-                </div>
-                <div className="text-xs text-gray-500">Regional Split</div>
-              </div>
-            </div>
-          </div>
+          <GimChordChart
+            items={islamicBanking.regionalAssets.map((item) => ({
+              id: String(item.id),
+              label: item.label,
+              value: item.value,
+              color: item.color,
+            }))}
+            formatter={(v) => formatUsdValue(v)}
+            height={260}
+          />
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div
               className="rounded-xl border p-3 text-xs"
@@ -3384,29 +3797,15 @@ function TabTakaful() {
           title="Regional Takaful Distribution (2024)"
           className="lg:col-span-2"
         >
-          <div className="relative h-[320px]">
-            <ResponsivePie
-              data={takaful.regionalAssets}
-              innerRadius={0.62}
-              padAngle={0.8}
-              cornerRadius={4}
-              colors={{ datum: "data.color" }}
-              theme={NIVO_THEME}
-              margin={DONUT_MARGIN_STANDARD}
-              arcLabel={formatTakafulRegionArcLabel}
-              arcLabelsSkipAngle={15}
-              arcLabelsTextColor={COLORS.textPrimary}
-              tooltip={TakafulRegionTooltipRenderer}
-            />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">
-                  {takaful.headline.totalAssets}
-                </div>
-                <div className="text-xs text-gray-500">by Region</div>
-              </div>
-            </div>
-          </div>
+          <RadialDistributionChart
+            items={takaful.regionalAssets.map((item) => ({
+              id: String(item.id),
+              label: item.label,
+              value: item.value,
+              color: item.color,
+            }))}
+            formatter={(v) => formatUsdValue(v)}
+          />
           <div
             className="mt-3 rounded-lg border p-2 text-center text-xs"
             style={{
@@ -3666,29 +4065,16 @@ function TabOtherIFIs() {
           title="Regional Distribution (2024)"
           className="lg:col-span-2"
         >
-          <div className="relative h-[320px]">
-            <ResponsivePie
-              data={otherIFIs.regionalAssets}
-              innerRadius={0.62}
-              padAngle={0.8}
-              cornerRadius={4}
-              colors={{ datum: "data.color" }}
-              theme={NIVO_THEME}
-              margin={DONUT_MARGIN_STANDARD}
-              arcLabel={formatOifiRegionArcLabel}
-              arcLabelsSkipAngle={15}
-              arcLabelsTextColor={COLORS.textPrimary}
-              tooltip={OifiRegionTooltipRenderer}
-            />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">
-                  {otherIFIs.headline.totalAssets}
-                </div>
-                <div className="text-xs text-gray-500">by Region</div>
-              </div>
-            </div>
-          </div>
+          <GimTreemap
+            items={otherIFIs.regionalAssets.map((item) => ({
+              id: String(item.id),
+              label: item.label,
+              value: item.value,
+              color: item.color,
+            }))}
+            formatter={(v) => formatUsdValue(v)}
+            height={240}
+          />
           <div
             className="mt-3 rounded-lg border p-2 text-center text-xs"
             style={{
@@ -3892,8 +4278,8 @@ function TabSukuk() {
       <div
         className="animate-in fade-in slide-in-from-top-6 duration-700 rounded-xl border p-6 mb-4"
         style={{
-          borderColor: `${COLORS.teal}40`,
-          background: `linear-gradient(135deg, ${COLORS.teal}08 0%, ${COLORS.emerald}08 50%, ${COLORS.teal}08 100%)`,
+          borderColor: `${COLORS.gold}60`,
+          background: `linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 45%, #FFFBEB 100%)`,
         }}
       >
         <div className="flex flex-col items-center text-center w-full">
@@ -4109,28 +4495,15 @@ function TabSukuk() {
           title="Sukuk Outstanding by Region (US$bn, 2024)"
           className="lg:col-span-2"
         >
-          <div className="relative h-[360px] animate-in fade-in zoom-in-95 duration-700">
-            <ResponsivePie
-              data={sukuk.regionalOutstanding}
-              innerRadius={0.62}
-              padAngle={0.6}
-              cornerRadius={4}
-              colors={{ datum: "data.color" }}
-              theme={NIVO_THEME}
-              margin={DONUT_MARGIN_STANDARD}
-              arcLabel={(d) => `US$${d.value}bn`}
-              arcLabelsSkipAngle={12}
-              arcLabelsTextColor={COLORS.textPrimary}
-            />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">
-                  US$1.031tn
-                </div>
-                <div className="text-xs text-gray-500">Outstanding</div>
-              </div>
-            </div>
-          </div>
+          <AreaCircleDistributionChart
+            items={sukuk.regionalOutstanding.map((item) => ({
+              id: String(item.id),
+              label: item.label,
+              value: item.value,
+              color: item.color,
+            }))}
+            formatter={(v) => formatUsdValue(v)}
+          />
           <div className="mt-3 rounded-xl border border-cyan-200 bg-gray-100 p-3 text-center text-xs text-gray-600">
             ⚖️ GCC (US$477bn) vs Southeast Asia (US$452bn) — the two dominant
             sukuk regions are virtually neck-and-neck, together representing 90%
@@ -4600,29 +4973,16 @@ function TabIslamicFunds() {
           title="Islamic Funds AuM by Region (US$bn, 2024)"
           className="lg:col-span-2"
         >
-          <div className="relative h-[340px]">
-            <p className="sr-only">Islamic Funds regional AuM donut chart</p>
-            <ResponsivePie
-              data={funds.regionalAuM}
-              innerRadius={0.62}
-              padAngle={0.8}
-              cornerRadius={4}
-              colors={{ datum: "data.color" }}
-              theme={NIVO_THEME}
-              margin={DONUT_MARGIN_STANDARD}
-              arcLabel={(d) => `US$${d.value}bn`}
-              arcLabelsSkipAngle={15}
-              arcLabelsTextColor={COLORS.textPrimary}
-            />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">
-                  {funds.headline.totalAuM}
-                </div>
-                <div className="text-xs text-gray-500">AuM by Region</div>
-              </div>
-            </div>
-          </div>
+          <GimTreemap
+            items={funds.regionalAuM.map((item) => ({
+              id: String(item.id),
+              label: item.label,
+              value: item.value,
+              color: item.color,
+            }))}
+            formatter={(v) => formatUsdValue(v)}
+            height={240}
+          />
           <div
             className="mt-3 rounded-lg border p-3 text-center text-xs"
             style={{
