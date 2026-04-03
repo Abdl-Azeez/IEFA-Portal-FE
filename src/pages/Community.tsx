@@ -22,6 +22,7 @@ import {
   communityService,
   apiSortToUiSort,
   getCommunityGroupMemberCount,
+  getCommunityGroupIsMember,
   type DiscussionAPI,
   type CommunityGroupAPI,
   type CommunityEventAPI,
@@ -43,10 +44,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Dialog } from "@/components/ui/dialog";
 
-
 const CATEGORY_PALETTE = [
-  "bg-[#D52B1E]", "bg-blue-600", "bg-green-600", "bg-orange-600",
-  "bg-purple-600", "bg-yellow-600", "bg-indigo-600", "bg-teal-600",
+  "bg-[#D52B1E]",
+  "bg-blue-600",
+  "bg-green-600",
+  "bg-orange-600",
+  "bg-purple-600",
+  "bg-yellow-600",
+  "bg-indigo-600",
+  "bg-teal-600",
 ];
 function getCategoryColor(name: string): string {
   let h = 0;
@@ -54,7 +60,7 @@ function getCategoryColor(name: string): string {
   return CATEGORY_PALETTE[h % CATEGORY_PALETTE.length];
 }
 
-/* -- API â†’ UI mapping helpers ---------------------------------------------- */
+/* -- API -> UI mapping helpers ---------------------------------------------- */
 function apiDiscussionToPost(
   d: DiscussionAPI,
   _apiCategories: CommunityCategoryAPI[],
@@ -67,7 +73,8 @@ function apiDiscussionToPost(
     "Unknown";
   const replies =
     d.interactions?.filter((i) => i.type === "comment").length ?? 0;
-  const totalLikes = d.interactions?.filter((i) => i.type === "like").length ?? 0;
+  const totalLikes =
+    d.interactions?.filter((i) => i.type === "like").length ?? 0;
   const hasLiked = d.hasLiked ?? false;
   return {
     id: d.id,
@@ -95,18 +102,18 @@ const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-}
+    transition: { staggerChildren: 0.1 },
+  },
+};
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { duration: 0.5 }
-  }
-}
+    transition: { duration: 0.5 },
+  },
+};
 
 export default function Community() {
   const [selectedTab, setSelectedTab] = useState("discussions");
@@ -121,13 +128,17 @@ export default function Community() {
   const [reportedPosts, setReportedPosts] = useState<string[]>([]);
   const [showStartDiscussionModal, setShowStartDiscussionModal] =
     useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [selectedPost, setSelectedPost] =
     useState<DetailedDiscussionPost | null>(null);
   const [showPosterProfile, setShowPosterProfile] = useState(false);
   const [selectedPoster, setSelectedPoster] = useState<UserProfile | null>(
     null,
   );
+  const [posterProfileHydrating, setPosterProfileHydrating] = useState(false);
   const { isModerator, user } = useAuth();
 
   // state to track hover card
@@ -161,7 +172,9 @@ export default function Community() {
   }, [selectedPost]);
 
   /* -- API state -- */
-  const [apiCategories, setApiCategories] = useState<CommunityCategoryAPI[]>([]);
+  const [apiCategories, setApiCategories] = useState<CommunityCategoryAPI[]>(
+    [],
+  );
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [discussionPosts, setDiscussionPosts] = useState<DiscussionPost[]>([]);
   const [groups, setGroups] = useState<CommunityGroupAPI[]>([]);
@@ -170,7 +183,7 @@ export default function Community() {
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  /** Maps discussionId â†’ likeInteractionId (so we can delete the like later) */
+  /** Maps discussionId -> likeInteractionId (so we can delete the like later) */
   const likeInteractionIds = useRef<Map<string, string>>(new Map());
   /** Incremented on back-navigation to trigger a discussions re-fetch */
   const [discussionRefreshKey, setDiscussionRefreshKey] = useState(0);
@@ -180,25 +193,37 @@ export default function Community() {
     string | undefined
   >(undefined);
   /** Bookmarked discussions for Bookmarks tab */
-  const [bookmarkedDiscussions, setBookmarkedDiscussions] = useState<DiscussionPost[]>([]);
+  const [bookmarkedDiscussions, setBookmarkedDiscussions] = useState<
+    DiscussionPost[]
+  >([]);
   const [bookmarksLoading, setBookmarksLoading] = useState(false);
   /** Flagged discussions for Flagged tab (moderators only) — derived from discussionPosts */
-  const [flaggedDiscussions, setFlaggedDiscussions] = useState<DiscussionPost[]>([]);
+  const [flaggedDiscussions, setFlaggedDiscussions] = useState<
+    DiscussionPost[]
+  >([]);
   const [flaggedLoading, setFlaggedLoading] = useState(false);
   /** Moderator join-request management in Groups tab */
-  const [joinRequestsById, setJoinRequestsById] = useState<Record<string, GroupJoinRequestAPI[]>>({});
-  const [expandedRequestGroupId, setExpandedRequestGroupId] = useState<string | null>(null);
-  const [joinRequestsLoadingGroupId, setJoinRequestsLoadingGroupId] = useState<string | null>(null);
+  const [joinRequestsById, setJoinRequestsById] = useState<
+    Record<string, GroupJoinRequestAPI[]>
+  >({});
+  const [expandedRequestGroupId, setExpandedRequestGroupId] = useState<
+    string | null
+  >(null);
+  const [joinRequestsLoadingGroupId, setJoinRequestsLoadingGroupId] = useState<
+    string | null
+  >(null);
   /** Moderator-only: show only flagged posts */
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
 
-  /* -- Load community categories (needed to map categoryId â†’ name) -- */
+  /* -- Load community categories (needed to map categoryId -> name) -- */
   useEffect(() => {
     setCategoriesLoading(true);
     communityService
       .getCategories()
       .then(setApiCategories)
-      .catch((err) => console.error("Failed to load community categories:", err))
+      .catch((err) =>
+        console.error("Failed to load community categories:", err),
+      )
       .finally(() => setCategoriesLoading(false));
   }, []);
 
@@ -206,7 +231,13 @@ export default function Community() {
   useEffect(() => {
     setDiscussionsLoading(true);
     const apiSort = filters.sortBy
-      ? apiSortToUiSort(filters.sortBy as "latest" | "earliest" | "mostPopular" | "unanswered")
+      ? apiSortToUiSort(
+          filters.sortBy as
+            | "latest"
+            | "earliest"
+            | "mostPopular"
+            | "unanswered",
+        )
       : "latest";
     const catId = filters.category
       ? apiCategories.find((c) => c.name === filters.category)?.id
@@ -215,7 +246,12 @@ export default function Community() {
       .getDiscussions({
         categoryId: catId,
         sortBy: apiSort,
-        timeRange: filters.timeRange as "day" | "week" | "month" | "all" | undefined,
+        timeRange: filters.timeRange as
+          | "day"
+          | "week"
+          | "month"
+          | "all"
+          | undefined,
         search: searchQuery || undefined,
         showBookmarkedOnly: filters.savedOnly,
       })
@@ -226,7 +262,9 @@ export default function Community() {
             .filter((d) => d.hasBookmarked ?? d.isBookmarked)
             .map((d) => d.id),
         );
-        setDiscussionPosts(data.map((d) => apiDiscussionToPost(d, apiCategories)));
+        setDiscussionPosts(
+          data.map((d) => apiDiscussionToPost(d, apiCategories)),
+        );
         setApiError(null);
       })
       .catch((err) => {
@@ -234,7 +272,7 @@ export default function Community() {
         setApiError("Failed to load discussions.");
       })
       .finally(() => setDiscussionsLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, searchQuery, apiCategories, discussionRefreshKey]);
 
   /* -- Load groups when tab is selected -- */
@@ -243,10 +281,18 @@ export default function Community() {
     setGroupsLoading(true);
     communityService
       .getGroups()
-      .then(setGroups)
+      .then((data) =>
+        setGroups(
+          data.map((g) => ({
+            ...g,
+            memberCount: getCommunityGroupMemberCount(g),
+            isMember: getCommunityGroupIsMember(g, user?.id),
+          })),
+        ),
+      )
       .catch((err) => console.error("Failed to load groups:", err))
       .finally(() => setGroupsLoading(false));
-  }, [selectedTab]);
+  }, [selectedTab, user?.id]);
 
   // Ensure groups are available in discussion modal for optional group selection.
   useEffect(() => {
@@ -254,12 +300,20 @@ export default function Community() {
     setGroupsLoading(true);
     communityService
       .getGroups()
-      .then(setGroups)
+      .then((data) =>
+        setGroups(
+          data.map((g) => ({
+            ...g,
+            memberCount: getCommunityGroupMemberCount(g),
+            isMember: getCommunityGroupIsMember(g, user?.id),
+          })),
+        ),
+      )
       .catch((err) =>
         console.error("Failed to load groups for discussion modal:", err),
       )
       .finally(() => setGroupsLoading(false));
-  }, [showStartDiscussionModal, groups.length]);
+  }, [showStartDiscussionModal, groups.length, user?.id]);
 
   /* -- Load bookmarked discussions when tab is selected -- */
   useEffect(() => {
@@ -267,10 +321,14 @@ export default function Community() {
     setBookmarksLoading(true);
     communityService
       .getBookmarkedDiscussions()
-      .then((data) => setBookmarkedDiscussions(data.map((d) => apiDiscussionToPost(d, apiCategories))))
+      .then((data) =>
+        setBookmarkedDiscussions(
+          data.map((d) => apiDiscussionToPost(d, apiCategories)),
+        ),
+      )
       .catch((err) => console.error("Failed to load bookmarks:", err))
       .finally(() => setBookmarksLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTab]);
 
   /* -- Load flagged discussions when moderator opens flagged tab -- */
@@ -285,7 +343,7 @@ export default function Community() {
       })
       .catch((err) => console.error("Failed to load flagged discussions:", err))
       .finally(() => setFlaggedLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTab, isModerator]);
 
   /* -- Load events when tab is selected -- */
@@ -304,7 +362,7 @@ export default function Community() {
       name: "Dr. Salman Al-Farsi",
       role: "Senior Portfolio Manager",
       organization: "ESG",
-      image: "ðŸ‘¨â€ðŸ’¼",
+      image: "👨‍💼",
       available: true,
       expertise: ["Shari'ah Audit", "Career Advice"],
     },
@@ -312,7 +370,7 @@ export default function Community() {
       name: "Dr. Fatima Al-Farruq",
       role: "Senior Portfolio Manager",
       organization: "ESG",
-      image: "ðŸ‘©â€ðŸ’¼",
+      image: "👩‍💼",
       available: true,
       expertise: ["Career Advice"],
     },
@@ -320,7 +378,7 @@ export default function Community() {
       name: "Dr. Ali Badar",
       role: "Senior Portfolio Manager",
       organization: "ESG",
-      image: "ðŸ‘¨â€ðŸ’¼",
+      image: "👨‍💼",
       available: true,
       expertise: ["Shari'ah Audit", "Career Advice"],
     },
@@ -446,9 +504,7 @@ export default function Community() {
     try {
       const isNowSaved = await communityService.toggleBookmark(postId);
       setSavedPosts((prev) =>
-        isNowSaved
-          ? [...prev, postId]
-          : prev.filter((id) => id !== postId),
+        isNowSaved ? [...prev, postId] : prev.filter((id) => id !== postId),
       );
       setDiscussionPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isSaved: isNowSaved } : p)),
@@ -464,32 +520,35 @@ export default function Community() {
     }
   }, []);
 
-  const toggleLikePost = useCallback(async (postId: string) => {
-    const alreadyLiked = likedPosts.includes(postId);
-    if (alreadyLiked) {
-      const interactionId = likeInteractionIds.current.get(postId);
-      if (interactionId) {
+  const toggleLikePost = useCallback(
+    async (postId: string) => {
+      const alreadyLiked = likedPosts.includes(postId);
+      if (alreadyLiked) {
+        const interactionId = likeInteractionIds.current.get(postId);
+        if (interactionId) {
+          try {
+            await communityService.deleteInteraction(interactionId);
+            likeInteractionIds.current.delete(postId);
+          } catch (err) {
+            console.error("Failed to unlike:", err);
+            return;
+          }
+        }
+        setLikedPosts((prev) => prev.filter((id) => id !== postId));
+      } else {
         try {
-          await communityService.deleteInteraction(interactionId);
-          likeInteractionIds.current.delete(postId);
+          const interaction = await communityService.createInteraction(postId, {
+            type: "like",
+          });
+          likeInteractionIds.current.set(postId, interaction.id);
+          setLikedPosts((prev) => [...prev, postId]);
         } catch (err) {
-          console.error("Failed to unlike:", err);
-          return;
+          console.error("Failed to like:", err);
         }
       }
-      setLikedPosts((prev) => prev.filter((id) => id !== postId));
-    } else {
-      try {
-        const interaction = await communityService.createInteraction(postId, {
-          type: "like",
-        });
-        likeInteractionIds.current.set(postId, interaction.id);
-        setLikedPosts((prev) => [...prev, postId]);
-      } catch (err) {
-        console.error("Failed to like:", err);
-      }
-    }
-  }, [likedPosts]);
+    },
+    [likedPosts],
+  );
 
   const handleShare = async (post: DiscussionPost) => {
     const url = `${window.location.origin}/community/${post.id}`;
@@ -511,7 +570,10 @@ export default function Community() {
 
   const handleReport = async (postId: string) => {
     if (reportedPosts.includes(postId)) {
-      toast({ title: "Already Reported", description: "You've already reported this post." });
+      toast({
+        title: "Already Reported",
+        description: "You've already reported this post.",
+      });
       return;
     }
     try {
@@ -523,7 +585,9 @@ export default function Community() {
       setBookmarkedDiscussions((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isReported: true } : p)),
       );
-      toast.success("Post reported. Thank you for helping keep the community safe.");
+      toast.success(
+        "Post reported. Thank you for helping keep the community safe.",
+      );
     } catch (err) {
       console.error("Failed to report post:", err);
       toast.error("Could not submit report. Please try again.");
@@ -543,7 +607,7 @@ export default function Community() {
       const myLike = interactions.find(
         (i) => i.type === "like" && i.user?.id === user?.id,
       );
-      initialIsLiked = !!myLike;
+      initialIsLiked = full.hasLiked ?? !!myLike;
       initialLikeInteractionId = myLike?.id;
       repliesList = interactions
         .filter((i) => i.type === "comment")
@@ -565,19 +629,28 @@ export default function Community() {
       // fall back to list-level data
     }
 
-    const freshLikeCount = (full?.interactions ?? []).filter((i) => i.type === "like").length;
-    const freshReplyCount = (full?.interactions ?? []).filter((i) => i.type === "comment").length;
+    const freshLikeCount = (full?.interactions ?? []).filter(
+      (i) => i.type === "like",
+    ).length;
+    const freshReplyCount = (full?.interactions ?? []).filter(
+      (i) => i.type === "comment",
+    ).length;
     setInitialLikeForDetail(initialIsLiked);
     setInitialLikeIdForDetail(initialLikeInteractionId);
 
     const stats = full?.authorStats;
     const posterProfile: UserProfile = {
       id: full?.author?.id ?? post.posterId,
-      name: [full?.author?.firstName, full?.author?.lastName].filter(Boolean).join(" ") || post.poster,
+      name:
+        [full?.author?.firstName, full?.author?.lastName]
+          .filter(Boolean)
+          .join(" ") || post.poster,
       title: full?.author?.role ?? "Member",
       displayPicture: full?.author?.profilePhotoUrl || post.posterAvatar || "",
       bio: "",
-      joinedDate: full?.author?.createdAt ? new Date(full.author.createdAt) : new Date(),
+      joinedDate: full?.author?.createdAt
+        ? new Date(full.author.createdAt)
+        : new Date(),
       totalPosts: stats?.posts ?? 0,
       totalViews: stats?.views ?? full?.viewCount ?? post.views,
       totalReplies: stats?.replies ?? freshReplyCount,
@@ -598,9 +671,9 @@ export default function Community() {
       posterDetails: posterProfile,
       attachments: (full?.attachments ?? []).map((url, idx) => ({
         id: `attachment-${idx}`,
-        type: /\.(png|jpe?g|gif|webp|svg)$/i.test(url) ? 'image' : 'file',
+        type: /\.(png|jpe?g|gif|webp|svg)$/i.test(url) ? "image" : "file",
         url,
-        name: url.split('/').pop() ?? `attachment-${idx + 1}`,
+        name: url.split("/").pop() ?? `attachment-${idx + 1}`,
         size: 0,
       })),
       repliesList,
@@ -615,10 +688,11 @@ export default function Community() {
   ) => {
     e.stopPropagation();
 
-    const posterProfile: UserProfile = {
+    // Show an immediate fallback, then hydrate with authoritative detail payload.
+    const fallbackProfile: UserProfile = {
       id: post.posterId,
       name: post.poster,
-      title: "Islamic Finance Professional",
+      title: "Member",
       displayPicture: post.posterAvatar || "",
       bio: "",
       joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
@@ -631,26 +705,73 @@ export default function Community() {
       rating: 4.5,
     };
 
-    setSelectedPoster(posterProfile);
+    setSelectedPoster(fallbackProfile);
     setShowPosterProfile(true);
+    setPosterProfileHydrating(true);
+
+    communityService
+      .getDiscussionById(post.id)
+      .then((full) => {
+        const stats = full.authorStats;
+        const mappedProfile: UserProfile = {
+          id: full.author?.id ?? post.posterId,
+          name:
+            [full.author?.firstName, full.author?.lastName]
+              .filter(Boolean)
+              .join(" ") ||
+            full.author?.username ||
+            post.poster,
+          title: full.author?.role ?? "Member",
+          displayPicture:
+            full.author?.profilePhotoUrl ?? post.posterAvatar ?? "",
+          bio: "",
+          joinedDate: full.author?.createdAt
+            ? new Date(full.author.createdAt)
+            : fallbackProfile.joinedDate,
+          totalPosts: stats?.posts ?? 0,
+          totalViews: stats?.views ?? full.viewCount ?? post.views,
+          totalReplies: stats?.replies ?? post.replies,
+          totalLikes:
+            stats?.likes ??
+            (full.interactions ?? []).filter((i) => i.type === "like").length,
+          isVerified: full.author?.isVerified ?? false,
+          isModerator: full.author?.isModerator ?? false,
+          rating: 4.5,
+        };
+        setSelectedPoster(mappedProfile);
+      })
+      .catch((err) => {
+        console.error("Failed to hydrate poster profile:", err);
+      })
+      .finally(() => {
+        setPosterProfileHydrating(false);
+      });
   };
 
-  const handlePinPost = useCallback(async (postId: string) => {
-    const post = discussionPosts.find((p) => p.id === postId);
-    if (!post) return;
-    try {
-      await communityService.updateDiscussion(postId, { isPinned: !post.isPinned });
-      setDiscussionPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, isPinned: !p.isPinned } : p)),
-      );
-    } catch (err) {
-      console.error("Failed to pin/unpin post:", err);
-    }
-  }, [discussionPosts]);
+  const handlePinPost = useCallback(
+    async (postId: string) => {
+      const post = discussionPosts.find((p) => p.id === postId);
+      if (!post) return;
+      try {
+        await communityService.updateDiscussion(postId, {
+          isPinned: !post.isPinned,
+        });
+        setDiscussionPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId ? { ...p, isPinned: !p.isPinned } : p,
+          ),
+        );
+      } catch (err) {
+        console.error("Failed to pin/unpin post:", err);
+      }
+    },
+    [discussionPosts],
+  );
 
   const handleDeletePost = useCallback((postId: string) => {
     setConfirmDialog({
-      message: "Are you sure you want to delete this post? This cannot be undone.",
+      message:
+        "Are you sure you want to delete this post? This cannot be undone.",
       onConfirm: async () => {
         try {
           await communityService.deleteDiscussion(postId);
@@ -695,85 +816,105 @@ export default function Community() {
     [apiCategories],
   );
 
-  const handleFlagToggle = useCallback(async (postId: string, currentlyFlagged: boolean) => {
-    try {
-      if (currentlyFlagged) {
-        await communityService.unflagDiscussion(postId);
-      } else {
-        await communityService.flagDiscussion(postId);
-      }
-      setDiscussionPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, isReported: !currentlyFlagged } : p)),
-      );
-      setBookmarkedDiscussions((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, isReported: !currentlyFlagged } : p)),
-      );
-      setFlaggedDiscussions((prev) =>
-        {
+  const handleFlagToggle = useCallback(
+    async (postId: string, currentlyFlagged: boolean) => {
+      try {
+        if (currentlyFlagged) {
+          await communityService.unflagDiscussion(postId);
+        } else {
+          await communityService.flagDiscussion(postId);
+        }
+        setDiscussionPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId ? { ...p, isReported: !currentlyFlagged } : p,
+          ),
+        );
+        setBookmarkedDiscussions((prev) =>
+          prev.map((p) =>
+            p.id === postId ? { ...p, isReported: !currentlyFlagged } : p,
+          ),
+        );
+        setFlaggedDiscussions((prev) => {
           if (currentlyFlagged) {
             return prev.filter((p) => p.id !== postId);
           }
           const existing = prev.find((p) => p.id === postId);
           if (existing) {
-            return prev.map((p) => (p.id === postId ? { ...p, isReported: true } : p));
+            return prev.map((p) =>
+              p.id === postId ? { ...p, isReported: true } : p,
+            );
           }
-          const fromBookmarked = bookmarkedDiscussions.find((p) => p.id === postId);
+          const fromBookmarked = bookmarkedDiscussions.find(
+            (p) => p.id === postId,
+          );
           const fromDiscussions = discussionPosts.find((p) => p.id === postId);
           const sourcePost = fromBookmarked ?? fromDiscussions;
-          return sourcePost ? [{ ...sourcePost, isReported: true }, ...prev] : prev;
-        },
-      );
-      // Also update selectedPost if open in detail view
-    } catch (err) {
-      console.error("Failed to flag/unflag discussion:", err);
-    }
-  }, [bookmarkedDiscussions, discussionPosts]);
+          return sourcePost
+            ? [{ ...sourcePost, isReported: true }, ...prev]
+            : prev;
+        });
+        // Also update selectedPost if open in detail view
+      } catch (err) {
+        console.error("Failed to flag/unflag discussion:", err);
+      }
+    },
+    [bookmarkedDiscussions, discussionPosts],
+  );
 
-  const handleToggleJoinRequests = useCallback(async (group: CommunityGroupAPI) => {
-    if (expandedRequestGroupId === group.id) {
-      setExpandedRequestGroupId(null);
-      return;
-    }
-    setExpandedRequestGroupId(group.id);
-    if (joinRequestsById[group.id]) return; // already loaded
-    setJoinRequestsLoadingGroupId(group.id);
-    try {
-      const requests = await communityService.getJoinRequests(group.id);
-      setJoinRequestsById((prev) => ({ ...prev, [group.id]: requests }));
-    } catch (err) {
-      console.error("Failed to load join requests:", err);
-    } finally {
-      setJoinRequestsLoadingGroupId(null);
-    }
-  }, [expandedRequestGroupId, joinRequestsById]);
+  const handleToggleJoinRequests = useCallback(
+    async (group: CommunityGroupAPI) => {
+      if (expandedRequestGroupId === group.id) {
+        setExpandedRequestGroupId(null);
+        return;
+      }
+      setExpandedRequestGroupId(group.id);
+      if (joinRequestsById[group.id]) return; // already loaded
+      setJoinRequestsLoadingGroupId(group.id);
+      try {
+        const requests = await communityService.getJoinRequests(group.id);
+        setJoinRequestsById((prev) => ({ ...prev, [group.id]: requests }));
+      } catch (err) {
+        console.error("Failed to load join requests:", err);
+      } finally {
+        setJoinRequestsLoadingGroupId(null);
+      }
+    },
+    [expandedRequestGroupId, joinRequestsById],
+  );
 
-  const handleApproveRequest = useCallback(async (groupId: string, requestId: string) => {
-    try {
-      await communityService.approveJoinRequest(requestId);
-      setJoinRequestsById((prev) => ({
-        ...prev,
-        [groupId]: (prev[groupId] ?? []).map((r) =>
-          r.id === requestId ? { ...r, status: 'approved' as const } : r,
-        ),
-      }));
-    } catch (err) {
-      console.error("Failed to approve join request:", err);
-    }
-  }, []);
+  const handleApproveRequest = useCallback(
+    async (groupId: string, requestId: string) => {
+      try {
+        await communityService.approveJoinRequest(requestId);
+        setJoinRequestsById((prev) => ({
+          ...prev,
+          [groupId]: (prev[groupId] ?? []).map((r) =>
+            r.id === requestId ? { ...r, status: "approved" as const } : r,
+          ),
+        }));
+      } catch (err) {
+        console.error("Failed to approve join request:", err);
+      }
+    },
+    [],
+  );
 
-  const handleRejectRequest = useCallback(async (groupId: string, requestId: string) => {
-    try {
-      await communityService.rejectJoinRequest(requestId);
-      setJoinRequestsById((prev) => ({
-        ...prev,
-        [groupId]: (prev[groupId] ?? []).map((r) =>
-          r.id === requestId ? { ...r, status: 'rejected' as const } : r,
-        ),
-      }));
-    } catch (err) {
-      console.error("Failed to reject join request:", err);
-    }
-  }, []);
+  const handleRejectRequest = useCallback(
+    async (groupId: string, requestId: string) => {
+      try {
+        await communityService.rejectJoinRequest(requestId);
+        setJoinRequestsById((prev) => ({
+          ...prev,
+          [groupId]: (prev[groupId] ?? []).map((r) =>
+            r.id === requestId ? { ...r, status: "rejected" as const } : r,
+          ),
+        }));
+      } catch (err) {
+        console.error("Failed to reject join request:", err);
+      }
+    },
+    [],
+  );
 
   // Show detail page if post is selected
   const handleBack = useCallback(() => {
@@ -823,9 +964,15 @@ export default function Community() {
       >
         <div className="flex flex-col items-center text-center">
           <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-2xl mb-2 overflow-hidden">
-            {post.posterAvatar?.startsWith("http")
-              ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
-              : <span>{post.posterAvatar || "👤"}</span>}
+            {post.posterAvatar?.startsWith("http") ? (
+              <img
+                src={post.posterAvatar}
+                alt={post.poster}
+                className="h-full w-full object-cover rounded-full"
+              />
+            ) : (
+              <span>{post.posterAvatar || "👤"}</span>
+            )}
           </div>
           <h3 className="font-semibold text-[#000000]">{post.poster}</h3>
           <p className="text-xs text-[#737692]">Islamic Finance Professional</p>
@@ -1035,23 +1182,25 @@ export default function Community() {
                         >
                           All
                         </motion.button>
-                        {apiCategories.map((cat) => cat.name).map((category) => (
-                          <motion.button
-                            key={category}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() =>
-                              setFilters((prev) => ({ ...prev, category }))
-                            }
-                            className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
-                              filters.category === category
-                                ? "bg-gradient-to-r from-[#D52B1E] to-[#B8241B] text-white shadow-lg shadow-red-200"
-                                : "bg-gray-100 text-[#000000] hover:bg-gray-200 border border-gray-200"
-                            }`}
-                          >
-                            {category}
-                          </motion.button>
-                        ))}
+                        {apiCategories
+                          .map((cat) => cat.name)
+                          .map((category) => (
+                            <motion.button
+                              key={category}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() =>
+                                setFilters((prev) => ({ ...prev, category }))
+                              }
+                              className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                                filters.category === category
+                                  ? "bg-gradient-to-r from-[#D52B1E] to-[#B8241B] text-white shadow-lg shadow-red-200"
+                                  : "bg-gray-100 text-[#000000] hover:bg-gray-200 border border-gray-200"
+                              }`}
+                            >
+                              {category}
+                            </motion.button>
+                          ))}
                       </div>
                     </div>
 
@@ -1079,22 +1228,22 @@ export default function Community() {
                           {
                             value: "latest",
                             label: "Latest First",
-                            icon: "â±ï¸",
+                            icon: "⏱️",
                           },
                           {
                             value: "earliest",
                             label: "Oldest First",
-                            icon: "ðŸ“œ",
+                            icon: "📜",
                           },
                           {
                             value: "mostPopular",
                             label: "Most Popular",
-                            icon: "ðŸ”¥",
+                            icon: "🔥",
                           },
                           {
                             value: "unanswered",
                             label: "Unanswered",
-                            icon: "â“",
+                            icon: "❓",
                           },
                         ].map((option) => (
                           <motion.button
@@ -1116,7 +1265,7 @@ export default function Community() {
                             <span>{option.label}</span>
                             {filters.sortBy === option.value && (
                               <div className="ml-auto h-5 w-5 rounded-full bg-blue-400 flex items-center justify-center">
-                                <span className="text-white text-xs">âœ“</span>
+                                <span className="text-white text-xs">✓</span>
                               </div>
                             )}
                           </motion.button>
@@ -1145,10 +1294,10 @@ export default function Community() {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { value: "day", label: "ðŸ“… Last Day" },
-                          { value: "week", label: "ðŸ“† Last Week" },
-                          { value: "month", label: "ðŸ“Š Last Month" },
-                          { value: "all", label: "ðŸŒ All Time" },
+                          { value: "day", label: "🗓 Last Day" },
+                          { value: "week", label: "📆 Last Week" },
+                          { value: "month", label: "📊 Last Month" },
+                          { value: "all", label: "🌍 All Time" },
                         ].map((option) => (
                           <motion.button
                             key={option.value}
@@ -1181,7 +1330,7 @@ export default function Community() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-purple-400 to-purple-500 flex items-center justify-center text-white text-lg">
-                          ðŸ’¾
+                          💾
                         </div>
                         <div>
                           <p className="font-semibold text-[#000000]">
@@ -1223,15 +1372,21 @@ export default function Community() {
                             <Flag className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="font-semibold text-[#000000]">Flagged Posts</p>
-                            <p className="text-xs text-[#737692]">Show only flagged</p>
+                            <p className="font-semibold text-[#000000]">
+                              Flagged Posts
+                            </p>
+                            <p className="text-xs text-[#737692]">
+                              Show only flagged
+                            </p>
                           </div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input
                             type="checkbox"
                             checked={showFlaggedOnly}
-                            onChange={(e) => setShowFlaggedOnly(e.target.checked)}
+                            onChange={(e) =>
+                              setShowFlaggedOnly(e.target.checked)
+                            }
                             className="sr-only peer"
                           />
                           <div
@@ -1382,9 +1537,15 @@ export default function Community() {
                                 className="flex-shrink-0 hover:opacity-80 transition-opacity"
                               >
                                 <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-lg shadow-sm cursor-pointer overflow-hidden">
-                                  {post.posterAvatar?.startsWith("http")
-                                    ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
-                                    : <span>{post.posterAvatar || "👤"}</span>}
+                                  {post.posterAvatar?.startsWith("http") ? (
+                                    <img
+                                      src={post.posterAvatar}
+                                      alt={post.poster}
+                                      className="h-full w-full object-cover rounded-full"
+                                    />
+                                  ) : (
+                                    <span>{post.posterAvatar || "👤"}</span>
+                                  )}
                                 </div>
                               </button>
 
@@ -1439,7 +1600,7 @@ export default function Community() {
                               </button>
                               {post.shares > 0 && (
                                 <div className="flex items-center gap-1 text-sm">
-                                  <span>ðŸ”—</span>
+                                  <span>🔗</span>
                                   <span>{post.shares}</span>
                                 </div>
                               )}
@@ -1447,37 +1608,50 @@ export default function Community() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (isModerator) {
-                                    handleFlagToggle(post.id, !!post.isReported);
+                                    handleFlagToggle(
+                                      post.id,
+                                      !!post.isReported,
+                                    );
                                   } else if (!post.isReported) {
                                     handleReport(post.id);
                                   }
                                 }}
                                 disabled={!isModerator && !!post.isReported}
-                                title={isModerator
-                                  ? (post.isReported ? 'Unflag this post' : 'Flag this post')
-                                  : (post.isReported ? 'Already reported' : 'Report this post')}
+                                title={
+                                  isModerator
+                                    ? post.isReported
+                                      ? "Unflag this post"
+                                      : "Flag this post"
+                                    : post.isReported
+                                      ? "Already reported"
+                                      : "Report this post"
+                                }
                                 className={`p-1 rounded transition-colors ${
                                   post.isReported
-                                    ? 'text-orange-600'
-                                    : 'text-[#737692] hover:text-red-600'
-                                } ${!isModerator && post.isReported ? 'cursor-default' : ''}`}
+                                    ? "text-orange-600"
+                                    : "text-[#737692] hover:text-red-600"
+                                } ${!isModerator && post.isReported ? "cursor-default" : ""}`}
                               >
-                                <Flag className={`h-4 w-4 ${post.isReported ? 'fill-current' : ''}`} />
+                                <Flag
+                                  className={`h-4 w-4 ${post.isReported ? "fill-current" : ""}`}
+                                />
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleSavePost(post.id);
                                 }}
-                                title={post.isSaved ? 'Remove bookmark' : 'Save post'}
+                                title={
+                                  post.isSaved ? "Remove bookmark" : "Save post"
+                                }
                                 className={`p-1 rounded transition-colors ${
                                   post.isSaved
-                                    ? 'text-[#D52B1E]'
-                                    : 'text-[#737692] hover:text-[#D52B1E]'
+                                    ? "text-[#D52B1E]"
+                                    : "text-[#737692] hover:text-[#D52B1E]"
                                 }`}
                               >
                                 <Bookmark
-                                  className={`h-4 w-4 ${post.isSaved ? 'fill-current' : ''}`}
+                                  className={`h-4 w-4 ${post.isSaved ? "fill-current" : ""}`}
                                 />
                               </button>
                             </div>
@@ -1503,8 +1677,12 @@ export default function Community() {
           <TabsContent value="bookmarks" className="mt-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-[#000000]">Saved Posts</h2>
-                <p className="text-sm text-[#737692] mt-0.5">Discussions you&apos;ve bookmarked for later</p>
+                <h2 className="text-xl font-bold text-[#000000]">
+                  Saved Posts
+                </h2>
+                <p className="text-sm text-[#737692] mt-0.5">
+                  Discussions you&apos;ve bookmarked for later
+                </p>
               </div>
               {!bookmarksLoading && (
                 <span className="text-xs font-semibold bg-red-50 text-[#D52B1E] px-3 py-1 rounded-full border border-[#D52B1E]/20">
@@ -1514,7 +1692,10 @@ export default function Community() {
             </div>
             {bookmarksLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-lg border p-6 animate-pulse space-y-3">
+                <div
+                  key={i}
+                  className="bg-white rounded-lg border p-6 animate-pulse space-y-3"
+                >
                   <div className="h-4 bg-gray-200 rounded w-1/2" />
                   <div className="h-3 bg-gray-100 rounded" />
                   <div className="h-3 bg-gray-100 rounded w-4/5" />
@@ -1524,8 +1705,12 @@ export default function Community() {
               <Card>
                 <CardContent className="p-12 text-center">
                   <Bookmark className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="font-semibold text-[#000000]">No saved posts yet</p>
-                  <p className="text-sm text-[#737692] mt-1">Bookmark discussions to find them here quickly.</p>
+                  <p className="font-semibold text-[#000000]">
+                    No saved posts yet
+                  </p>
+                  <p className="text-sm text-[#737692] mt-1">
+                    Bookmark discussions to find them here quickly.
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -1543,12 +1728,18 @@ export default function Community() {
                     <CardContent className="p-6">
                       <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold text-[#000000]">{post.title}</h3>
-                          <Badge className={`${getCategoryColor(post.category)} text-white hover:${getCategoryColor(post.category)}`}>
+                          <h3 className="text-lg font-semibold text-[#000000]">
+                            {post.title}
+                          </h3>
+                          <Badge
+                            className={`${getCategoryColor(post.category)} text-white hover:${getCategoryColor(post.category)}`}
+                          >
                             {post.category}
                           </Badge>
                           {post.isPinned && (
-                            <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pinned</Badge>
+                            <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                              Pinned
+                            </Badge>
                           )}
                           {isModerator && post.isReported && (
                             <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 flex items-center gap-1">
@@ -1557,33 +1748,58 @@ export default function Community() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-[#737692] line-clamp-2">{post.description}</p>
+                        <p className="text-sm text-[#737692] line-clamp-2">
+                          {post.description}
+                        </p>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t">
                           <div className="flex items-center gap-3">
                             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-sm shadow-sm overflow-hidden">
-                              {post.posterAvatar?.startsWith('http')
-                                ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
-                                : <span>{post.posterAvatar || '👤'}</span>}
+                              {post.posterAvatar?.startsWith("http") ? (
+                                <img
+                                  src={post.posterAvatar}
+                                  alt={post.poster}
+                                  className="h-full w-full object-cover rounded-full"
+                                />
+                              ) : (
+                                <span>{post.posterAvatar || "👤"}</span>
+                              )}
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-[#000000]">{post.poster}</p>
-                              <p className="text-xs text-[#737692]">{formatTime(post.createdAt)}</p>
+                              <p className="text-sm font-medium text-[#000000]">
+                                {post.poster}
+                              </p>
+                              <p className="text-xs text-[#737692]">
+                                {formatTime(post.createdAt)}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-4 text-[#737692]">
-                            <div className="flex items-center gap-1 text-sm"><Eye className="h-4 w-4" /><span>{post.views}</span></div>
+                            <div className="flex items-center gap-1 text-sm">
+                              <Eye className="h-4 w-4" />
+                              <span>{post.views}</span>
+                            </div>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleLikePost(post.id);
                               }}
                               className="flex items-center gap-1 text-sm hover:text-red-600 transition-colors"
-                              title={likedPosts.includes(post.id) ? "Unlike" : "Like"}
+                              title={
+                                likedPosts.includes(post.id) ? "Unlike" : "Like"
+                              }
                             >
-                              <Heart className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-current text-red-500" : ""}`} />
-                              <span>{post.likes + (likedPosts.includes(post.id) ? 1 : 0)}</span>
+                              <Heart
+                                className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-current text-red-500" : ""}`}
+                              />
+                              <span>
+                                {post.likes +
+                                  (likedPosts.includes(post.id) ? 1 : 0)}
+                              </span>
                             </button>
-                            <div className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /><span>{post.replies}</span></div>
+                            <div className="flex items-center gap-1 text-sm">
+                              <MessageSquare className="h-4 w-4" />
+                              <span>{post.replies}</span>
+                            </div>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1594,19 +1810,33 @@ export default function Community() {
                                 }
                               }}
                               disabled={!isModerator && !!post.isReported}
-                              title={isModerator
-                                ? (post.isReported ? 'Unflag this post' : 'Flag this post')
-                                : (post.isReported ? 'Already reported' : 'Report this post')}
+                              title={
+                                isModerator
+                                  ? post.isReported
+                                    ? "Unflag this post"
+                                    : "Flag this post"
+                                  : post.isReported
+                                    ? "Already reported"
+                                    : "Report this post"
+                              }
                               className={`p-1 rounded transition-colors ${
                                 post.isReported
-                                  ? 'text-orange-600'
-                                  : 'text-[#737692] hover:text-red-600'
-                              } ${!isModerator && post.isReported ? 'cursor-default' : ''}`}
+                                  ? "text-orange-600"
+                                  : "text-[#737692] hover:text-red-600"
+                              } ${!isModerator && post.isReported ? "cursor-default" : ""}`}
                             >
-                              <Flag className={`h-4 w-4 ${post.isReported ? 'fill-current' : ''}`} />
+                              <Flag
+                                className={`h-4 w-4 ${post.isReported ? "fill-current" : ""}`}
+                              />
                             </button>
                             <button
-                              onClick={(e) => { e.stopPropagation(); toggleSavePost(post.id); setBookmarkedDiscussions((prev) => prev.filter((p) => p.id !== post.id)); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSavePost(post.id);
+                                setBookmarkedDiscussions((prev) =>
+                                  prev.filter((p) => p.id !== post.id),
+                                );
+                              }}
                               className="p-1 rounded text-[#D52B1E] hover:text-red-700 transition-colors"
                               title="Remove bookmark"
                             >
@@ -1627,8 +1857,12 @@ export default function Community() {
             <TabsContent value="flagged" className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-[#000000]">Flagged Posts</h2>
-                  <p className="text-sm text-[#737692] mt-0.5">Discussions reported or flagged for review</p>
+                  <h2 className="text-xl font-bold text-[#000000]">
+                    Flagged Posts
+                  </h2>
+                  <p className="text-sm text-[#737692] mt-0.5">
+                    Discussions reported or flagged for review
+                  </p>
                 </div>
                 {!flaggedLoading && (
                   <span className="text-xs font-semibold bg-orange-50 text-orange-700 px-3 py-1 rounded-full border border-orange-200">
@@ -1638,7 +1872,10 @@ export default function Community() {
               </div>
               {flaggedLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg border p-6 animate-pulse space-y-3">
+                  <div
+                    key={i}
+                    className="bg-white rounded-lg border p-6 animate-pulse space-y-3"
+                  >
                     <div className="h-4 bg-gray-200 rounded w-1/2" />
                     <div className="h-3 bg-gray-100 rounded" />
                     <div className="h-3 bg-gray-100 rounded w-4/5" />
@@ -1648,8 +1885,12 @@ export default function Community() {
                 <Card>
                   <CardContent className="p-12 text-center">
                     <Flag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="font-semibold text-[#000000]">No flagged posts</p>
-                    <p className="text-sm text-[#737692] mt-1">Flagged discussions will appear here for review.</p>
+                    <p className="font-semibold text-[#000000]">
+                      No flagged posts
+                    </p>
+                    <p className="text-sm text-[#737692] mt-1">
+                      Flagged discussions will appear here for review.
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
@@ -1667,8 +1908,12 @@ export default function Community() {
                       <CardContent className="p-6">
                         <div className="flex flex-col gap-3">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg font-semibold text-[#000000]">{post.title}</h3>
-                            <Badge className={`${getCategoryColor(post.category)} text-white hover:${getCategoryColor(post.category)}`}>
+                            <h3 className="text-lg font-semibold text-[#000000]">
+                              {post.title}
+                            </h3>
+                            <Badge
+                              className={`${getCategoryColor(post.category)} text-white hover:${getCategoryColor(post.category)}`}
+                            >
                               {post.category}
                             </Badge>
                             <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 flex items-center gap-1">
@@ -1676,31 +1921,56 @@ export default function Community() {
                               Flagged
                             </Badge>
                             {post.isPinned && (
-                              <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pinned</Badge>
+                              <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                                Pinned
+                              </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-[#737692] line-clamp-2">{post.description}</p>
+                          <p className="text-sm text-[#737692] line-clamp-2">
+                            {post.description}
+                          </p>
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t">
                             <div className="flex items-center gap-3">
                               <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-sm shadow-sm overflow-hidden">
-                                {post.posterAvatar?.startsWith('http')
-                                  ? <img src={post.posterAvatar} alt={post.poster} className="h-full w-full object-cover rounded-full" />
-                                  : <span>{post.posterAvatar || '👤'}</span>}
+                                {post.posterAvatar?.startsWith("http") ? (
+                                  <img
+                                    src={post.posterAvatar}
+                                    alt={post.poster}
+                                    className="h-full w-full object-cover rounded-full"
+                                  />
+                                ) : (
+                                  <span>{post.posterAvatar || "👤"}</span>
+                                )}
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-[#000000]">{post.poster}</p>
-                                <p className="text-xs text-[#737692]">{formatTime(post.createdAt)}</p>
+                                <p className="text-sm font-medium text-[#000000]">
+                                  {post.poster}
+                                </p>
+                                <p className="text-xs text-[#737692]">
+                                  {formatTime(post.createdAt)}
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-4 text-[#737692]">
-                              <div className="flex items-center gap-1 text-sm"><Eye className="h-4 w-4" /><span>{post.views}</span></div>
-                              <div className="flex items-center gap-1 text-sm"><Heart className="h-4 w-4" /><span>{post.likes}</span></div>
-                              <div className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /><span>{post.replies}</span></div>
+                              <div className="flex items-center gap-1 text-sm">
+                                <Eye className="h-4 w-4" />
+                                <span>{post.views}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm">
+                                <Heart className="h-4 w-4" />
+                                <span>{post.likes}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm">
+                                <MessageSquare className="h-4 w-4" />
+                                <span>{post.replies}</span>
+                              </div>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleFlagToggle(post.id, true);
-                                  setFlaggedDiscussions((prev) => prev.filter((p) => p.id !== post.id));
+                                  setFlaggedDiscussions((prev) =>
+                                    prev.filter((p) => p.id !== post.id),
+                                  );
                                 }}
                                 className="p-1 rounded text-orange-600 hover:text-orange-800 transition-colors"
                                 title="Unflag this post"
@@ -1723,7 +1993,10 @@ export default function Community() {
             {groupsLoading ? (
               <div className="grid gap-6 md:grid-cols-2">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg border p-5 animate-pulse space-y-3">
+                  <div
+                    key={i}
+                    className="bg-white rounded-lg border p-5 animate-pulse space-y-3"
+                  >
                     <div className="h-4 bg-gray-200 rounded w-1/2" />
                     <div className="h-3 bg-gray-100 rounded w-1/3" />
                     <div className="h-3 bg-gray-100 rounded w-2/3" />
@@ -1749,7 +2022,9 @@ export default function Community() {
                             </CardTitle>
                             <div className="flex items-center gap-2 text-sm text-[#737692]">
                               <Users className="h-4 w-4" />
-                              <span>{getCommunityGroupMemberCount(group)} members</span>
+                              <span>
+                                {getCommunityGroupMemberCount(group)} members
+                              </span>
                             </div>
                           </div>
                           <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -1761,22 +2036,34 @@ export default function Community() {
                         <div className="space-y-3">
                           {group.description && (
                             <div>
-                              <p className="text-sm text-[#737692] mb-1">About</p>
-                              <p className="font-medium text-[#000000] text-sm">{group.description}</p>
+                              <p className="text-sm text-[#737692] mb-1">
+                                About
+                              </p>
+                              <p className="font-medium text-[#000000] text-sm">
+                                {group.description}
+                              </p>
                             </div>
                           )}
                           {group.topic && (
                             <div>
-                              <p className="text-sm text-[#737692] mb-1">Current Topic</p>
-                              <p className="font-medium text-[#000000]">{group.topic}</p>
+                              <p className="text-sm text-[#737692] mb-1">
+                                Current Topic
+                              </p>
+                              <p className="font-medium text-[#000000]">
+                                {group.topic}
+                              </p>
                             </div>
                           )}
                           {group.nextSession && (
                             <div>
-                              <p className="text-sm text-[#737692] mb-1">Next Session</p>
+                              <p className="text-sm text-[#737692] mb-1">
+                                Next Session
+                              </p>
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-[#D52B1E]" />
-                                <p className="font-medium text-[#000000]">{group.nextSession}</p>
+                                <p className="font-medium text-[#000000]">
+                                  {group.nextSession}
+                                </p>
                               </div>
                             </div>
                           )}
@@ -1794,15 +2081,20 @@ export default function Community() {
                                             isMember: false,
                                             memberCount: Math.max(
                                               0,
-                                              getCommunityGroupMemberCount(g) - 1,
+                                              getCommunityGroupMemberCount(g) -
+                                                1,
                                             ),
                                           }
                                         : g,
                                     ),
                                   );
                                 } else if (group.isPrivate) {
-                                  await communityService.requestJoinGroup(group.id);
-                                  toast.success('Join request sent! The group moderator will review your request.');
+                                  await communityService.requestJoinGroup(
+                                    group.id,
+                                  );
+                                  toast.success(
+                                    "Join request sent! The group moderator will review your request.",
+                                  );
                                 } else {
                                   await communityService.joinGroup(group.id);
                                   setGroups((prev) =>
@@ -1812,18 +2104,26 @@ export default function Community() {
                                             ...g,
                                             isMember: true,
                                             memberCount:
-                                              getCommunityGroupMemberCount(g) + 1,
+                                              getCommunityGroupMemberCount(g) +
+                                              1,
                                           }
                                         : g,
                                     ),
                                   );
                                 }
                               } catch (err) {
-                                console.error("Failed to join/leave group:", err);
+                                console.error(
+                                  "Failed to join/leave group:",
+                                  err,
+                                );
                               }
                             }}
                           >
-                            {group.isMember ? 'Leave Group' : group.isPrivate ? 'Request to Join' : 'Join Group'}
+                            {group.isMember
+                              ? "Leave Group"
+                              : group.isPrivate
+                                ? "Request to Join"
+                                : "Join Group"}
                           </Button>
                           {isModerator && group.isPrivate && (
                             <Button
@@ -1832,10 +2132,14 @@ export default function Community() {
                               onClick={() => handleToggleJoinRequests(group)}
                             >
                               <Users className="h-4 w-4" />
-                              {expandedRequestGroupId === group.id ? 'Hide Requests' : 'Join Requests'}
-                              {joinRequestsById[group.id]?.filter((r) => r.status === 'pending').length
-                                ? ` (${joinRequestsById[group.id].filter((r) => r.status === 'pending').length})`
-                                : ''}
+                              {expandedRequestGroupId === group.id
+                                ? "Hide Requests"
+                                : "Join Requests"}
+                              {joinRequestsById[group.id]?.filter(
+                                (r) => r.status === "pending",
+                              ).length
+                                ? ` (${joinRequestsById[group.id].filter((r) => r.status === "pending").length})`
+                                : ""}
                             </Button>
                           )}
                         </div>
@@ -1845,34 +2149,60 @@ export default function Community() {
                     {/* Moderator: expandable join requests panel */}
                     {isModerator && expandedRequestGroupId === group.id && (
                       <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
-                        <h4 className="font-semibold text-amber-800 text-sm">Pending Join Requests</h4>
+                        <h4 className="font-semibold text-amber-800 text-sm">
+                          Pending Join Requests
+                        </h4>
                         {joinRequestsLoadingGroupId === group.id ? (
                           <p className="text-sm text-amber-700">Loading…</p>
-                        ) : (joinRequestsById[group.id] ?? []).filter((r) => r.status === 'pending').length === 0 ? (
-                          <p className="text-sm text-amber-700">No pending requests.</p>
+                        ) : (joinRequestsById[group.id] ?? []).filter(
+                            (r) => r.status === "pending",
+                          ).length === 0 ? (
+                          <p className="text-sm text-amber-700">
+                            No pending requests.
+                          </p>
                         ) : (
                           (joinRequestsById[group.id] ?? [])
-                            .filter((r) => r.status === 'pending')
+                            .filter((r) => r.status === "pending")
                             .map((req) => {
-                              const name = [req.user?.firstName, req.user?.lastName].filter(Boolean).join(' ') || 'Member';
+                              const name =
+                                [req.user?.firstName, req.user?.lastName]
+                                  .filter(Boolean)
+                                  .join(" ") || "Member";
                               return (
-                                <div key={req.id} className="flex items-center justify-between gap-3 bg-white rounded-lg p-3 shadow-sm">
+                                <div
+                                  key={req.id}
+                                  className="flex items-center justify-between gap-3 bg-white rounded-lg p-3 shadow-sm"
+                                >
                                   <div className="flex items-center gap-3 min-w-0">
                                     <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
-                                      {req.user?.profilePhotoUrl
-                                        ? <img src={req.user.profilePhotoUrl} alt={name} className="h-full w-full object-cover" />
-                                        : name.charAt(0).toUpperCase()}
+                                      {req.user?.profilePhotoUrl ? (
+                                        <img
+                                          src={req.user.profilePhotoUrl}
+                                          alt={name}
+                                          className="h-full w-full object-cover"
+                                        />
+                                      ) : (
+                                        name.charAt(0).toUpperCase()
+                                      )}
                                     </div>
                                     <div className="min-w-0">
-                                      <p className="font-medium text-[#000000] text-sm truncate">{name}</p>
-                                      <p className="text-xs text-[#737692]">{new Date(req.createdAt).toLocaleDateString()}</p>
+                                      <p className="font-medium text-[#000000] text-sm truncate">
+                                        {name}
+                                      </p>
+                                      <p className="text-xs text-[#737692]">
+                                        {new Date(
+                                          req.createdAt,
+                                        ).toLocaleDateString()}
+                                      </p>
                                     </div>
                                   </div>
                                   <div className="flex gap-2 flex-shrink-0">
                                     <Button
                                       size="sm"
                                       className="bg-green-600 hover:bg-green-700 text-white text-xs px-3"
-                                      onClick={() => handleApproveRequest(group.id, req.id)}
+                                      onClick={() =>
+                                        handleApproveRequest(group.id, req.id)
+                                      }
                                     >
                                       Approve
                                     </Button>
@@ -1880,7 +2210,9 @@ export default function Community() {
                                       size="sm"
                                       variant="outline"
                                       className="border-red-300 text-red-600 hover:bg-red-50 text-xs px-3"
-                                      onClick={() => handleRejectRequest(group.id, req.id)}
+                                      onClick={() =>
+                                        handleRejectRequest(group.id, req.id)
+                                      }
                                     >
                                       Reject
                                     </Button>
@@ -2034,7 +2366,10 @@ export default function Community() {
                               Available for Mentorship
                             </span>
                           </div>
-                          <Button disabled className="w-full bg-[#D52B1E] opacity-60 cursor-not-allowed text-white text-sm">
+                          <Button
+                            disabled
+                            className="w-full bg-[#D52B1E] opacity-60 cursor-not-allowed text-white text-sm"
+                          >
                             Coming Soon
                           </Button>
                         </div>
@@ -2068,7 +2403,9 @@ export default function Community() {
                   </Card>
                 ))
               ) : events.length === 0 ? (
-                <p className="text-center text-[#737692] py-8">No events found.</p>
+                <p className="text-center text-[#737692] py-8">
+                  No events found.
+                </p>
               ) : (
                 events.map((event, index) => (
                   <motion.div
@@ -2103,9 +2440,18 @@ export default function Community() {
                                 </div>
                               )}
                               <div className="flex items-center gap-4 text-sm text-[#737692]">
-                                {event.location && <span>{"\uD83D\uDCCD"} {event.location}</span>}
-                                {(event.attendeeCount ?? event.attendees) != null && (
-                                  <span>\u2022 {event.attendeeCount ?? event.attendees} registered</span>
+                                {event.location && (
+                                  <span>
+                                    {"\uD83D\uDCCD"} {event.location}
+                                  </span>
+                                )}
+                                {(event.attendeeCount ?? event.attendees) !=
+                                  null && (
+                                  <span>
+                                    \u2022{" "}
+                                    {event.attendeeCount ?? event.attendees}{" "}
+                                    registered
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -2119,9 +2465,13 @@ export default function Community() {
                             onClick={async () => {
                               try {
                                 if (event.isRegistered) {
-                                  await communityService.unregisterFromEvent(event.id);
+                                  await communityService.unregisterFromEvent(
+                                    event.id,
+                                  );
                                 } else {
-                                  await communityService.registerForEvent(event.id);
+                                  await communityService.registerForEvent(
+                                    event.id,
+                                  );
                                 }
                                 setEvents((prev) =>
                                   prev.map((e) =>
@@ -2130,11 +2480,12 @@ export default function Community() {
                                           ...e,
                                           isRegistered: !e.isRegistered,
                                           attendeeCount:
-                                            (e.attendeeCount ?? e.attendees ?? 0) +
-                                            (e.isRegistered ? -1 : 1),
+                                            (e.attendeeCount ??
+                                              e.attendees ??
+                                              0) + (e.isRegistered ? -1 : 1),
                                         }
-                                      : e
-                                  )
+                                      : e,
+                                  ),
                                 );
                               } catch {
                                 // ignore registration error
@@ -2169,8 +2520,10 @@ export default function Community() {
           <PosterProfilePopup
             user={selectedPoster}
             isOpen={showPosterProfile}
+            isHydrating={posterProfileHydrating}
             onClose={() => {
               setShowPosterProfile(false);
+              setPosterProfileHydrating(false);
               setSelectedPoster(null);
             }}
           />
@@ -2178,13 +2531,25 @@ export default function Community() {
 
         {/* Confirm Dialog */}
         {confirmDialog && (
-          <Dialog open={!!confirmDialog} onClose={() => setConfirmDialog(null)} title="Confirm Action" maxWidth="max-w-sm">
-            <p className="text-sm text-slate-600 mb-6">{confirmDialog.message}</p>
+          <Dialog
+            open={!!confirmDialog}
+            onClose={() => setConfirmDialog(null)}
+            title="Confirm Action"
+            maxWidth="max-w-sm"
+          >
+            <p className="text-sm text-slate-600 mb-6">
+              {confirmDialog.message}
+            </p>
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setConfirmDialog(null)}>
+                Cancel
+              </Button>
               <Button
                 className="bg-red-600 hover:bg-red-700 text-white"
-                onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
               >
                 Confirm
               </Button>

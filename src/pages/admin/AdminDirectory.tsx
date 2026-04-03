@@ -7,6 +7,7 @@ import {
   type DirectoryCategoryAPI,
   type CreateDirectoryCategoryDto,
 } from "@/lib/directoryService";
+import type { DirectoryListingsParams } from "@/lib/directoryService";
 import {
   FolderOpen,
   Plus,
@@ -38,6 +39,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ImageUpload } from "@/components/ui/image-upload";
 import { toast } from "@/hooks/use-toast";
 import { BulkUploadDialog } from "@/components/admin/BulkUploadDialog";
 
@@ -99,7 +101,11 @@ const CATEGORY_CONFIG: Record<
   "Regulatory Bodies": { color: "#dc2626", bg: "#FEF2F2", icon: Shield },
 };
 
-const DYNAMIC_PALETTE: Array<{ color: string; bg: string; icon: React.ElementType }> = [
+const DYNAMIC_PALETTE: Array<{
+  color: string;
+  bg: string;
+  icon: React.ElementType;
+}> = [
   { color: "#D52B1E", bg: "#FEF2F2", icon: Building2 },
   { color: "#2563eb", bg: "#EFF6FF", icon: Shield },
   { color: "#7c3aed", bg: "#F5F3FF", icon: TrendingUp },
@@ -115,7 +121,8 @@ const DYNAMIC_PALETTE: Array<{ color: string; bg: string; icon: React.ElementTyp
 function getCategoryConfig(name: string) {
   if (CATEGORY_CONFIG[name]) return CATEGORY_CONFIG[name];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
+  for (let i = 0; i < name.length; i++)
+    hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
   return DYNAMIC_PALETTE[hash % DYNAMIC_PALETTE.length];
 }
 // INITIAL_ENTRIES removed – data is loaded from API on mount
@@ -233,9 +240,10 @@ function EntryFormModal({
   const [serviceInput, setServiceInput] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
 
-  const cats =
-    form.sector === "financial" ? financialCats : nonFinancialCats;
+  const cats = form.sector === "financial" ? financialCats : nonFinancialCats;
 
   function toggleCategory(cat: string) {
     setForm((p) => ({
@@ -350,7 +358,9 @@ function EntryFormModal({
             </label>
             <Input
               value={form.tagline}
-              onChange={(e) => setForm((p) => ({ ...p, tagline: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, tagline: e.target.value }))
+              }
               placeholder="e.g. World class Islamic bank"
               className="h-10 text-sm"
             />
@@ -517,7 +527,9 @@ function EntryFormModal({
             </label>
             <Input
               value={form.address}
-              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, address: e.target.value }))
+              }
               placeholder="Full street address"
               className="h-10 text-sm"
             />
@@ -684,33 +696,35 @@ function EntryFormModal({
             </div>
           </div>
 
-          {/* Logo & Banner URLs */}
+          {/* Logo & Banner Uploads */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Logo URL
+                Logo Upload
               </label>
-              <Input
+              <ImageUpload
                 value={form.logoUrl}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, logoUrl: e.target.value }))
-                }
-                placeholder="https://…/logo.png"
-                className="h-10 text-sm"
+                onChange={(url) => setForm((p) => ({ ...p, logoUrl: url }))}
+                onUploadPendingChange={setLogoUploading}
+                previewHeight="h-28"
               />
+              <p className="text-[11px] text-gray-500 mt-1">
+                Upload image (max 5MB). URL is auto-filled from upload response.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Banner URL
+                Banner Upload
               </label>
-              <Input
+              <ImageUpload
                 value={form.bannerUrl}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, bannerUrl: e.target.value }))
-                }
-                placeholder="https://…/banner.png"
-                className="h-10 text-sm"
+                onChange={(url) => setForm((p) => ({ ...p, bannerUrl: url }))}
+                onUploadPendingChange={setBannerUploading}
+                previewHeight="h-28"
               />
+              <p className="text-[11px] text-gray-500 mt-1">
+                Upload image (max 5MB). URL is auto-filled from upload response.
+              </p>
             </div>
           </div>
 
@@ -758,7 +772,10 @@ function EntryFormModal({
               <button
                 type="button"
                 onClick={() =>
-                  setForm((p) => ({ ...p, shariahCertified: !p.shariahCertified }))
+                  setForm((p) => ({
+                    ...p,
+                    shariahCertified: !p.shariahCertified,
+                  }))
                 }
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   form.shariahCertified ? "bg-green-500" : "bg-gray-300"
@@ -820,6 +837,7 @@ function EntryFormModal({
           </Button>
           <Button
             onClick={handleSubmit}
+            disabled={logoUploading || bannerUploading}
             className="bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl gap-2"
           >
             <Save className="h-4 w-4" /> Save Entry
@@ -1084,18 +1102,25 @@ function CategoryFormModal({
   onSave: (dto: CreateDirectoryCategoryDto) => Promise<void>;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(initial?.name ?? '');
-  const [description, setDescription] = useState(initial?.description ?? '');
+  const [name, setName] = useState(initial?.name ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [isFinancial, setIsFinancial] = useState(initial?.isFinancial ?? true);
   const [sortOrder, setSortOrder] = useState(initial?.sortOrder ?? 0);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { setErr('Name is required'); return; }
+    if (!name.trim()) {
+      setErr("Name is required");
+      return;
+    }
     setSaving(true);
     setErr(null);
     try {
@@ -1107,14 +1132,17 @@ function CategoryFormModal({
         sortOrder,
       });
     } catch (ex: unknown) {
-      setErr(ex instanceof Error ? ex.message : 'Save failed');
+      setErr(ex instanceof Error ? ex.message : "Save failed");
     } finally {
       setSaving(false);
     }
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -1123,18 +1151,39 @@ function CategoryFormModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-800">{initial ? 'Edit Category' : 'New Category'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X className="h-4 w-4" /></button>
+          <h2 className="text-lg font-bold text-slate-800">
+            {initial ? "Edit Category" : "New Category"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Islamic Banks" className="rounded-xl" autoFocus />
-            {slug && <p className="text-xs text-slate-400 mt-1">Slug: <span className="font-mono">{slug}</span></p>}
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Name *
+            </label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Islamic Banks"
+              className="rounded-xl"
+              autoFocus
+            />
+            {slug && (
+              <p className="text-xs text-slate-400 mt-1">
+                Slug: <span className="font-mono">{slug}</span>
+              </p>
+            )}
             {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Description
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -1144,7 +1193,9 @@ function CategoryFormModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Type
+            </label>
             <div className="flex gap-3">
               {([true, false] as const).map((val) => (
                 <button
@@ -1153,17 +1204,19 @@ function CategoryFormModal({
                   onClick={() => setIsFinancial(val)}
                   className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-all ${
                     isFinancial === val
-                      ? 'bg-[#D52B1E] text-white border-[#D52B1E]'
-                      : 'bg-white text-slate-600 border-gray-200 hover:border-gray-300'
+                      ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+                      : "bg-white text-slate-600 border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  {val ? 'Financial' : 'Non-Financial'}
+                  {val ? "Financial" : "Non-Financial"}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Sort Order</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Sort Order
+            </label>
             <Input
               type="number"
               value={sortOrder}
@@ -1173,9 +1226,20 @@ function CategoryFormModal({
             />
           </div>
           <div className="flex gap-3 justify-end pt-1">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl">
-              {saving ? 'Saving…' : 'Save'}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={saving}
+              className="bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl"
+            >
+              {saving ? "Saving…" : "Save"}
             </Button>
           </div>
         </form>
@@ -1205,12 +1269,21 @@ function DeleteCategoryConfirm({
         className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"
       >
         <h2 className="text-lg font-bold text-slate-800">Delete Category</h2>
-        <p className="text-sm text-slate-600">Are you sure you want to delete <strong>{name}</strong>? This cannot be undone.</p>
+        <p className="text-sm text-slate-600">
+          Are you sure you want to delete <strong>{name}</strong>? This cannot
+          be undone.
+        </p>
         <div className="flex gap-3 justify-end">
-          <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+          <Button variant="outline" onClick={onClose} className="rounded-xl">
+            Cancel
+          </Button>
           <Button
             disabled={deleting}
-            onClick={async () => { setDeleting(true); await onConfirm(); setDeleting(false); }}
+            onClick={async () => {
+              setDeleting(true);
+              await onConfirm();
+              setDeleting(false);
+            }}
             className="bg-red-600 hover:bg-red-700 text-white rounded-xl"
           >
             {deleting ? "Deleting…" : "Delete"}
@@ -1224,10 +1297,13 @@ function DeleteCategoryConfirm({
 
 export default function AdminDirectory() {
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
-  const [apiCategories, setApiCategories] = useState<DirectoryCategoryAPI[]>([]);
+  const [apiCategories, setApiCategories] = useState<DirectoryCategoryAPI[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sector, setSector] = useState<"all" | "financial" | "non-financial">(
     "all",
   );
@@ -1249,16 +1325,38 @@ export default function AdminDirectory() {
     | null
   >(null);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   /* -- Fetch data on mount -- */
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      directoryService.getListings(),
-      directoryService.getCategories(),
-    ])
-      .then(([listings, categories]) => {
-        setEntries(listings.map(apiToEntry));
+    directoryService
+      .getCategories()
+      .then((categories) => {
         setApiCategories(categories);
+      })
+      .catch((err) => {
+        console.error("Failed to load directory categories:", err);
+      });
+  }, []);
+
+  /* -- Fetch listings with active search/filter params -- */
+  useEffect(() => {
+    const params: DirectoryListingsParams = {};
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (sector !== "all") params.isFinancial = sector === "financial";
+    if (selectedCategory !== "All") {
+      const category = apiCategories.find((c) => c.name === selectedCategory);
+      if (category) params.categoryId = category.id;
+    }
+
+    setLoading(true);
+    directoryService
+      .getListings(params)
+      .then((listings) => {
+        setEntries(listings.map(apiToEntry));
         setApiError(null);
       })
       .catch((err) => {
@@ -1266,7 +1364,7 @@ export default function AdminDirectory() {
         setApiError("Failed to load data from server. Please refresh.");
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [debouncedSearch, sector, selectedCategory, apiCategories]);
 
   /* -- Category name → ID lookup for form submission -- */
   const categoryNameToId = useMemo(() => {
@@ -1277,12 +1375,20 @@ export default function AdminDirectory() {
 
   /* -- Category lists for the entry form -- */
   const financialCats = useMemo(
-    () => apiCategories.filter((c) => c.isFinancial).sort((a, b) => a.sortOrder - b.sortOrder).map((c) => c.name),
+    () =>
+      apiCategories
+        .filter((c) => c.isFinancial)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((c) => c.name),
     [apiCategories],
   );
 
   const nonFinancialCats = useMemo(
-    () => apiCategories.filter((c) => !c.isFinancial).sort((a, b) => a.sortOrder - b.sortOrder).map((c) => c.name),
+    () =>
+      apiCategories
+        .filter((c) => !c.isFinancial)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((c) => c.name),
     [apiCategories],
   );
 
@@ -1294,8 +1400,10 @@ export default function AdminDirectory() {
 
   const availableCategories = useMemo(() => {
     const sorted = [...apiCategories].sort((a, b) => a.sortOrder - b.sortOrder);
-    if (sector === "financial") return sorted.filter((c) => c.isFinancial).map((c) => c.name);
-    if (sector === "non-financial") return sorted.filter((c) => !c.isFinancial).map((c) => c.name);
+    if (sector === "financial")
+      return sorted.filter((c) => c.isFinancial).map((c) => c.name);
+    if (sector === "non-financial")
+      return sorted.filter((c) => !c.isFinancial).map((c) => c.name);
     return sorted.map((c) => c.name);
   }, [apiCategories, sector]);
 
@@ -1312,25 +1420,8 @@ export default function AdminDirectory() {
   }, [entries, sector]);
 
   const filtered = useMemo(() => {
-    return entries.filter((e) => {
-      if (sector !== "all" && e.sector !== sector) return false;
-      if (
-        selectedCategory !== "All" &&
-        !e.categories.includes(selectedCategory)
-      )
-        return false;
-      if (search) {
-        const q = search.toLowerCase();
-        if (
-          !e.name.toLowerCase().includes(q) &&
-          !e.country.toLowerCase().includes(q) &&
-          !e.categories.some((c) => c.toLowerCase().includes(q))
-        )
-          return false;
-      }
-      return true;
-    });
-  }, [entries, sector, selectedCategory, search]);
+    return entries;
+  }, [entries]);
 
   const stats = buildStats(entries);
 
@@ -1344,7 +1435,11 @@ export default function AdminDirectory() {
       const socialLinks: Record<string, string> = {};
       if (data.linkedinUrl) socialLinks.linkedin = data.linkedinUrl;
       if (data.twitterUrl) socialLinks.twitter = data.twitterUrl;
-      const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const slug = data.name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
       const dto = {
         name: data.name,
         slug,
@@ -1381,7 +1476,8 @@ export default function AdminDirectory() {
           );
           setEntries((p) =>
             p.map((e) =>
-              e.id === (modalState as { type: "edit"; entry: DirectoryEntry }).entry.id
+              e.id ===
+              (modalState as { type: "edit"; entry: DirectoryEntry }).entry.id
                 ? apiToEntry(updated)
                 : e,
             ),
@@ -1818,17 +1914,23 @@ export default function AdminDirectory() {
         </div>
       </motion.div>
 
-
       {/* ── Category Management ─────────────────────────────────────────── */}
-      <motion.div variants={item} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <motion.div
+        variants={item}
+        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+      >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-semibold text-slate-800">Category Management</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Create and manage classification categories</p>
+            <h2 className="text-base font-semibold text-slate-800">
+              Category Management
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Create and manage classification categories
+            </p>
           </div>
           <Button
             size="sm"
-            onClick={() => setCatModal({ type: 'create' })}
+            onClick={() => setCatModal({ type: "create" })}
             className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-xl gap-1.5 text-xs"
           >
             <Plus className="h-3.5 w-3.5" /> Add Category
@@ -1841,111 +1943,148 @@ export default function AdminDirectory() {
               <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
                   // eslint-disable-next-line react/no-array-index-key
-                  <div key={`skel-cat-${i}`} className="animate-pulse h-10 bg-slate-100 rounded-xl" />
+                  <div
+                    key={`skel-cat-${i}`}
+                    className="animate-pulse h-10 bg-slate-100 rounded-xl"
+                  />
                 ))}
               </div>
-            )
+            );
           }
           if (apiCategories.length === 0) {
-            return <p className="text-center text-slate-400 text-sm py-8">No categories found.</p>
+            return (
+              <p className="text-center text-slate-400 text-sm py-8">
+                No categories found.
+              </p>
+            );
           }
           return (
-          <div className="divide-y divide-gray-100">
-            {(
-              [
-                {
-                  label: 'Financial',
-                  badge: 'bg-blue-50 text-blue-700 border-blue-100',
-                  dot: 'bg-blue-500',
-                  items: apiCategories.filter((c) => c.isFinancial).sort((a, b) => a.sortOrder - b.sortOrder),
-                },
-                {
-                  label: 'Non-Financial',
-                  badge: 'bg-purple-50 text-purple-700 border-purple-100',
-                  dot: 'bg-purple-500',
-                  items: apiCategories.filter((c) => !c.isFinancial).sort((a, b) => a.sortOrder - b.sortOrder),
-                },
-              ] as const
-            ).map((group) => (
-              <div key={group.label} className="p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${group.badge}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${group.dot}`} />
-                    {group.label}
-                  </span>
-                  <span className="text-xs text-slate-400">{group.items.length} {group.items.length === 1 ? 'category' : 'categories'}</span>
-                </div>
-                {group.items.length === 0 ? (
-                  <p className="text-xs text-slate-400 pl-1">No {group.label.toLowerCase()} categories yet.</p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {group.items.map((cat) => (
-                      <div
-                        key={cat.id}
-                        className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2"
-                      >
-                        <span className="text-sm text-slate-700 truncate">{cat.name}</span>
-                        <div className="flex gap-1 shrink-0">
-                          <button
-                            onClick={() => setCatModal({ type: 'edit', cat })}
-                            className="p-1 rounded hover:bg-slate-200 text-slate-500"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setCatModal({ type: 'delete', cat })}
-                            className="p-1 rounded hover:bg-red-100 text-red-500"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+            <div className="divide-y divide-gray-100">
+              {(
+                [
+                  {
+                    label: "Financial",
+                    badge: "bg-blue-50 text-blue-700 border-blue-100",
+                    dot: "bg-blue-500",
+                    items: apiCategories
+                      .filter((c) => c.isFinancial)
+                      .sort((a, b) => a.sortOrder - b.sortOrder),
+                  },
+                  {
+                    label: "Non-Financial",
+                    badge: "bg-purple-50 text-purple-700 border-purple-100",
+                    dot: "bg-purple-500",
+                    items: apiCategories
+                      .filter((c) => !c.isFinancial)
+                      .sort((a, b) => a.sortOrder - b.sortOrder),
+                  },
+                ] as const
+              ).map((group) => (
+                <div key={group.label} className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${group.badge}`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${group.dot}`}
+                      />
+                      {group.label}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {group.items.length}{" "}
+                      {group.items.length === 1 ? "category" : "categories"}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )
+                  {group.items.length === 0 ? (
+                    <p className="text-xs text-slate-400 pl-1">
+                      No {group.label.toLowerCase()} categories yet.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {group.items.map((cat) => (
+                        <div
+                          key={cat.id}
+                          className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2"
+                        >
+                          <span className="text-sm text-slate-700 truncate">
+                            {cat.name}
+                          </span>
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => setCatModal({ type: "edit", cat })}
+                              className="p-1 rounded hover:bg-slate-200 text-slate-500"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                setCatModal({ type: "delete", cat })
+                              }
+                              className="p-1 rounded hover:bg-red-100 text-red-500"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
         })()}
       </motion.div>
 
       {/* Category Modals */}
       <AnimatePresence>
-        {catModal?.type === 'create' && (
+        {catModal?.type === "create" && (
           <CategoryFormModal
             onSave={async (dto) => {
               try {
                 const created = await directoryService.createCategory(dto);
                 setApiCategories((prev) => [...prev, created]);
                 setCatModal(null);
-              } catch { toast.error('Failed to create category.'); }
+              } catch {
+                toast.error("Failed to create category.");
+              }
             }}
             onClose={() => setCatModal(null)}
           />
         )}
-        {catModal?.type === 'edit' && (
+        {catModal?.type === "edit" && (
           <CategoryFormModal
             initial={catModal.cat}
             onSave={async (dto) => {
               try {
-                const updated = await directoryService.updateCategory(catModal.cat.id, dto);
-                setApiCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+                const updated = await directoryService.updateCategory(
+                  catModal.cat.id,
+                  dto,
+                );
+                setApiCategories((prev) =>
+                  prev.map((c) => (c.id === updated.id ? updated : c)),
+                );
                 setCatModal(null);
-              } catch { toast.error('Failed to update category.'); }
+              } catch {
+                toast.error("Failed to update category.");
+              }
             }}
             onClose={() => setCatModal(null)}
           />
         )}
-        {catModal?.type === 'delete' && (
+        {catModal?.type === "delete" && (
           <DeleteCategoryConfirm
             name={catModal.cat.name}
             onConfirm={async () => {
               try {
                 await directoryService.deleteCategory(catModal.cat.id);
-                setApiCategories((prev) => prev.filter((c) => c.id !== catModal.cat.id));
+                setApiCategories((prev) =>
+                  prev.filter((c) => c.id !== catModal.cat.id),
+                );
                 setCatModal(null);
-              } catch { toast.error('Failed to delete category.'); }
+              } catch {
+                toast.error("Failed to delete category.");
+              }
             }}
             onClose={() => setCatModal(null)}
           />
@@ -1994,11 +2133,14 @@ export default function AdminDirectory() {
         title="Directory Listings"
         templateEndpoint="/directory/listings/bulk-upload/template"
         uploadEndpoint="/directory/listings/bulk-upload"
-        invalidateKeys={['admin', 'directory']}
+        invalidateKeys={["admin", "directory"]}
         templateFilename="directory-listings-template.csv"
         onSuccess={() => {
           // Re-fetch entries after bulk upload
-          directoryService.getListings().then((data) => setEntries(data.map(apiToEntry))).catch(() => null);
+          directoryService
+            .getListings()
+            .then((data) => setEntries(data.map(apiToEntry)))
+            .catch(() => null);
         }}
       />
     </motion.div>

@@ -82,7 +82,65 @@ export interface CreateDirectoryListingDto {
   status?: string;
 }
 
+export interface ContributeDirectoryListingDto {
+  name: string;
+  slug?: string;
+  categoryId: string;
+  listingType: string;
+  tagline?: string;
+  description: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  websiteUrl?: string;
+  email?: string;
+  phone?: string;
+  country: string;
+  city?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  yearFounded?: number;
+  employeeRange?: string;
+  shariahCertified?: boolean;
+  certifyingBody?: string;
+  aumUsdMillions?: number;
+  socialLinks?: Record<string, string>;
+  services?: string[];
+  tags?: string[];
+  isFinancial: boolean;
+  status?: "draft";
+}
+
 export type UpdateDirectoryListingDto = Partial<CreateDirectoryListingDto>;
+
+/* ── Query params for listing search/filter ─────────────────────────────── */
+
+export interface DirectoryListingsParams {
+  /** Full-text search across name, tagline, description, tags */
+  search?: string;
+  /** Filter by Category ID */
+  categoryId?: string;
+  /** Filter by financial status */
+  isFinancial?: boolean;
+  /** Filter by listing type: institution | fund | professional | regulator | consultancy | fintech | ngo */
+  listingType?: string;
+  /** Filter by single country */
+  country?: string;
+  /** Filter by city */
+  city?: string;
+  /** Filter by tags (comma-separated) */
+  tags?: string;
+  /** Filter by shariah certified status */
+  shariahCertified?: boolean;
+  /** Filter by multiple countries (comma-separated) */
+  countries?: string;
+  /** Filter by multiple services (comma-separated) */
+  services?: string;
+  /** Year founded from (inclusive) */
+  yearFoundedFrom?: number;
+  /** Year founded to (inclusive) */
+  yearFoundedTo?: number;
+}
 
 export interface CreateDirectoryCategoryDto {
   name: string;
@@ -98,7 +156,7 @@ export interface CreateDirectoryCategoryDto {
 
 export const directoryService = {
   /* -- Listings -- */
-  getListings: (params?: { categoryId?: string; isFinancial?: boolean }) =>
+  getListings: (params?: DirectoryListingsParams) =>
     api
       .get<DirectoryListingAPI[]>("/directory/listings", { params })
       .then((r) => r.data),
@@ -111,6 +169,11 @@ export const directoryService = {
   createListing: (data: CreateDirectoryListingDto) =>
     api
       .post<DirectoryListingAPI>("/directory/listings", data)
+      .then((r) => r.data),
+
+  contributeListing: (data: ContributeDirectoryListingDto) =>
+    api
+      .post<DirectoryListingAPI>("/directory/listings/contribute", data)
       .then((r) => r.data),
 
   updateListing: (id: string, data: UpdateDirectoryListingDto) =>
@@ -136,8 +199,7 @@ export const directoryService = {
       .patch<DirectoryCategoryAPI>(`/directory/categories/${id}`, data)
       .then((r) => r.data),
 
-  deleteCategory: (id: string) =>
-    api.delete(`/directory/categories/${id}`),
+  deleteCategory: (id: string) => api.delete(`/directory/categories/${id}`),
 };
 
 /* ── Mapping helpers ────────────────────────────────────────────────────── */

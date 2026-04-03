@@ -1,11 +1,14 @@
 ﻿import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   directoryService,
   type DirectoryListingAPI,
   type DirectoryCategoryAPI,
+  type ContributeDirectoryListingDto,
 } from "@/lib/directoryService";
+import type { DirectoryListingsParams } from "@/lib/directoryService";
 import {
   Search,
   SlidersHorizontal,
@@ -29,9 +32,13 @@ import {
   Phone,
   ChevronDown,
   ChevronUp,
+  Plus,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ImageUpload } from "@/components/ui/image-upload";
+import { toast } from "@/hooks/use-toast";
 
 /* -- Types ----------------------------------------------------------------- */
 interface DirectoryEntry {
@@ -44,11 +51,19 @@ interface DirectoryEntry {
   headquarters: string;
   country: string;
   keyServices: string[];
+  tags: string[];
+  listingType: string;
   website: string;
   email?: string;
   phone?: string;
   linkedinUrl?: string;
   twitterUrl?: string;
+}
+
+interface SubmissionReceipt {
+  name: string;
+  submittedAt: string;
+  expectedTimeline: string;
 }
 
 /* -- Category config ------------------------------------------------------- */
@@ -74,7 +89,11 @@ const CATEGORY_CONFIG: Record<
 };
 
 /** Colour palette used for categories not in CATEGORY_CONFIG. */
-const DYNAMIC_PALETTE: Array<{ color: string; bg: string; icon: React.ElementType }> = [
+const DYNAMIC_PALETTE: Array<{
+  color: string;
+  bg: string;
+  icon: React.ElementType;
+}> = [
   { color: "#D52B1E", bg: "#FEF2F2", icon: Building2 },
   { color: "#2563eb", bg: "#EFF6FF", icon: Shield },
   { color: "#7c3aed", bg: "#F5F3FF", icon: TrendingUp },
@@ -90,7 +109,8 @@ const DYNAMIC_PALETTE: Array<{ color: string; bg: string; icon: React.ElementTyp
 function getCategoryConfig(name: string) {
   if (CATEGORY_CONFIG[name]) return CATEGORY_CONFIG[name];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
+  for (let i = 0; i < name.length; i++)
+    hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
   return DYNAMIC_PALETTE[hash % DYNAMIC_PALETTE.length];
 }
 
@@ -105,7 +125,9 @@ function apiListingToEntry(a: DirectoryListingAPI): DirectoryEntry {
     yearEstablished: a.yearFounded ?? null,
     headquarters: a.city ?? "",
     country: a.country ?? "",
-    keyServices: a.services ?? a.tags ?? [],
+    keyServices: a.services ?? [],
+    tags: a.tags ?? [],
+    listingType: a.listingType ?? "",
     website: a.websiteUrl ?? "",
     email: a.email ?? undefined,
     phone: a.phone ?? undefined,
@@ -113,752 +135,6 @@ function apiListingToEntry(a: DirectoryListingAPI): DirectoryEntry {
     twitterUrl: a.socialLinks?.twitter ?? undefined,
   };
 }
-
-// Kept as fallback so the UI renders without an API connection during development
-const DIRECTORY_DATA: DirectoryEntry[] = [
-  /* === FINANCIAL === */
-  {
-    id: "1",
-    name: "Dubai Islamic Bank",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "The world's first full-service Islamic bank, offering Shariah-compliant retail, corporate, and investment banking services across the UAE and globally.",
-    yearEstablished: 1975,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: [
-      "Retail Banking",
-      "Corporate Banking",
-      "Investment Banking",
-      "Sukuk",
-    ],
-    website: "dib.ae",
-    email: "info@dib.ae",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "2",
-    name: "Al Rajhi Bank",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "One of the largest Islamic banks by assets, headquartered in Riyadh with an extensive regional and international network focusing on Shariah-compliant banking.",
-    yearEstablished: 1957,
-    headquarters: "Riyadh",
-    country: "Saudi Arabia",
-    keyServices: [
-      "Retail Banking",
-      "SME Finance",
-      "Trade Finance",
-      "Home Finance",
-    ],
-    website: "alrajhibank.com.sa",
-    email: "contactus@alrajhi-bank.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "3",
-    name: "Maybank Islamic",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "The largest Islamic bank in Malaysia and ASEAN by assets, providing a comprehensive suite of Shariah-compliant products for individuals and institutions.",
-    yearEstablished: 2008,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Consumer Banking",
-      "Commercial Banking",
-      "Wealth Management",
-      "Investment Banking",
-    ],
-    website: "maybank2u.com.my",
-    email: "info@maybank.com",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "4",
-    name: "Kuwait Finance House",
-    sector: "financial",
-    categories: ["Islamic Banks", "Capital Markets"],
-    overview:
-      "One of the world's leading Islamic financial institutions with a presence across the Gulf, Europe, and Asia, specializing in corporate, investment, and retail banking.",
-    yearEstablished: 1977,
-    headquarters: "Kuwait City",
-    country: "Kuwait",
-    keyServices: [
-      "Corporate Finance",
-      "Investment Banking",
-      "Real Estate",
-      "Sukuk Structuring",
-    ],
-    website: "kfh.com",
-    email: "info@kfh.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "5",
-    name: "Meezan Bank",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "Pakistan's first and largest dedicated Islamic commercial bank providing innovative Shariah-compliant banking solutions to individuals and businesses.",
-    yearEstablished: 2002,
-    headquarters: "Karachi",
-    country: "Pakistan",
-    keyServices: [
-      "Consumer Banking",
-      "Corporate Banking",
-      "Trade Finance",
-      "Home Finance",
-    ],
-    website: "meezanbank.com",
-    email: "customercare@meezanbank.com",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "6",
-    name: "Qatar Islamic Bank",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "Qatar's leading Islamic bank providing innovative financial solutions with strict adherence to Shariah principles across retail, corporate, and private banking.",
-    yearEstablished: 1982,
-    headquarters: "Doha",
-    country: "Qatar",
-    keyServices: [
-      "Retail Banking",
-      "Corporate Banking",
-      "Private Banking",
-      "Treasury",
-    ],
-    website: "qib.com.qa",
-    email: "info@qib.com.qa",
-    linkedinUrl: "#",
-  },
-  {
-    id: "7",
-    name: "Takaful Malaysia Bhd",
-    sector: "financial",
-    categories: ["Takaful Providers"],
-    overview:
-      "A pioneer and market leader in the Malaysian Takaful industry, offering a comprehensive range of family and general Takaful products to individuals and corporates.",
-    yearEstablished: 1984,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Family Takaful",
-      "General Takaful",
-      "Group Takaful",
-      "Medical Takaful",
-    ],
-    website: "takaful.com.my",
-    email: "customerservice@takaful.com.my",
-    linkedinUrl: "#",
-  },
-  {
-    id: "8",
-    name: "Salama Islamic Arab Insurance",
-    sector: "financial",
-    categories: ["Takaful Providers"],
-    overview:
-      "One of the largest Takaful operators worldwide, with operations spanning the UAE, Egypt, Senegal, and beyond, offering life, general, and re-Takaful solutions.",
-    yearEstablished: 1979,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: [
-      "Life Takaful",
-      "General Takaful",
-      "Re-Takaful",
-      "Health Cover",
-    ],
-    website: "salama.ae",
-    email: "info@salama.ae",
-    linkedinUrl: "#",
-  },
-  {
-    id: "9",
-    name: "Syarikat Takaful Malaysia Keluarga",
-    sector: "financial",
-    categories: ["Takaful Providers"],
-    overview:
-      "Malaysia's largest family Takaful operator by assets, providing Shariah-compliant protection and savings solutions to over 4 million certificate holders.",
-    yearEstablished: 1985,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Family Takaful",
-      "Investment-linked Plans",
-      "Group Benefits",
-      "Retirement Planning",
-    ],
-    website: "takafulmalaysia.com.my",
-    email: "customercare@takafulmalaysia.com.my",
-    linkedinUrl: "#",
-  },
-  {
-    id: "10",
-    name: "Saturna Capital",
-    sector: "financial",
-    categories: ["Asset Management"],
-    overview:
-      "A U.S.-based investment management firm specializing in ethical, Shariah-compliant investment funds including the widely recognized Amana Funds.",
-    yearEstablished: 1989,
-    headquarters: "Bellingham, WA",
-    country: "USA",
-    keyServices: [
-      "Equity Funds",
-      "Income Funds",
-      "ESG Investing",
-      "Shariah Screening",
-    ],
-    website: "saturna.com",
-    email: "info@saturna.com",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "11",
-    name: "Amundi Islamic",
-    sector: "financial",
-    categories: ["Asset Management"],
-    overview:
-      "Part of the global Amundi Group, offering Shariah-compliant fund management and portfolio solutions for institutional investors across Europe and the GCC.",
-    yearEstablished: 2008,
-    headquarters: "Paris",
-    country: "France",
-    keyServices: [
-      "Sukuk Funds",
-      "Equity Portfolios",
-      "Money Market",
-      "Multi-Asset Solutions",
-    ],
-    website: "amundi.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "12",
-    name: "CIMB Islamic Asset Management",
-    sector: "financial",
-    categories: ["Asset Management", "Capital Markets"],
-    overview:
-      "A leading Islamic asset manager in ASEAN providing professionally managed Shariah-compliant investment products to retail, corporate, and institutional investors.",
-    yearEstablished: 2005,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Unit Trusts",
-      "Discretionary Portfolios",
-      "Pension Solutions",
-      "Alternative Investments",
-    ],
-    website: "cimbislamic.com",
-    email: "am@cimb.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "13",
-    name: "Nasdaq Dubai",
-    sector: "financial",
-    categories: ["Capital Markets"],
-    overview:
-      "The international financial exchange in the Middle East, providing a transparent, regulated platform for Sukuk listings, equities, and derivatives.",
-    yearEstablished: 2005,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: [
-      "Sukuk Listing",
-      "Equity Market",
-      "Derivatives",
-      "Market Data Services",
-    ],
-    website: "nasdaqdubai.com",
-    email: "info@nasdaqdubai.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "14",
-    name: "IILM",
-    sector: "financial",
-    categories: ["Capital Markets"],
-    overview:
-      "An international institution issuing short-term Sukuk instruments to facilitate efficient cross-border liquidity management for Islamic financial institutions globally.",
-    yearEstablished: 2010,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Short-term Sukuk",
-      "Liquidity Instruments",
-      "Cross-border Settlement",
-    ],
-    website: "iilm.com",
-    email: "info@iilm.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "15",
-    name: "Wahed Invest",
-    sector: "financial",
-    categories: ["Islamic Fintech"],
-    overview:
-      "A New York-based halal robo-advisory platform offering automated, Shariah-compliant portfolio management to retail investors globally via a mobile-first experience.",
-    yearEstablished: 2015,
-    headquarters: "New York",
-    country: "USA",
-    keyServices: [
-      "Robo-Advisory",
-      "Portfolio Management",
-      "Shariah Screening",
-      "Retirement Planning",
-    ],
-    website: "wahedinvest.com",
-    email: "support@wahedinvest.com",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "16",
-    name: "Ethis Group",
-    sector: "financial",
-    categories: ["Islamic Fintech"],
-    overview:
-      "A Singapore-based Islamic crowdfunding and impact investment platform specializing in property and social impact opportunities across Southeast Asia.",
-    yearEstablished: 2014,
-    headquarters: "Singapore",
-    country: "Singapore",
-    keyServices: [
-      "Crowdfunding",
-      "Real Estate Finance",
-      "SME Financing",
-      "Impact Investing",
-    ],
-    website: "ethis.co",
-    email: "hello@ethis.co",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "17",
-    name: "Hijra (formerly Alami)",
-    sector: "financial",
-    categories: ["Islamic Fintech"],
-    overview:
-      "Indonesia's leading Shariah P2P lending platform, connecting underserved SMEs with investors seeking transparent, halal investment opportunities.",
-    yearEstablished: 2018,
-    headquarters: "Jakarta",
-    country: "Indonesia",
-    keyServices: [
-      "P2P Lending",
-      "SME Finance",
-      "Supply Chain Finance",
-      "Shariah Advisory",
-    ],
-    website: "hijra.id",
-    email: "hello@hijra.id",
-    linkedinUrl: "#",
-  },
-  {
-    id: "18",
-    name: "Amanie Advisors",
-    sector: "financial",
-    categories: ["Shariah Advisory"],
-    overview:
-      "A globally respected Shariah advisory firm providing structuring, audit, and compliance services to Islamic financial institutions and capital markets worldwide.",
-    yearEstablished: 2008,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Shariah Structuring",
-      "Shariah Audit",
-      "Compliance Review",
-      "Training",
-    ],
-    website: "amanieadvisors.com",
-    email: "info@amanieadvisors.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "19",
-    name: "Dar Al Shariah",
-    sector: "financial",
-    categories: ["Shariah Advisory"],
-    overview:
-      "A leading Islamic finance consultancy in the UAE providing comprehensive Shariah advisory, fatwa issuance, and product structuring services to financial institutions.",
-    yearEstablished: 2009,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: [
-      "Shariah Advisory",
-      "Fatwa Issuance",
-      "Product Structuring",
-      "Training",
-    ],
-    website: "daralshariah.com",
-    email: "info@daralshariah.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "20",
-    name: "Shariyah Review Bureau",
-    sector: "financial",
-    categories: ["Shariah Advisory"],
-    overview:
-      "A Bahrain-based Shariah advisory and audit firm delivering technology-driven compliance tools and digital fatwa management solutions to institutions globally.",
-    yearEstablished: 2012,
-    headquarters: "Manama",
-    country: "Bahrain",
-    keyServices: [
-      "Shariah Audit",
-      "Compliance SaaS",
-      "Digital Fatwa Management",
-      "Training",
-    ],
-    website: "shariyah.com",
-    email: "info@shariyah.com",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  /* === NON-FINANCIAL === */
-  {
-    id: "21",
-    name: "ISRA (International Shariah Research Academy)",
-    sector: "non-financial",
-    categories: ["Research Institutions"],
-    overview:
-      "Malaysia's premier institution for Shariah research in Islamic finance, driving academic and policy research through publications, a global fatwa repository, and conferences.",
-    yearEstablished: 2008,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Shariah Research",
-      "Fatwa Repository",
-      "Academic Publishing",
-      "Conferences",
-    ],
-    website: "isra.my",
-    email: "info@isra.my",
-    linkedinUrl: "#",
-  },
-  {
-    id: "22",
-    name: "IIFM (International Islamic Financial Market)",
-    sector: "non-financial",
-    categories: ["Research Institutions", "Regulatory Bodies"],
-    overview:
-      "An international standard-setting body for Islamic capital and money market products and contracts, facilitating standardization across jurisdictions.",
-    yearEstablished: 2002,
-    headquarters: "Manama",
-    country: "Bahrain",
-    keyServices: [
-      "Standard Setting",
-      "Product Templates",
-      "Market Research",
-      "Industry Reports",
-    ],
-    website: "iifm.net",
-    email: "info@iifm.net",
-    linkedinUrl: "#",
-  },
-  {
-    id: "23",
-    name: "Islamic Economics Institute, King Abdulaziz University",
-    sector: "non-financial",
-    categories: ["Research Institutions", "Education & Training"],
-    overview:
-      "A leading academic research institution advancing the study of Islamic economics, finance, and banking through scholarly publications and international conferences.",
-    yearEstablished: 1976,
-    headquarters: "Jeddah",
-    country: "Saudi Arabia",
-    keyServices: [
-      "Academic Research",
-      "Publishing",
-      "Conferences",
-      "Economic Policy Analysis",
-    ],
-    website: "kau.edu.sa/iei",
-  },
-  {
-    id: "24",
-    name: "Zaid Ibrahim & Co",
-    sector: "non-financial",
-    categories: ["Legal Services"],
-    overview:
-      "One of the largest law firms in Malaysia, with a specialist Islamic finance practice advising on Sukuk structures, Takaful regulation, and Islamic banking transactions.",
-    yearEstablished: 1969,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Sukuk Structuring",
-      "Regulatory Advisory",
-      "Islamic Banking Law",
-      "Dispute Resolution",
-    ],
-    website: "zaidibrahim.com",
-    email: "enquiries@zaidibrahim.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "25",
-    name: "Al Tamimi & Company",
-    sector: "non-financial",
-    categories: ["Legal Services"],
-    overview:
-      "The largest full-service law firm in the Middle East, with a specialist Islamic finance team advising on complex cross-border Sukuk, project finance, and regulatory matters.",
-    yearEstablished: 1989,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: [
-      "Islamic Finance Law",
-      "Sukuk Issuance",
-      "Project Finance",
-      "Regulatory Compliance",
-    ],
-    website: "tamimi.com",
-    email: "dubai@tamimi.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "26",
-    name: "Norton Rose Fulbright (Islamic Finance)",
-    sector: "non-financial",
-    categories: ["Legal Services"],
-    overview:
-      "A global law firm with a dedicated Islamic finance practice advising on landmark Sukuk issuances, Islamic trade finance, and Takaful regulatory matters globally.",
-    yearEstablished: 1794,
-    headquarters: "London",
-    country: "United Kingdom",
-    keyServices: [
-      "Sukuk Documentation",
-      "Takaful Advisory",
-      "Cross-border Finance",
-      "Regulatory",
-    ],
-    website: "nortonrosefulbright.com",
-    email: "contact@nortonrosefulbright.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "27",
-    name: "INCEIF: The Global University of Islamic Finance",
-    sector: "non-financial",
-    categories: ["Education & Training", "Research Institutions"],
-    overview:
-      "Malaysia's leading graduate university for Islamic finance offering internationally recognized master's and doctoral programs alongside professional certifications.",
-    yearEstablished: 2006,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Graduate Programs",
-      "Professional Certifications",
-      "Executive Training",
-      "Research",
-    ],
-    website: "inceif.org",
-    email: "info@inceif.org",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "28",
-    name: "Ethica Institute of Islamic Finance",
-    sector: "non-financial",
-    categories: ["Education & Training"],
-    overview:
-      "The world's largest Islamic finance education provider, offering the CIFP certification and hundreds of e-learning modules accessible from anywhere in the world.",
-    yearEstablished: 2001,
-    headquarters: "Dubai",
-    country: "UAE",
-    keyServices: [
-      "CIFP Certification",
-      "E-Learning",
-      "Corporate Training",
-      "Shariah Compliance Courses",
-    ],
-    website: "ethicainstitute.com",
-    email: "info@ethicainstitute.com",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "29",
-    name: "IBFIM (Islamic Banking & Finance Institute Malaysia)",
-    sector: "non-financial",
-    categories: ["Education & Training"],
-    overview:
-      "A dedicated Islamic finance training institute in Malaysia offering professional certifications, workshops, and tailored corporate training programs for practitioners.",
-    yearEstablished: 2001,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Professional Certifications",
-      "Workshops",
-      "Corporate Training",
-      "Consultancy",
-    ],
-    website: "ibfim.com",
-    email: "info@ibfim.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "30",
-    name: "Dr. Muhammad Imran Usmani",
-    sector: "non-financial",
-    categories: ["Scholars & Experts"],
-    overview:
-      "One of the world's foremost Islamic finance scholars and Shariah supervisory board members, with deep expertise in contemporary fiqh al-muamalat and product structuring.",
-    yearEstablished: null,
-    headquarters: "Karachi",
-    country: "Pakistan",
-    keyServices: [
-      "Shariah Board Membership",
-      "Fatwa Issuance",
-      "Product Structuring",
-      "Keynote Speaking",
-    ],
-    website: "darululoomkarachi.edu.pk",
-  },
-  {
-    id: "31",
-    name: "Dr. Daud Bakar",
-    sector: "non-financial",
-    categories: ["Scholars & Experts"],
-    overview:
-      "A renowned Shariah scholar serving on multiple international Shariah supervisory boards, prolific author, and educator with expertise in Islamic finance jurisprudence.",
-    yearEstablished: null,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Shariah Advisory",
-      "Training & Education",
-      "Research",
-      "Keynote Speaking",
-    ],
-    website: "amanie.com",
-    linkedinUrl: "#",
-  },
-  {
-    id: "32",
-    name: "Sheikh Nizam Yaquby",
-    sector: "non-financial",
-    categories: ["Scholars & Experts"],
-    overview:
-      "One of the most sought-after Shariah scholars globally, serving on the boards of numerous leading Islamic banks, investment firms, and regulatory bodies across the GCC.",
-    yearEstablished: null,
-    headquarters: "Manama",
-    country: "Bahrain",
-    keyServices: [
-      "Shariah Board Membership",
-      "Fatwa Issuance",
-      "Scholarly Advisory",
-    ],
-    website: "#",
-  },
-  {
-    id: "33",
-    name: "Bank Negara Malaysia (BNM)",
-    sector: "non-financial",
-    categories: ["Regulatory Bodies"],
-    overview:
-      "Malaysia's central bank and primary regulator of Islamic finance institutions, responsible for monetary policy, financial stability, and the development of the Islamic financial system.",
-    yearEstablished: 1959,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Monetary Policy",
-      "Financial Regulation",
-      "Islamic Finance Development",
-      "Licensing",
-    ],
-    website: "bnm.gov.my",
-    email: "info@bnm.gov.my",
-    linkedinUrl: "#",
-  },
-  {
-    id: "34",
-    name: "AAOIFI",
-    sector: "non-financial",
-    categories: ["Regulatory Bodies", "Research Institutions"],
-    overview:
-      "The leading international standard-setting body for accounting, auditing, governance, ethics, and Shariah standards for Islamic financial institutions globally.",
-    yearEstablished: 1991,
-    headquarters: "Manama",
-    country: "Bahrain",
-    keyServices: [
-      "Standard Setting",
-      "Certifications",
-      "Conferences",
-      "Training",
-    ],
-    website: "aaoifi.com",
-    email: "secretariat@aaoifi.com",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "35",
-    name: "IFSB (Islamic Financial Services Board)",
-    sector: "non-financial",
-    categories: ["Regulatory Bodies"],
-    overview:
-      "An international standard-setting organisation that promotes the soundness and stability of the Islamic financial services industry through prudential regulatory standards.",
-    yearEstablished: 2002,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Prudential Standards",
-      "Regulatory Guidelines",
-      "Research",
-      "Capacity Building",
-    ],
-    website: "ifsb.org",
-    email: "ifsb_sec@ifsb.org",
-    linkedinUrl: "#",
-    twitterUrl: "#",
-  },
-  {
-    id: "36",
-    name: "Securities Commission Malaysia",
-    sector: "non-financial",
-    categories: ["Regulatory Bodies"],
-    overview:
-      "Malaysia's capital markets regulator and a leading authority on Islamic capital markets, overseeing Sukuk issuance, Islamic funds, and related market activities.",
-    yearEstablished: 1993,
-    headquarters: "Kuala Lumpur",
-    country: "Malaysia",
-    keyServices: [
-      "Capital Market Regulation",
-      "Sukuk Approval",
-      "Fund Oversight",
-      "Investor Protection",
-    ],
-    website: "sc.com.my",
-    email: "cau@seccom.com.my",
-    linkedinUrl: "#",
-  },
-  {
-    id: "37",
-    name: "Jaiz Bank PLC",
-    sector: "financial",
-    categories: ["Islamic Banks"],
-    overview:
-      "Nigeria's first full-fledged non-interest Islamic bank, providing Shariah-compliant retail, corporate and investment banking services across Nigeria.",
-    yearEstablished: 2012,
-    headquarters: "Abuja",
-    country: "Nigeria",
-    keyServices: [
-      "Retail Banking",
-      "Corporate Banking",
-      "Trade Finance",
-      "Shariah-Compliant Financing",
-    ],
-    website: "jaizbank.com",
-    email: "info@jaizbank.com",
-  },
-];
 
 /* -- Animation variants ---------------------------------------------------- */
 const containerVariants = {
@@ -1216,6 +492,604 @@ function DetailModal({
   );
 }
 
+function ContributeListingModal({
+  open,
+  onClose,
+  categories,
+  onSubmitted,
+}: Readonly<{
+  open: boolean;
+  onClose: () => void;
+  categories: DirectoryCategoryAPI[];
+  onSubmitted: (data: {
+    name: string;
+    submittedAt: string;
+  }) => void | Promise<void>;
+}>) {
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [form, setForm] = useState({
+    name: "",
+    listingType: "institution",
+    categoryId: "",
+    isFinancial: true,
+    tagline: "",
+    description: "",
+    logoUrl: "",
+    bannerUrl: "",
+    websiteUrl: "",
+    email: "",
+    phone: "",
+    country: "",
+    city: "",
+    address: "",
+    yearFounded: "",
+    employeeRange: "",
+    shariahCertified: false,
+    certifyingBody: "",
+    aumUsdMillions: "",
+    linkedin: "",
+    twitter: "",
+    services: "",
+    tags: "",
+  });
+
+  const availableCategories = useMemo(
+    () => categories.filter((c) => c.isFinancial === form.isFinancial),
+    [categories, form.isFinancial],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    if (!availableCategories.some((c) => c.id === form.categoryId)) {
+      setForm((p) => ({ ...p, categoryId: availableCategories[0]?.id ?? "" }));
+    }
+  }, [open, availableCategories, form.categoryId]);
+
+  if (!open) return null;
+
+  const closeAndReset = () => {
+    if (submitting) return;
+    setErrors({});
+    setForm({
+      name: "",
+      listingType: "institution",
+      categoryId: "",
+      isFinancial: true,
+      tagline: "",
+      description: "",
+      logoUrl: "",
+      bannerUrl: "",
+      websiteUrl: "",
+      email: "",
+      phone: "",
+      country: "",
+      city: "",
+      address: "",
+      yearFounded: "",
+      employeeRange: "",
+      shariahCertified: false,
+      certifyingBody: "",
+      aumUsdMillions: "",
+      linkedin: "",
+      twitter: "",
+      services: "",
+      tags: "",
+    });
+    onClose();
+  };
+
+  const validate = () => {
+    const nextErrors: Record<string, string> = {};
+    if (!form.name.trim()) nextErrors.name = "Name is required.";
+    if (!form.categoryId.trim())
+      nextErrors.categoryId = "Category is required.";
+    if (!form.listingType.trim())
+      nextErrors.listingType = "Listing type is required.";
+    if (!form.description.trim())
+      nextErrors.description = "Description is required.";
+    if (!form.country.trim()) nextErrors.country = "Country is required.";
+    if (form.yearFounded && !/^\d{4}$/.test(form.yearFounded)) {
+      nextErrors.yearFounded =
+        "Year Founded must be exactly 4 digits (e.g. 1940).";
+    }
+    return nextErrors;
+  };
+
+  const submit = async () => {
+    const nextErrors = validate();
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      toast.error("Please complete all required fields.");
+      return;
+    }
+    setErrors({});
+
+    const slug = form.name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const socialLinks: Record<string, string> = {};
+    if (form.linkedin.trim()) socialLinks.linkedin = form.linkedin.trim();
+    if (form.twitter.trim()) socialLinks.twitter = form.twitter.trim();
+
+    const payload: ContributeDirectoryListingDto = {
+      name: form.name.trim(),
+      slug,
+      categoryId: form.categoryId,
+      listingType: form.listingType,
+      tagline: form.tagline.trim() || undefined,
+      description: form.description.trim(),
+      logoUrl: form.logoUrl.trim() || undefined,
+      bannerUrl: form.bannerUrl.trim() || undefined,
+      websiteUrl: form.websiteUrl.trim() || undefined,
+      email: form.email.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      country: form.country.trim(),
+      city: form.city.trim() || undefined,
+      address: form.address.trim() || undefined,
+      yearFounded: form.yearFounded
+        ? Number.parseInt(form.yearFounded, 10)
+        : undefined,
+      employeeRange: form.employeeRange.trim() || undefined,
+      shariahCertified: form.shariahCertified,
+      certifyingBody: form.certifyingBody.trim() || undefined,
+      aumUsdMillions: form.aumUsdMillions
+        ? Number.parseFloat(form.aumUsdMillions)
+        : undefined,
+      socialLinks:
+        Object.keys(socialLinks).length > 0 ? socialLinks : undefined,
+      services: form.services
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      tags: form.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      isFinancial: form.isFinancial,
+      status: "draft",
+    };
+
+    setSubmitting(true);
+    try {
+      await directoryService.contributeListing(payload);
+      toast.success("Contribution submitted for admin review.");
+      await onSubmitted({
+        name: payload.name,
+        submittedAt: new Date().toISOString(),
+      });
+      closeAndReset();
+    } catch (err) {
+      console.error("Failed to submit contribution:", err);
+      toast.error("Submission failed. Please review the form and try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[100] h-[100dvh] w-screen flex items-end sm:items-center justify-center p-0 sm:p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="absolute inset-0 h-[100dvh] w-screen bg-black/50 backdrop-blur-sm"
+        onClick={closeAndReset}
+      />
+      <motion.div
+        className="relative bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-3xl max-h-[92dvh] overflow-y-auto shadow-2xl"
+        initial={{ y: 60, opacity: 0, scale: 0.97 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: 60, opacity: 0, scale: 0.97 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
+        <div className="p-6 border-b border-gray-100">
+          <button
+            onClick={closeAndReset}
+            disabled={submitting}
+            className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-gray-100 text-gray-400"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <h2 className="text-xl font-bold text-gray-900">
+            Contribute a Directory Listing
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            All contributions are submitted as draft and require admin approval
+            before they are published.
+          </p>
+          <p className="text-xs text-gray-500 mt-2">
+            <span className="text-red-500 font-semibold">*</span> Required
+            fields
+          </p>
+        </div>
+
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={form.name}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, name: e.target.value }));
+                if (errors.name) setErrors((prev) => ({ ...prev, name: "" }));
+              }}
+              className={
+                errors.name
+                  ? "border-red-400 focus-visible:ring-red-300"
+                  : undefined
+              }
+            />
+            {errors.name && (
+              <p className="text-xs text-red-600 mt-1">{errors.name}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Sector <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, isFinancial: true }))}
+                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${form.isFinancial ? "bg-[#D52B1E] border-[#D52B1E] text-white" : "bg-white border-gray-200 text-gray-700"}`}
+              >
+                Financial
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, isFinancial: false }))}
+                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${!form.isFinancial ? "bg-[#D52B1E] border-[#D52B1E] text-white" : "bg-white border-gray-200 text-gray-700"}`}
+              >
+                Non-Financial
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.categoryId}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, categoryId: e.target.value }));
+                if (errors.categoryId)
+                  setErrors((prev) => ({ ...prev, categoryId: "" }));
+              }}
+              className={`w-full h-10 rounded-md border px-3 text-sm bg-white text-gray-900 ${errors.categoryId ? "border-red-400 focus:ring-red-300" : "border-gray-200 focus:ring-[#D52B1E]/30"}`}
+            >
+              {availableCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {errors.categoryId && (
+              <p className="text-xs text-red-600 mt-1">{errors.categoryId}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Listing Type <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.listingType}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, listingType: e.target.value }));
+                if (errors.listingType)
+                  setErrors((prev) => ({ ...prev, listingType: "" }));
+              }}
+              className={`w-full h-10 rounded-md border px-3 text-sm bg-white text-gray-900 ${errors.listingType ? "border-red-400 focus:ring-red-300" : "border-gray-200 focus:ring-[#D52B1E]/30"}`}
+            >
+              {LISTING_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            {errors.listingType && (
+              <p className="text-xs text-red-600 mt-1">{errors.listingType}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Year Founded
+            </label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="e.g. 2025"
+              maxLength={4}
+              value={form.yearFounded}
+              onChange={(e) => {
+                const digitsOnly = e.target.value
+                  .replace(/\D/g, "")
+                  .slice(0, 4);
+                setForm((p) => ({ ...p, yearFounded: digitsOnly }));
+                if (errors.yearFounded)
+                  setErrors((prev) => ({ ...prev, yearFounded: "" }));
+              }}
+              className={
+                errors.yearFounded
+                  ? "border-red-400 focus-visible:ring-red-300"
+                  : undefined
+              }
+            />
+            {errors.yearFounded && (
+              <p className="text-xs text-red-600 mt-1">{errors.yearFounded}</p>
+            )}
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Tagline
+            </label>
+            <Input
+              value={form.tagline}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, tagline: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Description <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, description: e.target.value }));
+                if (errors.description)
+                  setErrors((prev) => ({ ...prev, description: "" }));
+              }}
+              className={`w-full min-h-24 rounded-md border px-3 py-2 text-sm bg-white text-gray-900 ${errors.description ? "border-red-400 focus:ring-red-300" : "border-gray-200 focus:ring-[#D52B1E]/30"}`}
+            />
+            {errors.description && (
+              <p className="text-xs text-red-600 mt-1">{errors.description}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Country <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={form.country}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, country: e.target.value }));
+                if (errors.country)
+                  setErrors((prev) => ({ ...prev, country: "" }));
+              }}
+              className={
+                errors.country
+                  ? "border-red-400 focus-visible:ring-red-300"
+                  : undefined
+              }
+            />
+            {errors.country && (
+              <p className="text-xs text-red-600 mt-1">{errors.country}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              City
+            </label>
+            <Input
+              value={form.city}
+              onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Address
+            </label>
+            <Input
+              value={form.address}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, address: e.target.value }))
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Website URL
+            </label>
+            <Input
+              value={form.websiteUrl}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, websiteUrl: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Email
+            </label>
+            <Input
+              value={form.email}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, email: e.target.value }))
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Phone
+            </label>
+            <Input
+              value={form.phone}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, phone: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Employee Range
+            </label>
+            <Input
+              value={form.employeeRange}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, employeeRange: e.target.value }))
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Services (comma-separated)
+            </label>
+            <Input
+              value={form.services}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, services: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Tags (comma-separated)
+            </label>
+            <Input
+              value={form.tags}
+              onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Logo Upload
+            </label>
+            <ImageUpload
+              value={form.logoUrl}
+              onChange={(url) => setForm((p) => ({ ...p, logoUrl: url }))}
+              previewHeight="h-28"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Upload image (max 5MB). URL is auto-filled from upload response.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Banner Upload
+            </label>
+            <ImageUpload
+              value={form.bannerUrl}
+              onChange={(url) => setForm((p) => ({ ...p, bannerUrl: url }))}
+              previewHeight="h-28"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Upload image (max 5MB). URL is auto-filled from upload response.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              LinkedIn URL
+            </label>
+            <Input
+              value={form.linkedin}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, linkedin: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Twitter/X URL
+            </label>
+            <Input
+              value={form.twitter}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, twitter: e.target.value }))
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              AUM (USD Millions)
+            </label>
+            <Input
+              type="number"
+              value={form.aumUsdMillions}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, aumUsdMillions: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Certifying Body
+            </label>
+            <Input
+              value={form.certifyingBody}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, certifyingBody: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="md:col-span-2 flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.shariahCertified}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, shariahCertified: e.target.checked }))
+              }
+              className="h-4 w-4 rounded border-gray-300 accent-[#D52B1E]"
+            />
+            <span className="text-sm text-gray-700">Shariah certified</span>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={closeAndReset}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={submitting}
+            className="bg-[#D52B1E] hover:bg-[#B8241B] text-white"
+          >
+            {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            Submit for Admin Review
+          </Button>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
+
+const LISTING_TYPES = [
+  "institution",
+  "fund",
+  "professional",
+  "regulator",
+  "consultancy",
+  "fintech",
+  "ngo",
+] as const;
+
 function FilterPanel({
   countries,
   selectedCountries,
@@ -1225,6 +1099,14 @@ function FilterPanel({
   onServiceChange,
   yearRange,
   onYearRangeChange,
+  listingType,
+  onListingTypeChange,
+  shariahCertified,
+  onShariahCertifiedChange,
+  citySearch,
+  onCitySearchChange,
+  tagsFilter,
+  onTagsFilterChange,
   onClear,
   onClose,
 }: Readonly<{
@@ -1236,15 +1118,40 @@ function FilterPanel({
   onServiceChange: (s: string) => void;
   yearRange: [number | null, number | null];
   onYearRangeChange: (r: [number | null, number | null]) => void;
+  listingType: string;
+  onListingTypeChange: (t: string) => void;
+  shariahCertified: boolean | null;
+  onShariahCertifiedChange: (v: boolean | null) => void;
+  citySearch: string;
+  onCitySearchChange: (v: string) => void;
+  tagsFilter: string[];
+  onTagsFilterChange: (tags: string[]) => void;
   onClear: () => void;
   onClose: () => void;
 }>) {
-  const [expanded, setExpanded] = useState({ country: true, services: true });
+  const [expanded, setExpanded] = useState({
+    country: true,
+    services: true,
+    listingType: true,
+  });
+  const [tagInput, setTagInput] = useState("");
   const activeCount =
     selectedCountries.length +
     selectedServices.length +
     (yearRange[0] ? 1 : 0) +
-    (yearRange[1] ? 1 : 0);
+    (yearRange[1] ? 1 : 0) +
+    (listingType ? 1 : 0) +
+    (shariahCertified !== null ? 1 : 0) +
+    (citySearch ? 1 : 0) +
+    tagsFilter.length;
+
+  function addTag() {
+    const t = tagInput.trim().toLowerCase();
+    if (t && !tagsFilter.includes(t)) {
+      onTagsFilterChange([...tagsFilter, t]);
+    }
+    setTagInput("");
+  }
 
   return (
     <motion.div
@@ -1289,6 +1196,124 @@ function FilterPanel({
           </div>
         </div>
         <div className="flex-1 p-5 space-y-5">
+          {/* Listing Type */}
+          <div>
+            <button
+              className="flex items-center justify-between w-full text-sm font-semibold text-gray-800 mb-3"
+              onClick={() =>
+                setExpanded((p) => ({ ...p, listingType: !p.listingType }))
+              }
+            >
+              Listing Type
+              {expanded.listingType ? (
+                <ChevronUp className="h-4 w-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-400" />
+              )}
+            </button>
+            {expanded.listingType && (
+              <div className="flex flex-wrap gap-2">
+                {LISTING_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() =>
+                      onListingTypeChange(listingType === t ? "" : t)
+                    }
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize border transition-all ${
+                      listingType === t
+                        ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+                        : "bg-white text-slate-600 border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Shariah Certified */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-3">
+              Shariah Certified
+            </p>
+            <div className="flex gap-2">
+              {(
+                [
+                  { label: "Any", value: null },
+                  { label: "Yes", value: true },
+                  { label: "No", value: false },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.label}
+                  onClick={() => onShariahCertifiedChange(opt.value)}
+                  className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                    shariahCertified === opt.value
+                      ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+                      : "bg-white text-slate-600 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* City */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-3">City</p>
+            <input
+              type="text"
+              placeholder="e.g. Dubai, Kuala Lumpur"
+              value={citySearch}
+              onChange={(e) => onCitySearchChange(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+            />
+          </div>
+          {/* Tags */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-3">Tags</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add a tag..."
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addTag();
+                  }
+                }}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+              />
+              <button
+                onClick={addTag}
+                className="px-3 py-2 bg-[#D52B1E] text-white rounded-lg text-xs font-semibold hover:bg-[#B8241B]"
+              >
+                Add
+              </button>
+            </div>
+            {tagsFilter.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {tagsFilter.map((t) => (
+                  <span
+                    key={t}
+                    className="flex items-center gap-1 text-xs bg-gray-100 px-2.5 py-1 rounded-full text-gray-700"
+                  >
+                    #{t}
+                    <button
+                      onClick={() =>
+                        onTagsFilterChange(tagsFilter.filter((x) => x !== t))
+                      }
+                      className="hover:text-red-500"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Country */}
           <div>
             <button
@@ -1322,6 +1347,11 @@ function FilterPanel({
                     </span>
                   </label>
                 ))}
+                {countries.length === 0 && (
+                  <p className="text-xs text-gray-400">
+                    No countries available
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -1358,13 +1388,16 @@ function FilterPanel({
                     </span>
                   </label>
                 ))}
+                {allServices.length === 0 && (
+                  <p className="text-xs text-gray-400">No services available</p>
+                )}
               </div>
             )}
           </div>
           {/* Year range */}
           <div>
             <p className="text-sm font-semibold text-gray-800 mb-3">
-              Year Established
+              Year Founded
             </p>
             <div className="flex gap-3 items-center">
               <input
@@ -1411,47 +1444,46 @@ function FilterPanel({
 /* -- Main Page ------------------------------------------------------------- */
 export default function Directory() {
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   const [searchParams] = useSearchParams();
 
   /* -- API state -- */
   const [apiEntries, setApiEntries] = useState<DirectoryEntry[] | null>(null);
-  const [apiCategories, setApiCategories] = useState<DirectoryCategoryAPI[]>([]);
+  const [apiCategories, setApiCategories] = useState<DirectoryCategoryAPI[]>(
+    [],
+  );
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [contributeOpen, setContributeOpen] = useState(false);
+  const [countryUniverse, setCountryUniverse] = useState<string[]>([]);
+  const [submissionReceipt, setSubmissionReceipt] =
+    useState<SubmissionReceipt | null>(null);
 
-  useEffect(() => {
-    setApiLoading(true);
-    Promise.all([
-      directoryService.getListings(),
-      directoryService.getCategories(),
-    ])
-      .then(([listings, categories]) => {
-        setApiEntries(listings.map(apiListingToEntry));
-        setApiCategories(categories);
-        setApiError(null);
-      })
-      .catch((err) => {
-        console.error("Failed to load directory listings:", err);
-        setApiError("Failed to load directory. Showing cached data.");
-      })
-      .finally(() => setApiLoading(false));
-  }, []);
+  const [statsEntries, setStatsEntries] = useState<{
+    finCount: number;
+    nonFinCount: number;
+    countryCount: number;
+  } | null>(null);
 
-  // Use API data when available, fall back to built-in data
-  const allEntries = apiEntries ?? DIRECTORY_DATA;
-
-  const [sector, setSector] = useState<'financial' | 'non-financial'>(() => {
-    const s = searchParams.get('sector');
-    return s === 'non-financial' ? 'non-financial' : 'financial';
+  /* -- Filter state -- */
+  const [sector, setSector] = useState<"financial" | "non-financial">(() => {
+    const s = searchParams.get("sector");
+    return s === "non-financial" ? "non-financial" : "financial";
   });
-  const [geography, setGeography] = useState<'all' | 'local' | 'global'>('all');
+  const [geography, setGeography] = useState<"all" | "local" | "global">("all");
   const [selectedCategory, setSelectedCategory] = useState(() => {
-    return searchParams.get('category') ?? 'All';
+    return searchParams.get("category") ?? "All";
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [listingType, setListingType] = useState("");
+  const [shariahCertified, setShariahCertified] = useState<boolean | null>(
+    null,
+  );
+  const [citySearch, setCitySearch] = useState("");
+  const [tagsFilter, setTagsFilter] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -1465,28 +1497,179 @@ export default function Directory() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const CARDS_PER_PAGE = 6;
+  const RECEIPT_STORAGE_KEY = "directory-contribution-receipt";
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(RECEIPT_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SubmissionReceipt;
+      if (parsed?.name && parsed?.submittedAt && parsed?.expectedTimeline) {
+        setSubmissionReceipt(parsed);
+      }
+    } catch {
+      // ignore bad localStorage payloads
+    }
+  }, []);
+
+  const handleSubmissionReceived = ({
+    name,
+    submittedAt,
+  }: {
+    name: string;
+    submittedAt: string;
+  }) => {
+    const receipt: SubmissionReceipt = {
+      name,
+      submittedAt,
+      expectedTimeline: "Typically reviewed within 3-5 business days.",
+    };
+    setSubmissionReceipt(receipt);
+    try {
+      window.localStorage.setItem(RECEIPT_STORAGE_KEY, JSON.stringify(receipt));
+    } catch {
+      // no-op when storage is unavailable
+    }
+  };
+
+  const clearSubmissionReceipt = () => {
+    setSubmissionReceipt(null);
+    try {
+      window.localStorage.removeItem(RECEIPT_STORAGE_KEY);
+    } catch {
+      // no-op when storage is unavailable
+    }
+  };
+
+  /* -- Debounce search query -- */
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  /* -- Initial load: categories + summary stats for hero section -- */
+  useEffect(() => {
+    Promise.all([
+      directoryService.getListings(),
+      directoryService.getCategories(),
+    ])
+      .then(([listings, categories]) => {
+        const mapped = listings.map(apiListingToEntry);
+        setCountryUniverse(
+          [...new Set(mapped.map((e) => e.country).filter(Boolean))].sort(
+            (a, b) => a.localeCompare(b),
+          ),
+        );
+        setStatsEntries({
+          finCount: mapped.filter((e) => e.sector === "financial").length,
+          nonFinCount: mapped.filter((e) => e.sector === "non-financial")
+            .length,
+          countryCount: new Set(mapped.map((e) => e.country)).size,
+        });
+        setApiCategories(categories);
+      })
+      .catch(console.error);
+  }, []);
+
+  /* -- Reactive fetch: re-run whenever any filter changes -- */
+  useEffect(() => {
+    const params: DirectoryListingsParams = {
+      isFinancial: sector === "financial",
+    };
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (selectedCategory !== "All") {
+      const cat = apiCategories.find((c) => c.name === selectedCategory);
+      if (cat) params.categoryId = cat.id;
+    }
+    if (listingType) params.listingType = listingType;
+    if (selectedServices.length > 0)
+      params.services = selectedServices.join(",");
+    if (yearRange[0]) params.yearFoundedFrom = yearRange[0];
+    if (yearRange[1]) params.yearFoundedTo = yearRange[1];
+    if (shariahCertified !== null) params.shariahCertified = shariahCertified;
+    if (citySearch) params.city = citySearch;
+    if (tagsFilter.length > 0) params.tags = tagsFilter.join(",");
+
+    if (geography === "local") {
+      params.country = "Nigeria";
+    } else if (geography === "global") {
+      const nonNigeriaCountries = countryUniverse.filter(
+        (c) => c.trim().toLowerCase() !== "nigeria",
+      );
+      const selectedNonNigeria = selectedCountries.filter(
+        (c) => c.trim().toLowerCase() !== "nigeria",
+      );
+      const countriesForQuery =
+        selectedNonNigeria.length > 0
+          ? selectedNonNigeria
+          : nonNigeriaCountries;
+      if (countriesForQuery.length > 0) {
+        params.countries = countriesForQuery.join(",");
+      }
+    } else if (selectedCountries.length > 0) {
+      params.countries = selectedCountries.join(",");
+    }
+
+    setApiLoading(true);
+    directoryService
+      .getListings(params)
+      .then((listings) => {
+        setApiEntries(listings.map(apiListingToEntry));
+        setApiError(null);
+      })
+      .catch((err) => {
+        console.error("Failed to load directory listings:", err);
+        setApiError("Failed to load directory. Please try again.");
+      })
+      .finally(() => setApiLoading(false));
+  }, [
+    sector,
+    debouncedSearch,
+    selectedCategory,
+    apiCategories,
+    listingType,
+    selectedCountries,
+    selectedServices,
+    yearRange,
+    shariahCertified,
+    citySearch,
+    tagsFilter,
+    geography,
+    countryUniverse,
+  ]);
 
   // When navigating via searchParams change (e.g. from global search), sync state
   useEffect(() => {
-    const s = searchParams.get('sector');
-    const c = searchParams.get('category');
-    if (s === 'non-financial') setSector('non-financial');
-    else if (s === 'financial') setSector('financial');
+    const s = searchParams.get("sector");
+    const c = searchParams.get("category");
+    if (s === "non-financial") setSector("non-financial");
+    else if (s === "financial") setSector("financial");
     if (c) setSelectedCategory(decodeURIComponent(c));
     setCurrentPage(1);
   }, [searchParams]);
 
-  // Reset filters when user manually switches sector tab
+  // Reset filters when sector tab is switched
   useEffect(() => {
-    if (!searchParams.get('category')) {
-      setSelectedCategory('All');
+    if (!searchParams.get("category")) {
+      setSelectedCategory("All");
     }
     setSelectedCountries([]);
     setSelectedServices([]);
     setYearRange([null, null]);
+    setListingType("");
+    setShariahCertified(null);
+    setCitySearch("");
+    setTagsFilter([]);
     setCurrentPage(1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sector]);
+
+  useEffect(() => {
+    setSelectedCountries([]);
+    setCurrentPage(1);
+  }, [geography]);
+
+  const allEntries = apiEntries ?? [];
 
   const categories = useMemo(
     () =>
@@ -1497,86 +1680,32 @@ export default function Directory() {
     [apiCategories, sector],
   );
 
-  const sectorEntries = useMemo(
-    () => allEntries.filter((e) => e.sector === sector),
-    [allEntries, sector],
-  );
-
-  // Sector entries further filtered by geography — used for category counts
-  const geoSectorEntries = useMemo(() => {
-    if (geography === 'local') return sectorEntries.filter((e) => e.country === 'Nigeria');
-    if (geography === 'global') return sectorEntries.filter((e) => e.country !== 'Nigeria');
-    return sectorEntries;
-  }, [sectorEntries, geography]);
-
+  // Derived from current API results (dynamic, reflects active filters)
   const allCountries = useMemo(
     () =>
-      [...new Set(geoSectorEntries.map((e) => e.country))].sort((a, b) =>
-        a.localeCompare(b),
+      [...new Set(allEntries.map((e) => e.country).filter(Boolean))].sort(
+        (a, b) => a.localeCompare(b),
       ),
-    [geoSectorEntries],
+    [allEntries],
   );
 
   const allServices = useMemo(() => {
     const set = new Set<string>();
-    geoSectorEntries.forEach((e) => e.keyServices.forEach((s) => set.add(s)));
+    allEntries.forEach((e) => e.keyServices.forEach((s) => set.add(s)));
     return [...set].sort((a, b) => a.localeCompare(b));
-  }, [geoSectorEntries]);
+  }, [allEntries]);
 
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: geoSectorEntries.length };
-    geoSectorEntries.forEach((e) =>
+    const counts: Record<string, number> = { All: allEntries.length };
+    allEntries.forEach((e) =>
       e.categories.forEach((c) => {
         counts[c] = (counts[c] ?? 0) + 1;
       }),
     );
     return counts;
-  }, [geoSectorEntries]);
+  }, [allEntries]);
 
-  const filteredEntries = useMemo(() => {
-    return sectorEntries.filter((e) => {
-      if (geography === 'local' && e.country !== 'Nigeria') return false;
-      if (geography === 'global' && e.country === 'Nigeria') return false;
-      if (
-        selectedCategory !== "All" &&
-        !e.categories.includes(selectedCategory)
-      )
-        return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        if (
-          !e.name.toLowerCase().includes(q) &&
-          !e.overview.toLowerCase().includes(q) &&
-          !e.country.toLowerCase().includes(q) &&
-          !e.keyServices.some((s) => s.toLowerCase().includes(q))
-        )
-          return false;
-      }
-      if (
-        selectedCountries.length > 0 &&
-        !selectedCountries.includes(e.country)
-      )
-        return false;
-      if (
-        selectedServices.length > 0 &&
-        !e.keyServices.some((s) => selectedServices.includes(s))
-      )
-        return false;
-      if (yearRange[0] && e.yearEstablished && e.yearEstablished < yearRange[0])
-        return false;
-      if (yearRange[1] && e.yearEstablished && e.yearEstablished > yearRange[1])
-        return false;
-      return true;
-    });
-  }, [
-    sectorEntries,
-    geography,
-    selectedCategory,
-    searchQuery,
-    selectedCountries,
-    selectedServices,
-    yearRange,
-  ]);
+  const filteredEntries = allEntries;
 
   const totalPages = Math.ceil(filteredEntries.length / CARDS_PER_PAGE);
   const paginatedEntries = filteredEntries.slice(
@@ -1600,26 +1729,25 @@ export default function Directory() {
     setSelectedCountries([]);
     setSelectedServices([]);
     setYearRange([null, null]);
+    setListingType("");
+    setShariahCertified(null);
+    setCitySearch("");
+    setTagsFilter([]);
     setCurrentPage(1);
   };
   const activeFilterCount =
     selectedCountries.length +
     selectedServices.length +
     (yearRange[0] ? 1 : 0) +
-    (yearRange[1] ? 1 : 0);
+    (yearRange[1] ? 1 : 0) +
+    (listingType ? 1 : 0) +
+    (shariahCertified !== null ? 1 : 0) +
+    (citySearch ? 1 : 0) +
+    tagsFilter.length;
 
-  const geoFilteredData = geography === 'local'
-    ? allEntries.filter((e) => e.country === 'Nigeria')
-    : geography === 'global'
-    ? allEntries.filter((e) => e.country !== 'Nigeria')
-    : allEntries;
-  const finCount = geoFilteredData.filter(
-    (e) => e.sector === "financial",
-  ).length;
-  const nonFinCount = geoFilteredData.filter(
-    (e) => e.sector === "non-financial",
-  ).length;
-  const countryCount = new Set(geoFilteredData.map((e) => e.country)).size;
+  const finCount = statsEntries?.finCount ?? 0;
+  const nonFinCount = statsEntries?.nonFinCount ?? 0;
+  const countryCount = statsEntries?.countryCount ?? 0;
 
   return (
     <motion.div
@@ -1669,22 +1797,87 @@ export default function Directory() {
                 ))}
               </div>
 
+              <div className="pt-2">
+                <Button
+                  onClick={() => setContributeOpen(true)}
+                  className="bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Contribute Listing
+                </Button>
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Contributions are submitted as drafts and published only after
+                  admin approval.
+                </p>
+
+                {submissionReceipt && (
+                  <div className="mt-3 rounded-xl border border-emerald-300/30 bg-emerald-500/10 p-3 text-xs text-emerald-100 max-w-xl">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-emerald-200">
+                          My submission was received
+                        </p>
+                        <p className="mt-1 text-emerald-100/90">
+                          <span className="font-medium">
+                            {submissionReceipt.name}
+                          </span>{" "}
+                          was submitted on{" "}
+                          {new Date(
+                            submissionReceipt.submittedAt,
+                          ).toLocaleString()}
+                          .
+                        </p>
+                        <p className="mt-1 text-emerald-100/80">
+                          {submissionReceipt.expectedTimeline}
+                        </p>
+                      </div>
+                      <button
+                        onClick={clearSubmissionReceipt}
+                        className="text-emerald-100/70 hover:text-white"
+                        aria-label="Dismiss submission receipt"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Geography filter */}
               <div className="flex items-center gap-2 pt-2">
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-widest mr-1">View:</span>
-                {([
-                  { id: 'all' as const, label: '🌐 All', desc: 'All regions' },
-                  { id: 'local' as const, label: '🇳🇬 Local', desc: 'Nigeria only' },
-                  { id: 'global' as const, label: '🌍 Global', desc: 'International' },
-                ] as const).map((g) => (
+                <span className="text-xs text-gray-400 font-medium uppercase tracking-widest mr-1">
+                  View:
+                </span>
+                {(
+                  [
+                    {
+                      id: "all" as const,
+                      label: "🌐 All",
+                      desc: "All regions",
+                    },
+                    {
+                      id: "local" as const,
+                      label: "🇳🇬 Local",
+                      desc: "Nigeria only",
+                    },
+                    {
+                      id: "global" as const,
+                      label: "🌍 Global",
+                      desc: "International",
+                    },
+                  ] as const
+                ).map((g) => (
                   <button
                     key={g.id}
-                    onClick={() => { setGeography(g.id); setCurrentPage(1); }}
+                    onClick={() => {
+                      setGeography(g.id);
+                      setCurrentPage(1);
+                    }}
                     title={g.desc}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border ${
                       geography === g.id
-                        ? 'bg-[#D52B1E] text-white border-[#D52B1E] shadow-lg shadow-[#D52B1E]/25'
-                        : 'bg-white/10 text-gray-300 border-white/20 hover:bg-white/20 hover:text-white'
+                        ? "bg-[#D52B1E] text-white border-[#D52B1E] shadow-lg shadow-[#D52B1E]/25"
+                        : "bg-white/10 text-gray-300 border-white/20 hover:bg-white/20 hover:text-white"
                     }`}
                   >
                     {g.label}
@@ -1810,11 +2003,63 @@ export default function Directory() {
         </motion.div>
 
         {/* Active filter chips */}
-        {(selectedCountries.length > 0 || selectedServices.length > 0) && (
+        {(selectedCountries.length > 0 ||
+          selectedServices.length > 0 ||
+          Boolean(listingType) ||
+          Boolean(citySearch) ||
+          tagsFilter.length > 0 ||
+          shariahCertified !== null) && (
           <motion.div
             variants={itemVariants}
             className="flex flex-wrap gap-2 items-center"
           >
+            {listingType && (
+              <span className="flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full capitalize">
+                Type: {listingType}
+                <button
+                  onClick={() => setListingType("")}
+                  className="hover:text-red-500"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {shariahCertified !== null && (
+              <span className="flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full">
+                Shariah: {shariahCertified ? "Certified" : "Not Certified"}
+                <button
+                  onClick={() => setShariahCertified(null)}
+                  className="hover:text-red-500"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {citySearch && (
+              <span className="flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full">
+                City: {citySearch}
+                <button
+                  onClick={() => setCitySearch("")}
+                  className="hover:text-red-500"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {tagsFilter.map((t) => (
+              <span
+                key={t}
+                className="flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full"
+              >
+                #{t}
+                <button
+                  onClick={() => setTagsFilter((p) => p.filter((x) => x !== t))}
+                  className="hover:text-red-500"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
             {selectedCountries.map((c) => (
               <span
                 key={c}
@@ -1996,8 +2241,28 @@ export default function Directory() {
             onServiceChange={toggleService}
             yearRange={yearRange}
             onYearRangeChange={setYearRange}
+            listingType={listingType}
+            onListingTypeChange={setListingType}
+            shariahCertified={shariahCertified}
+            onShariahCertifiedChange={setShariahCertified}
+            citySearch={citySearch}
+            onCitySearchChange={setCitySearch}
+            tagsFilter={tagsFilter}
+            onTagsFilterChange={setTagsFilter}
             onClear={clearFilters}
             onClose={() => setShowFilters(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Contribute listing modal */}
+      <AnimatePresence>
+        {contributeOpen && (
+          <ContributeListingModal
+            open={contributeOpen}
+            onClose={() => setContributeOpen(false)}
+            categories={apiCategories}
+            onSubmitted={handleSubmissionReceived}
           />
         )}
       </AnimatePresence>

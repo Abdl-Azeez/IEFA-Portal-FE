@@ -99,6 +99,15 @@ export interface CommunityGroupAPI {
   description?: string;
   coverImageUrl?: string;
   memberCount?: number;
+  memberships?: Array<{
+    id: string;
+    groupId: string;
+    userId: string;
+    status: "pending" | "approved" | "rejected" | string;
+    role: "member" | "admin" | "moderator" | string;
+    createdAt?: string;
+    updatedAt?: string;
+  }>;
   members?:
     | number
     | Array<{
@@ -129,6 +138,10 @@ export function getCommunityGroupMemberCount(group: CommunityGroupAPI): number {
     return group.memberCount;
   }
 
+  if (Array.isArray(group.memberships)) {
+    return group.memberships.filter((m) => m.status === "approved").length;
+  }
+
   if (Array.isArray(group.members)) {
     return group.members.length;
   }
@@ -138,6 +151,17 @@ export function getCommunityGroupMemberCount(group: CommunityGroupAPI): number {
   }
 
   return 0;
+}
+
+export function getCommunityGroupIsMember(
+  group: CommunityGroupAPI,
+  userId?: string | null,
+): boolean {
+  if (typeof group.isMember === "boolean") return group.isMember;
+  if (!userId || !Array.isArray(group.memberships)) return false;
+  return group.memberships.some(
+    (m) => m.userId === userId && m.status === "approved",
+  );
 }
 
 export interface CommunityEventAPI {

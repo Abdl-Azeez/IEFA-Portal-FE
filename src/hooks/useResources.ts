@@ -106,7 +106,10 @@ export const useTrackResourceDownload = () =>
 export const useSubmitUserResource = () =>
   useMutation({
     mutationFn: async (dto: SubmitUserResourceDto) => {
-      const { data } = await api.post<UserResourceSubmission>('/resources/submissions', dto)
+      const { data } = await api.post<UserResourceSubmission>(
+        "/resources/contribute",
+        dto,
+      );
       return data
     },
   })

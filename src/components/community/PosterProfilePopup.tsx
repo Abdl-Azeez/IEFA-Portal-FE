@@ -5,13 +5,19 @@ import { Button } from '@/components/ui/button'
 import type { UserProfile } from '@/types/community'
 
 interface PosterProfilePopupProps {
-  user: UserProfile
-  isOpen: boolean
-  onClose: () => void
+  user: UserProfile;
+  isOpen: boolean;
+  isHydrating?: boolean;
+  onClose: () => void;
 }
 
-export default function PosterProfilePopup({ user, isOpen, onClose }: PosterProfilePopupProps) {
-  if (!isOpen) return null
+export default function PosterProfilePopup({
+  user,
+  isOpen,
+  isHydrating = false,
+  onClose,
+}: PosterProfilePopupProps) {
+  if (!isOpen) return null;
 
   return (
     <motion.div
@@ -42,10 +48,20 @@ export default function PosterProfilePopup({ user, isOpen, onClose }: PosterProf
             <div className="space-y-6">
               {/* Display Picture & Name */}
               <div className="flex flex-col items-center text-center">
-                <div className="h-24 w-24 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-5xl mb-4 shadow-lg">
-                  {user.displayPicture}
+                <div className="h-24 w-24 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-5xl mb-4 shadow-lg overflow-hidden">
+                  {user.displayPicture?.startsWith("http") ? (
+                    <img
+                      src={user.displayPicture}
+                      alt={user.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span>{user.displayPicture || "👤"}</span>
+                  )}
                 </div>
-                <h2 className="text-2xl font-bold text-[#000000]">{user.name}</h2>
+                <h2 className="text-2xl font-bold text-[#000000]">
+                  {user.name}
+                </h2>
                 <div className="flex items-center justify-center gap-2 mt-1">
                   <p className="text-sm text-[#737692]">{user.title}</p>
                   {user.isVerified && (
@@ -54,12 +70,24 @@ export default function PosterProfilePopup({ user, isOpen, onClose }: PosterProf
                     </div>
                   )}
                 </div>
+                {isHydrating && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-[#737692] bg-gray-50 border border-gray-200 rounded-full px-3 py-1 animate-pulse">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#D52B1E]" />
+                    <span>Updating profile stats...</span>
+                  </div>
+                )}
               </div>
 
               {/* Join Date */}
               <div className="flex items-center gap-2 text-sm text-[#737692] justify-center">
                 <Calendar className="h-4 w-4" />
-                <span>Joined {user.joinedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}</span>
+                <span>
+                  Joined{" "}
+                  {user.joinedDate.toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                  })}
+                </span>
               </div>
 
               {/* Bio */}
@@ -74,28 +102,52 @@ export default function PosterProfilePopup({ user, isOpen, onClose }: PosterProf
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <FileText className="h-4 w-4 text-[#D52B1E]" />
-                    <span className="text-lg font-bold text-[#000000]">{user.totalPosts}</span>
+                    {isHydrating ? (
+                      <span className="h-6 w-10 rounded bg-gray-200 animate-pulse inline-block" />
+                    ) : (
+                      <span className="text-lg font-bold text-[#000000]">
+                        {user.totalPosts}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-[#737692]">Posts</p>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Eye className="h-4 w-4 text-[#D52B1E]" />
-                    <span className="text-lg font-bold text-[#000000]">{user.totalViews.toLocaleString()}</span>
+                    {isHydrating ? (
+                      <span className="h-6 w-10 rounded bg-gray-200 animate-pulse inline-block" />
+                    ) : (
+                      <span className="text-lg font-bold text-[#000000]">
+                        {user.totalViews.toLocaleString()}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-[#737692]">Views</p>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <MessageSquare className="h-4 w-4 text-[#D52B1E]" />
-                    <span className="text-lg font-bold text-[#000000]">{user.totalReplies}</span>
+                    {isHydrating ? (
+                      <span className="h-6 w-10 rounded bg-gray-200 animate-pulse inline-block" />
+                    ) : (
+                      <span className="text-lg font-bold text-[#000000]">
+                        {user.totalReplies}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-[#737692]">Replies</p>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Heart className="h-4 w-4 text-[#D52B1E]" />
-                    <span className="text-lg font-bold text-[#000000]">{user.totalLikes}</span>
+                    {isHydrating ? (
+                      <span className="h-6 w-10 rounded bg-gray-200 animate-pulse inline-block" />
+                    ) : (
+                      <span className="text-lg font-bold text-[#000000]">
+                        {user.totalLikes}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-[#737692]">Likes</p>
                 </div>
@@ -106,12 +158,21 @@ export default function PosterProfilePopup({ user, isOpen, onClose }: PosterProf
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2">
                     {[...Array(5)].map((_, i) => (
-                      <span key={i} className={i < Math.round(user.rating!) ? 'text-yellow-400' : 'text-gray-300'}>
+                      <span
+                        key={i}
+                        className={
+                          i < Math.round(user.rating!)
+                            ? "text-yellow-400"
+                            : "text-gray-300"
+                        }
+                      >
                         ★
                       </span>
                     ))}
                   </div>
-                  <p className="text-sm text-[#737692] mt-1">{user.rating?.toFixed(1)} / 5.0</p>
+                  <p className="text-sm text-[#737692] mt-1">
+                    {user.rating?.toFixed(1)} / 5.0
+                  </p>
                 </div>
               )}
 
@@ -127,7 +188,9 @@ export default function PosterProfilePopup({ user, isOpen, onClose }: PosterProf
 
               {user.isModerator && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-center">
-                  <p className="text-xs font-semibold text-blue-700">Community Moderator</p>
+                  <p className="text-xs font-semibold text-blue-700">
+                    Community Moderator
+                  </p>
                 </div>
               )}
             </div>
@@ -135,5 +198,5 @@ export default function PosterProfilePopup({ user, isOpen, onClose }: PosterProf
         </Card>
       </motion.div>
     </motion.div>
-  )
+  );
 }
