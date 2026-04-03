@@ -260,11 +260,11 @@ export default function StartDiscussionModal({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl"
       >
-        <Card className="bg-white shadow-xl">
+        <Card className="bg-white shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
           {/* Header */}
-          <CardHeader className="pb-4 border-b sticky top-0 bg-white">
+          <CardHeader className="pb-4 border-b z-20 bg-white shadow-sm flex-shrink-0">
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl">Start a Discussion</CardTitle>
               <button
@@ -276,7 +276,7 @@ export default function StartDiscussionModal({
             </div>
           </CardHeader>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto">
             <CardContent className="p-6 space-y-6">
               {/* Community Guidelines Alert */}
               <motion.div
