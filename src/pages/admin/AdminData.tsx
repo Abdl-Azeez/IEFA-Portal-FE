@@ -3,8 +3,9 @@ import { useMemo, useState, useEffect } from 'react'
 import {
   Database, Plus, Search, MoreVertical, Edit, Trash2, TrendingUp,
   BarChart2, Loader2, Download, Lock, Settings, X, Check,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Upload,
 } from 'lucide-react'
+import { BulkUploadDialog } from '@/components/admin/BulkUploadDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -100,6 +101,9 @@ export default function AdminData() {
   const [editingSection, setEditingSection] = useState<DataCategory | null>(null)
   const [editSectionName, setEditSectionName] = useState('')
   const [seedingDefaults, setSeedingDefaults] = useState(false)
+
+  // Bulk upload
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
@@ -220,6 +224,9 @@ export default function AdminData() {
           <p className="text-slate-500 text-sm">Manage Islamic finance market data metrics and datasets</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-lg gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]" onClick={() => setBulkUploadOpen(true)}>
+            <Upload className="h-3.5 w-3.5" /> Bulk Upload
+          </Button>
           <Button variant="outline" size="sm" className="rounded-lg gap-1.5" onClick={() => exportToCsv('data-metrics', filteredDatasets.map((d) => ({
             id: d.id,
             metric: d.title,
@@ -702,6 +709,17 @@ export default function AdminData() {
           </div>
         </Dialog>
       )}
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        title="Datasets"
+        templateEndpoint="/datasets/bulk-upload/template"
+        uploadEndpoint="/datasets/bulk-upload"
+        invalidateKeys={['admin', 'datasets']}
+        templateFilename="datasets-template.csv"
+      />
     </motion.div>
   )
 }

@@ -23,6 +23,7 @@ import {
   ChevronRight,
   User,
 } from 'lucide-react'
+import { BulkUploadDialog } from '@/components/admin/BulkUploadDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -211,10 +212,8 @@ export default function AdminResources() {
   const [editGlossaryId, setEditGlossaryId]        = useState<string | null>(null)
   const [glossaryForm, setGlossaryForm]             = useState<GlossaryForm>(EMPTY_GLOSSARY_FORM)
 
-  const [bulkImportOpen, setBulkImportOpen] = useState(false)
-  const [bulkPreview, setBulkPreview]       = useState<{ term: string; definition: string; status: 'draft' | 'published' }[]>([])
-  const [bulkError, setBulkError]           = useState<string | null>(null)
-  const [bulkImporting, setBulkImporting]   = useState(false)
+  const [bulkUploadResourcesOpen, setBulkUploadResourcesOpen] = useState(false)
+  const [bulkUploadGlossaryOpen, setBulkUploadGlossaryOpen]   = useState(false)
 
   /* ── Category form state ────────────────────────────────────────────── */
   const [catModalOpen, setCatModalOpen]   = useState(false)
@@ -432,53 +431,6 @@ export default function AdminResources() {
     await deleteCategory.mutateAsync(id)
   }
 
-  /* ── Bulk CSV import ────────────────────────────────────────────────── */
-  async function handleBulkFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setBulkError(null); setBulkPreview([])
-    const targetInput = e.target
-    const text = await file.text().catch(() => null)
-    if (!text) { setBulkError('Could not read file.'); return }
-    const lines = text.split(/\r?\n/).filter(l => l.trim())
-    if (lines.length < 2) { setBulkError('File must have a header row and at least one data row.'); return }
-    const header = lines[0]
-    let delim = ','
-    if (header.includes('\t')) delim = '\t'
-    else if (header.includes(';')) delim = ';'
-    const cols = header.split(delim).map(c => c.replaceAll(/(^"|"$)/g, '').trim().toLowerCase())
-    const termIdx   = cols.findIndex(c => ['term', 'word', 'title'].includes(c))
-    const defIdx    = cols.findIndex(c => ['definition', 'description', 'meaning', 'desc'].includes(c))
-    const statusIdx = cols.indexOf('status')
-    if (termIdx === -1 || defIdx === -1) {
-      setBulkError(`Could not find 'term' and 'definition' columns. Found: ${cols.join(', ')}`)
-      return
-    }
-    const parsed: { term: string; definition: string; status: 'draft' | 'published' }[] = []
-    for (let i = 1; i < lines.length; i++) {
-      const row = lines[i].split(delim).map(c => c.replaceAll(/(^"|"$)/g, '').trim())
-      const term = row[termIdx]; const definition = row[defIdx]
-      if (!term || !definition) continue
-      const rawStatus = (row[statusIdx] ?? '').toLowerCase()
-      parsed.push({ term, definition, status: rawStatus === 'published' ? 'published' : 'draft' })
-    }
-    if (parsed.length === 0) { setBulkError('No valid rows found in the file.'); return }
-    setBulkPreview(parsed)
-    targetInput.value = ''
-  }
-
-  async function confirmBulkImport() {
-    setBulkImporting(true)
-    try {
-      for (const row of bulkPreview) {
-        await createGlossTerm.mutateAsync({ term: row.term, definition: row.definition, status: row.status })
-      }
-      setBulkPreview([]); setBulkImportOpen(false); setBulkError(null)
-    } finally {
-      setBulkImporting(false)
-    }
-  }
-
   /* ── Reject reason state ───────────────────────────────────────────── */
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectTargetId, setRejectTargetId]   = useState<string | null>(null)
@@ -552,10 +504,16 @@ export default function AdminResources() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {activeView === 'resources' && (
+            <Button size="sm" variant="outline" className="rounded-lg gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
+              onClick={() => setBulkUploadResourcesOpen(true)}>
+              <Upload className="h-3.5 w-3.5" /> Bulk Upload
+            </Button>
+          )}
           {activeView === 'glossary' && (
             <Button size="sm" variant="outline" className="rounded-lg gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
-              onClick={() => { setBulkImportOpen(true); setBulkPreview([]); setBulkError(null) }}>
-              <Upload className="h-3.5 w-3.5" /> Bulk Import
+              onClick={() => setBulkUploadGlossaryOpen(true)}>
+              <Upload className="h-3.5 w-3.5" /> Bulk Upload
             </Button>
           )}
           {(activeView !== 'pending') && (
@@ -953,65 +911,27 @@ export default function AdminResources() {
           </div>
         </div>
       </Dialog>
-      <Dialog open={bulkImportOpen} onClose={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }} title="Bulk Import Glossary Terms" maxWidth="max-w-2xl">
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
-            <strong>Accepted formats:</strong> CSV or Excel (exported as CSV). Header must include <strong>term</strong> and <strong>definition</strong> columns. Optional <strong>status</strong> column. Delimiters: comma, semicolon, or tab.
-          </div>
-          <div>
-            <p className="block text-xs font-medium text-slate-600 mb-2">Choose CSV / Excel file</p>
-            <label className="flex items-center gap-3 cursor-pointer w-full h-24 border-2 border-dashed border-gray-200 rounded-xl px-4 hover:bg-gray-50 transition-colors">
-              <input type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="sr-only" onChange={handleBulkFile} />
-              <Upload className="h-6 w-6 text-gray-400 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-gray-700">Click to select file</p>
-                <p className="text-xs text-gray-400 mt-0.5">CSV, TSV or Excel (.csv / .xls / .xlsx)</p>
-              </div>
-            </label>
-          </div>
-          {bulkError && (
-            <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-              <strong>Error:</strong> {bulkError}
-            </div>
-          )}
-          {bulkPreview.length > 0 && (
-            <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">Preview \u2014 {bulkPreview.length} term{bulkPreview.length === 1 ? '' : 's'} found</p>
-              <div className="rounded-xl border border-gray-100 overflow-hidden max-h-64 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
-                    <tr>
-                      <th className="px-3 py-2 text-left">#</th>
-                      <th className="px-3 py-2 text-left">Term</th>
-                      <th className="px-3 py-2 text-left">Definition</th>
-                      <th className="px-3 py-2 text-left">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {bulkPreview.map((g, i) => (
-                      <tr key={`${g.term}-${i}`} className="hover:bg-slate-50/50">
-                        <td className="px-3 py-2 text-slate-400">{i + 1}</td>
-                        <td className="px-3 py-2 font-semibold text-slate-800">{g.term}</td>
-                        <td className="px-3 py-2 text-slate-500 max-w-xs"><p className="line-clamp-2">{g.definition}</p></td>
-                        <td className="px-3 py-2">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status] ?? ''}`}>{g.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-          <div className="flex justify-end gap-3 pt-1">
-            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setBulkImportOpen(false); setBulkPreview([]); setBulkError(null) }} disabled={bulkImporting}>Cancel</Button>
-            <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5" disabled={bulkPreview.length === 0 || bulkImporting} onClick={confirmBulkImport}>
-              {bulkImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Import {bulkPreview.length > 0 ? `${bulkPreview.length} Terms` : 'Terms'}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+      {/* Resources Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={bulkUploadResourcesOpen}
+        onClose={() => setBulkUploadResourcesOpen(false)}
+        title="Resources"
+        templateEndpoint="/resources/bulk-upload/template"
+        uploadEndpoint="/resources/bulk-upload"
+        invalidateKeys={['admin', 'resources']}
+        templateFilename="resources-template.csv"
+      />
+
+      {/* Glossary Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={bulkUploadGlossaryOpen}
+        onClose={() => setBulkUploadGlossaryOpen(false)}
+        title="Glossary Terms"
+        templateEndpoint="/resources/glossary/bulk-upload/template"
+        uploadEndpoint="/resources/glossary/bulk-upload"
+        invalidateKeys={['admin', 'resources', 'glossary']}
+        templateFilename="glossary-terms-template.csv"
+      />
     </motion.div>
   )
 }

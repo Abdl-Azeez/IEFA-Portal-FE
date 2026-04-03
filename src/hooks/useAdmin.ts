@@ -1634,6 +1634,106 @@ export const useAdminDeleteIFProfessional = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bulk Uploads (CSV via multipart/form-data)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const useAdminBulkUploadDatasets = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/datasets/bulk-upload', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'datasets'] });
+      toast({ title: 'Datasets uploaded successfully' });
+    },
+    onError: (e: any) =>
+      toast({
+        title: 'Upload failed',
+        description: e.response?.data?.message ?? 'Failed to process file',
+        variant: 'destructive',
+      }),
+  });
+};
+
+export const useAdminBulkUploadDirectory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/directory/listings/bulk-upload', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'directory'] });
+      toast({ title: 'Directory listings uploaded successfully' });
+    },
+    onError: (e: any) =>
+      toast({
+        title: 'Upload failed',
+        description: e.response?.data?.message ?? 'Failed to process file',
+        variant: 'destructive',
+      }),
+  });
+};
+
+export const useAdminBulkUploadResources = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/resources/bulk-upload', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'resources'] });
+      toast({ title: 'Resources uploaded successfully' });
+    },
+    onError: (e: any) =>
+      toast({
+        title: 'Upload failed',
+        description: e.response?.data?.message ?? 'Failed to process file',
+        variant: 'destructive',
+      }),
+  });
+};
+
+export const useAdminBulkUploadGlossary = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/resources/glossary/bulk-upload', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'resources', 'glossary'] });
+      toast({ title: 'Glossary terms uploaded successfully' });
+    },
+    onError: (e: any) =>
+      toast({
+        title: 'Upload failed',
+        description: e.response?.data?.message ?? 'Failed to process file',
+        variant: 'destructive',
+      }),
+  });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Market Insights
 // ─────────────────────────────────────────────────────────────────────────────
 

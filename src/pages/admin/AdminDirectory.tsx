@@ -34,10 +34,12 @@ import {
   X,
   Save,
   Building,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import { BulkUploadDialog } from "@/components/admin/BulkUploadDialog";
 
 /* -- Animation variants ---------------------------------------------------- */
 const container = {
@@ -1238,6 +1240,7 @@ export default function AdminDirectory() {
     | { type: "delete"; entry: DirectoryEntry }
     | null
   >(null);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   const [catModal, setCatModal] = useState<
     | { type: "create" }
@@ -1454,14 +1457,24 @@ export default function AdminDirectory() {
             and regulatory bodies
           </p>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setModalState({ type: "create" })}
-          className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-xl gap-1.5"
-          disabled={loading}
-        >
-          <Plus className="h-3.5 w-3.5" /> Add Entry
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBulkUploadOpen(true)}
+            className="rounded-xl gap-1.5 border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
+          >
+            <Upload className="h-3.5 w-3.5" /> Bulk Upload
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setModalState({ type: "create" })}
+            className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-xl gap-1.5"
+            disabled={loading}
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Entry
+          </Button>
+        </div>
       </motion.div>
 
       {/* Stats */}
@@ -1973,6 +1986,21 @@ export default function AdminDirectory() {
           />
         )}
       </AnimatePresence>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        title="Directory Listings"
+        templateEndpoint="/directory/listings/bulk-upload/template"
+        uploadEndpoint="/directory/listings/bulk-upload"
+        invalidateKeys={['admin', 'directory']}
+        templateFilename="directory-listings-template.csv"
+        onSuccess={() => {
+          // Re-fetch entries after bulk upload
+          directoryService.getListings().then((data) => setEntries(data.map(apiToEntry))).catch(() => null);
+        }}
+      />
     </motion.div>
   );
 }
