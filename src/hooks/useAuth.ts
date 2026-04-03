@@ -20,6 +20,8 @@ interface RegisterData {
 }
 
 interface UpdateUserData {
+  username?: string;
+  lmsStudentId?: string | null;
   firstName?: string;
   lastName?: string;
   phone?: string;
@@ -31,6 +33,8 @@ interface AuthUserPayload {
   id?: string;
   userId?: string;
   email: string;
+  username?: string | null;
+  lmsStudentId?: string | null;
   role: "student" | "instructor" | "admin" | "staff";
   isModerator?: boolean;
   firstName?: string;
@@ -48,7 +52,13 @@ const AUTH_PROFILE_STORAGE_KEY = "authProfile";
 
 type StoredAuthProfile = Pick<
   AuthUserPayload,
-  "firstName" | "lastName" | "profilePhotoUrl" | "phone" | "country"
+  | "username"
+  | "lmsStudentId"
+  | "firstName"
+  | "lastName"
+  | "profilePhotoUrl"
+  | "phone"
+  | "country"
 >;
 
 const readStoredAuthProfile = (): StoredAuthProfile | null => {
@@ -63,6 +73,8 @@ const readStoredAuthProfile = (): StoredAuthProfile | null => {
 
 const persistAuthProfile = (user: Partial<AuthUserPayload>) => {
   const profile: StoredAuthProfile = {
+    username: user.username,
+    lmsStudentId: user.lmsStudentId,
     firstName: user.firstName,
     lastName: user.lastName,
     profilePhotoUrl: user.profilePhotoUrl,
@@ -70,7 +82,13 @@ const persistAuthProfile = (user: Partial<AuthUserPayload>) => {
     country: user.country,
   };
 
-  if (!profile.firstName && !profile.lastName && !profile.profilePhotoUrl) {
+  if (
+    !profile.username &&
+    !profile.lmsStudentId &&
+    !profile.firstName &&
+    !profile.lastName &&
+    !profile.profilePhotoUrl
+  ) {
     return;
   }
 
@@ -88,6 +106,8 @@ const normalizeAuthUser = (user: AuthUserPayload) => {
     ...(Object.prototype.hasOwnProperty.call(user, "isModerator")
       ? { isModerator: !!user.isModerator }
       : {}),
+    username: user.username ?? storedProfile?.username,
+    lmsStudentId: user.lmsStudentId ?? storedProfile?.lmsStudentId,
     firstName: user.firstName ?? storedProfile?.firstName,
     lastName: user.lastName ?? storedProfile?.lastName,
     profilePhotoUrl: user.profilePhotoUrl ?? storedProfile?.profilePhotoUrl,
@@ -351,6 +371,8 @@ export const useAppHealth = () => {
 };
 
 interface UpdateProfileData {
+  username?: string;
+  lmsStudentId?: string | null;
   firstName?: string;
   lastName?: string;
   phone?: string;
@@ -508,7 +530,7 @@ export const useToggleModerator = () => {
 
 export interface UserSearchResult {
   id: string;
-  email: string;
+  username?: string | null;
   firstName?: string;
   lastName?: string;
   profilePhotoUrl?: string;
@@ -518,8 +540,8 @@ export const useUserSearch = (query: string) => {
   return useQuery({
     queryKey: ["users", "search", query],
     queryFn: async () => {
-      const response = await api.get("/users/search", {
-        params: { email: query },
+      const response = await api.get("/users/search/username", {
+        params: { username: query },
       });
       const users: UserSearchResult[] =
         response.data?.users ??

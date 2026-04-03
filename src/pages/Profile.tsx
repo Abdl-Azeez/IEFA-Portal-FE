@@ -38,6 +38,8 @@ export default function Profile() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   const [form, setForm] = useState({
+    username: user?.username ?? '',
+    lmsStudentId: user?.lmsStudentId ?? '',
     firstName: user?.firstName ?? '',
     lastName: user?.lastName ?? '',
     phone: user?.phone ?? '',
@@ -49,6 +51,8 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       setForm({
+        username: user.username ?? '',
+        lmsStudentId: user.lmsStudentId ?? '',
         firstName: user.firstName ?? '',
         lastName: user.lastName ?? '',
         phone: user.phone ?? '',
@@ -60,7 +64,11 @@ export default function Profile() {
 
   function handleSave() {
     if (!user?.id) return
-    updateProfile.mutate(form);
+    updateProfile.mutate({
+      ...form,
+      username: form.username.trim() || undefined,
+      lmsStudentId: form.lmsStudentId.trim() || null,
+    });
   }
 
   const initials = [form.firstName, form.lastName]
@@ -195,6 +203,27 @@ export default function Profile() {
                 className="bg-gray-50 text-slate-500 cursor-not-allowed"
               />
               <p className="text-xs text-slate-400">Email address cannot be changed here.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  value={form.username}
+                  onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                  placeholder="danesi_xx"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lmsStudentId">LMS Student ID</Label>
+                <Input
+                  id="lmsStudentId"
+                  value={form.lmsStudentId}
+                  onChange={(e) => setForm((f) => ({ ...f, lmsStudentId: e.target.value }))}
+                  placeholder="Optional"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">

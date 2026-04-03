@@ -680,6 +680,7 @@ export default function Community() {
           categoryId: data.categoryId,
           groupId: data.groupId,
           attachments: data.attachmentUrls.filter((u) => u.trim()),
+          taggedUserIds: data.mentions,
         });
         setDiscussionPosts((prev) => [
           apiDiscussionToPost(created, apiCategories),

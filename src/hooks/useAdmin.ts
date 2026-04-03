@@ -40,6 +40,8 @@ export interface ListParams {
 export interface AdminUser {
   id: string;
   email: string;
+  username?: string | null;
+  lmsStudentId?: string | null;
   firstName: string;
   lastName: string;
   role: "student" | "instructor" | "admin" | "staff";
@@ -87,6 +89,8 @@ export const useAdminUpdateUser = () => {
     }: {
       id: string;
       dto: {
+        username?: string;
+        lmsStudentId?: string | null;
         firstName?: string;
         lastName?: string;
         phone?: string;

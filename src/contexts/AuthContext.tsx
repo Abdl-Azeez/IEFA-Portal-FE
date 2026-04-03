@@ -9,6 +9,8 @@ import api from "@/lib/api";
 interface User {
   id: string;
   email: string;
+  username?: string | null;
+  lmsStudentId?: string | null;
   role: string;
   isModerator?: boolean;
   firstName?: string;
@@ -49,6 +51,8 @@ const hasAuthUserChanged = (current: User | null, next: User) => {
   return (
     current.id !== next.id ||
     current.email !== next.email ||
+    current.username !== next.username ||
+    current.lmsStudentId !== next.lmsStudentId ||
     current.role !== next.role ||
     !!current.isModerator !== !!next.isModerator ||
     current.firstName !== next.firstName ||
@@ -90,6 +94,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const mergedUser: User = {
         ...user,
         ...meData,
+        username: meData.username ?? user?.username,
+        lmsStudentId: meData.lmsStudentId ?? user?.lmsStudentId,
         firstName: meData.firstName ?? user?.firstName,
         lastName: meData.lastName ?? user?.lastName,
         profilePhotoUrl: meData.profilePhotoUrl ?? user?.profilePhotoUrl,

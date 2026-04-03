@@ -107,9 +107,10 @@ export default function StartDiscussionModal({
   const showMentionDropdown = mentionQuery !== null && mentionQuery.length >= 1
 
   const insertMention = (user: UserSearchResult) => {
+    if (!user.username) return
     const before = content.slice(0, mentionStart)
     const after = content.slice(mentionStart + 1 + (mentionQuery?.length ?? 0))
-    const tag = `@${user.email} `
+    const tag = `@${user.username} `
     setContent(before + tag + after)
     setMentions(prev => Array.from(new Set([...prev, user.id])))
     closeMention()
@@ -139,7 +140,7 @@ export default function StartDiscussionModal({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setMentionSelectedIndex(i => Math.max(i - 1, 0))
-    } else if ((e.key === 'Enter' || e.key === 'Tab') && mentionResults[mentionSelectedIndex]) {
+    } else if ((e.key === 'Enter' || e.key === 'Tab') && mentionResults[mentionSelectedIndex]?.username) {
       e.preventDefault()
       insertMention(mentionResults[mentionSelectedIndex])
     } else if (e.key === 'Escape') {
@@ -385,7 +386,7 @@ export default function StartDiscussionModal({
                   value={content}
                   onChange={handleContentChange}
                   onKeyDown={handleContentKeyDown}
-                  placeholder="Share your thoughts, questions, or insights here. Type @email to mention a user"
+                  placeholder="Share your thoughts, questions, or insights here. Type @username to mention a user"
                   maxLength={5000}
                   required
                   className={`w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D52B1E] resize-vertical min-h-[200px] bg-background text-foreground placeholder:text-muted-foreground ${
@@ -408,11 +409,17 @@ export default function StartDiscussionModal({
                         No users found for &ldquo;{mentionQuery}&rdquo;
                       </div>
                     )}
-                    <ul className="max-h-44 overflow-y-auto">
+                    {!mentionLoading && mentionResults.length > 0 && (
+                      <div className="px-3 py-2 text-xs text-[#737692] border-b border-gray-100">
+                        {mentionResults.length} result{mentionResults.length === 1 ? '' : 's'} found. Use arrows to navigate and Enter to select.
+                      </div>
+                    )}
+                    <ul className="max-h-60 overflow-y-auto">
                       {mentionResults.map((user, idx) => (
                         <li key={user.id}>
                           <button
                             type="button"
+                            disabled={!user.username}
                             onMouseDown={(e) => { e.preventDefault(); insertMention(user) }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
                               idx === mentionSelectedIndex ? 'bg-red-50' : 'hover:bg-gray-50'
@@ -423,7 +430,7 @@ export default function StartDiscussionModal({
                                 <img src={user.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
                               ) : (
                                 <span className="text-xs text-white font-semibold">
-                                  {(user.firstName?.[0] ?? user.email[0]).toUpperCase()}
+                                  {(user.firstName?.[0] ?? user.username?.[0] ?? '?').toUpperCase()}
                                 </span>
                               )}
                             </div>
@@ -433,7 +440,9 @@ export default function StartDiscussionModal({
                                   {[user.firstName, user.lastName].filter(Boolean).join(' ')}
                                 </p>
                               )}
-                              <p className="text-xs text-[#737692] truncate">{user.email}</p>
+                              <p className="text-xs text-[#737692] truncate">
+                                {user.username ? `@${user.username}` : 'No username available'}
+                              </p>
                             </div>
                           </button>
                         </li>

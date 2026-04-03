@@ -4,6 +4,8 @@ import { createJSONStorage, persist } from "zustand/middleware";
 interface User {
   id: string;
   email: string;
+  username?: string | null;
+  lmsStudentId?: string | null;
   role: string;
   isModerator?: boolean;
   firstName?: string;

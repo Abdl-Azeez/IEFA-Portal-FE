@@ -86,6 +86,8 @@ export default function AdminUsers() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [editForm, setEditForm] = useState({
+    username: "",
+    lmsStudentId: "",
     firstName: "",
     lastName: "",
     phone: "",
@@ -96,6 +98,8 @@ export default function AdminUsers() {
   function openEditUser(u: AdminUser) {
     setEditUser(u);
     setEditForm({
+      username: u.username ?? "",
+      lmsStudentId: u.lmsStudentId ?? "",
       firstName: u.firstName,
       lastName: u.lastName,
       phone: u.phone ?? "",
@@ -109,7 +113,14 @@ export default function AdminUsers() {
   function closeEditModal() {
     setEditModalOpen(false);
     setEditUser(null);
-    setEditForm({ firstName: "", lastName: "", phone: "", country: "" });
+    setEditForm({
+      username: "",
+      lmsStudentId: "",
+      firstName: "",
+      lastName: "",
+      phone: "",
+      country: "",
+    });
     setEditRole("student");
   }
 
@@ -172,6 +183,8 @@ export default function AdminUsers() {
                 "users",
                 users.map((u) => ({
                   id: u.id,
+                  username: u.username ?? "",
+                  lmsStudentId: u.lmsStudentId ?? "",
                   firstName: u.firstName,
                   lastName: u.lastName,
                   email: u.email,
@@ -332,6 +345,10 @@ export default function AdminUsers() {
                               {fullName}
                             </p>
                             <p className="text-xs text-slate-400">{u.email}</p>
+                            <p className="text-xs text-slate-400">
+                              {u.username ? `@${u.username}` : "No username"}
+                              {u.lmsStudentId ? ` • LMS: ${u.lmsStudentId}` : ""}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -509,6 +526,42 @@ export default function AdminUsers() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label
+                htmlFor="user-username"
+                className="block text-xs font-medium text-slate-600 mb-1"
+              >
+                Username
+              </label>
+              <Input
+                id="user-username"
+                value={editForm.username}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, username: e.target.value }))
+                }
+                placeholder="danesi_xx"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="user-lms-id"
+                className="block text-xs font-medium text-slate-600 mb-1"
+              >
+                LMS Student ID
+              </label>
+              <Input
+                id="user-lms-id"
+                value={editForm.lmsStudentId}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, lmsStudentId: e.target.value }))
+                }
+                placeholder="Optional"
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
                 htmlFor="user-fname"
                 className="block text-xs font-medium text-slate-600 mb-1"
               >
@@ -611,7 +664,14 @@ export default function AdminUsers() {
                 if (!editUser) return;
                 const roleChanged = editRole !== editUser.role;
                 updateMutation.mutate(
-                  { id: editUser.id, dto: editForm },
+                  {
+                    id: editUser.id,
+                    dto: {
+                      ...editForm,
+                      username: editForm.username.trim() || undefined,
+                      lmsStudentId: editForm.lmsStudentId.trim() || null,
+                    },
+                  },
                   {
                     onSuccess: () => {
                       if (roleChanged) {
