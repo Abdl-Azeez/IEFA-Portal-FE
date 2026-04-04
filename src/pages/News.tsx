@@ -984,6 +984,7 @@ export function News() {
   const [perPage, setPerPage] = useState(9)
   const [publishedYearFrom, setPublishedYearFrom] = useState('')
   const [publishedYearTo, setPublishedYearTo] = useState('')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [openArticleId, setOpenArticleId] = useState<string | null>(null)
   const [openExtArticle, setOpenExtArticle] =
@@ -1217,6 +1218,15 @@ export function News() {
             Verified &amp; Curated
           </div>
           <div className="hidden md:flex flex-1 h-px bg-gray-100" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAdvancedFilters((prev) => !prev)}
+            className="h-8 rounded-full border-gray-200 text-[#737692] hover:text-[#D52B1E] hover:border-[#D52B1E]"
+          >
+            {showAdvancedFilters ? 'Hide Filters' : 'Show Filters'}
+          </Button>
           {newsData && (
             <span className="text-sm text-[#737692]">
               {newsData.meta.itemCount.toLocaleString()} articles
@@ -1225,117 +1235,129 @@ export function News() {
         </div>
 
         {/* API filters */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 md:p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-[#000000]">Filter Articles</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              className="text-[#737692] hover:text-[#D52B1E]"
+        <AnimatePresence initial={false}>
+          {showAdvancedFilters && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -8, height: 0 }}
+              transition={{ duration: 0.22 }}
+              className="overflow-hidden"
             >
-              Reset Filters
-            </Button>
-          </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-4 md:p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#000000]">Filter Articles</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="text-[#737692] hover:text-[#D52B1E]"
+                  >
+                    Reset Filters
+                  </Button>
+                </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            <label className="text-xs text-[#737692]">
-              Status
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as '' | 'draft' | 'published')
-                  setPage(1)
-                }}
-                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
-              >
-                <option value="">All</option>
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
-              </select>
-            </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <label className="text-xs text-[#737692]">
+                    Status
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value as '' | 'draft' | 'published')
+                        setPage(1)
+                      }}
+                      className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+                    >
+                      <option value="">All</option>
+                      <option value="published">Published</option>
+                      <option value="draft">Draft</option>
+                    </select>
+                  </label>
 
-            <label className="text-xs text-[#737692]">
-              Featured
-              <select
-                value={featuredFilter}
-                onChange={(e) => {
-                  setFeaturedFilter(e.target.value as 'all' | 'featured' | 'nonFeatured')
-                  setPage(1)
-                }}
-                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
-              >
-                <option value="all">All</option>
-                <option value="featured">Featured only</option>
-                <option value="nonFeatured">Not featured</option>
-              </select>
-            </label>
+                  <label className="text-xs text-[#737692]">
+                    Featured
+                    <select
+                      value={featuredFilter}
+                      onChange={(e) => {
+                        setFeaturedFilter(e.target.value as 'all' | 'featured' | 'nonFeatured')
+                        setPage(1)
+                      }}
+                      className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+                    >
+                      <option value="all">All</option>
+                      <option value="featured">Featured only</option>
+                      <option value="nonFeatured">Not featured</option>
+                    </select>
+                  </label>
 
-            <label className="text-xs text-[#737692]">
-              Sort Order
-              <select
-                value={order}
-                onChange={(e) => {
-                  setOrder(e.target.value as 'ASC' | 'DESC')
-                  setPage(1)
-                }}
-                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
-              >
-                <option value="DESC">Newest first (DESC)</option>
-                <option value="ASC">Oldest first (ASC)</option>
-              </select>
-            </label>
+                  <label className="text-xs text-[#737692]">
+                    Sort Order
+                    <select
+                      value={order}
+                      onChange={(e) => {
+                        setOrder(e.target.value as 'ASC' | 'DESC')
+                        setPage(1)
+                      }}
+                      className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+                    >
+                      <option value="DESC">Newest first (DESC)</option>
+                      <option value="ASC">Oldest first (ASC)</option>
+                    </select>
+                  </label>
 
-            <label className="text-xs text-[#737692]">
-              Published Year From
-              <Input
-                type="number"
-                min={1900}
-                max={2100}
-                value={publishedYearFrom}
-                onChange={(e) => {
-                  setPublishedYearFrom(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="e.g. 2024"
-                className="mt-1 h-10 rounded-xl border-gray-200"
-              />
-            </label>
+                  <label className="text-xs text-[#737692]">
+                    Published Year From
+                    <Input
+                      type="number"
+                      min={1900}
+                      max={2100}
+                      value={publishedYearFrom}
+                      onChange={(e) => {
+                        setPublishedYearFrom(e.target.value)
+                        setPage(1)
+                      }}
+                      placeholder="e.g. 2024"
+                      className="mt-1 h-10 rounded-xl border-gray-200"
+                    />
+                  </label>
 
-            <label className="text-xs text-[#737692]">
-              Published Year To
-              <Input
-                type="number"
-                min={1900}
-                max={2100}
-                value={publishedYearTo}
-                onChange={(e) => {
-                  setPublishedYearTo(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="e.g. 2026"
-                className="mt-1 h-10 rounded-xl border-gray-200"
-              />
-            </label>
+                  <label className="text-xs text-[#737692]">
+                    Published Year To
+                    <Input
+                      type="number"
+                      min={1900}
+                      max={2100}
+                      value={publishedYearTo}
+                      onChange={(e) => {
+                        setPublishedYearTo(e.target.value)
+                        setPage(1)
+                      }}
+                      placeholder="e.g. 2026"
+                      className="mt-1 h-10 rounded-xl border-gray-200"
+                    />
+                  </label>
 
-            <label className="text-xs text-[#737692]">
-              Per Page
-              <select
-                value={perPage}
-                onChange={(e) => {
-                  setPerPage(Number(e.target.value))
-                  setPage(1)
-                }}
-                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
-              >
-                <option value={9}>9</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-              </select>
-            </label>
-          </div>
-        </div>
+                  <label className="text-xs text-[#737692]">
+                    Per Page
+                    <select
+                      value={perPage}
+                      onChange={(e) => {
+                        setPerPage(Number(e.target.value))
+                        setPage(1)
+                      }}
+                      className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+                    >
+                      <option value={9}>9</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={30}>30</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Tag filters */}
         {tags && tags.length > 0 && (
