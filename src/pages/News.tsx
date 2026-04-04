@@ -1,6 +1,6 @@
 ﻿import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Clock,
   Search,
@@ -977,7 +977,13 @@ function ArticleDetail({ id, onClose }: Readonly<{ id: string; onClose: () => vo
 export function News() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [selectedTag, setSelectedTag] = useState('')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [statusFilter, setStatusFilter] = useState<'' | 'draft' | 'published'>('published')
+  const [featuredFilter, setFeaturedFilter] = useState<'all' | 'featured' | 'nonFeatured'>('all')
+  const [order, setOrder] = useState<'ASC' | 'DESC'>('DESC')
+  const [perPage, setPerPage] = useState(9)
+  const [publishedYearFrom, setPublishedYearFrom] = useState('')
+  const [publishedYearTo, setPublishedYearTo] = useState('')
   const [page, setPage] = useState(1)
   const [openArticleId, setOpenArticleId] = useState<string | null>(null)
   const [openExtArticle, setOpenExtArticle] =
@@ -1002,12 +1008,24 @@ export function News() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
+  const yearFromNum = Number.parseInt(publishedYearFrom, 10)
+  const yearToNum = Number.parseInt(publishedYearTo, 10)
+  const yearFrom = Number.isFinite(yearFromNum) ? yearFromNum : undefined
+  const yearTo = Number.isFinite(yearToNum) ? yearToNum : undefined
+
   const { data: newsData, isLoading } = useNews({
     page,
-    perPage: 9,
+    perPage,
     search: search || undefined,
-    tags: selectedTag ? [selectedTag] : undefined,
-    status: 'published',
+    tags: selectedTags.length > 0 ? selectedTags : undefined,
+    status: statusFilter || undefined,
+    order,
+    isFeatured:
+      featuredFilter === 'all'
+        ? undefined
+        : featuredFilter === 'featured',
+    publishedYearFrom: yearFrom,
+    publishedYearTo: yearTo,
   })
 
   const { data: tags } = useNewsTags()
@@ -1016,9 +1034,131 @@ export function News() {
   const items = newsData?.data ?? []
 
   function handleTagClick(tagName: string) {
-    setSelectedTag((prev) => (prev === tagName ? '' : tagName))
+    setSelectedTags((prev) =>
+      prev.includes(tagName)
+        ? prev.filter((tag) => tag !== tagName)
+        : [...prev, tagName],
+    )
     setPage(1)
   }
+
+  function clearFilters() {
+    setSelectedTags([])
+    setStatusFilter('published')
+    setFeaturedFilter('all')
+    setOrder('DESC')
+    setPerPage(9)
+    setPublishedYearFrom('')
+    setPublishedYearTo('')
+    setPage(1)
+  }
+
+  const activeFilterChips = useMemo(() => {
+    const chips: Array<{ key: string; label: string; onRemove: () => void }> = []
+
+    if (search.trim()) {
+      chips.push({
+        key: 'search',
+        label: `Search: ${search.trim()}`,
+        onRemove: () => {
+          setSearchInput('')
+          setSearch('')
+          setPage(1)
+        },
+      })
+    }
+
+    selectedTags.forEach((tag) => {
+      chips.push({
+        key: `tag-${tag}`,
+        label: `Tag: ${tag}`,
+        onRemove: () => {
+          setSelectedTags((prev) => prev.filter((t) => t !== tag))
+          setPage(1)
+        },
+      })
+    })
+
+    if (statusFilter && statusFilter !== 'published') {
+      chips.push({
+        key: 'status',
+        label: `Status: ${statusFilter}`,
+        onRemove: () => {
+          setStatusFilter('published')
+          setPage(1)
+        },
+      })
+    }
+
+    if (featuredFilter !== 'all') {
+      chips.push({
+        key: 'featured',
+        label:
+          featuredFilter === 'featured'
+            ? 'Featured only'
+            : 'Not featured',
+        onRemove: () => {
+          setFeaturedFilter('all')
+          setPage(1)
+        },
+      })
+    }
+
+    if (order !== 'DESC') {
+      chips.push({
+        key: 'order',
+        label: 'Sort: ASC',
+        onRemove: () => {
+          setOrder('DESC')
+          setPage(1)
+        },
+      })
+    }
+
+    if (perPage !== 9) {
+      chips.push({
+        key: 'perPage',
+        label: `Per page: ${perPage}`,
+        onRemove: () => {
+          setPerPage(9)
+          setPage(1)
+        },
+      })
+    }
+
+    if (publishedYearFrom.trim()) {
+      chips.push({
+        key: 'yearFrom',
+        label: `From: ${publishedYearFrom.trim()}`,
+        onRemove: () => {
+          setPublishedYearFrom('')
+          setPage(1)
+        },
+      })
+    }
+
+    if (publishedYearTo.trim()) {
+      chips.push({
+        key: 'yearTo',
+        label: `To: ${publishedYearTo.trim()}`,
+        onRemove: () => {
+          setPublishedYearTo('')
+          setPage(1)
+        },
+      })
+    }
+
+    return chips
+  }, [
+    featuredFilter,
+    order,
+    perPage,
+    publishedYearFrom,
+    publishedYearTo,
+    search,
+    selectedTags,
+    statusFilter,
+  ])
 
   function handlePage(p: number) {
     setPage(p)
@@ -1084,16 +1224,129 @@ export function News() {
           )}
         </div>
 
+        {/* API filters */}
+        <div className="bg-white border border-gray-100 rounded-2xl p-4 md:p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-[#000000]">Filter Articles</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="text-[#737692] hover:text-[#D52B1E]"
+            >
+              Reset Filters
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <label className="text-xs text-[#737692]">
+              Status
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as '' | 'draft' | 'published')
+                  setPage(1)
+                }}
+                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+              >
+                <option value="">All</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </select>
+            </label>
+
+            <label className="text-xs text-[#737692]">
+              Featured
+              <select
+                value={featuredFilter}
+                onChange={(e) => {
+                  setFeaturedFilter(e.target.value as 'all' | 'featured' | 'nonFeatured')
+                  setPage(1)
+                }}
+                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+              >
+                <option value="all">All</option>
+                <option value="featured">Featured only</option>
+                <option value="nonFeatured">Not featured</option>
+              </select>
+            </label>
+
+            <label className="text-xs text-[#737692]">
+              Sort Order
+              <select
+                value={order}
+                onChange={(e) => {
+                  setOrder(e.target.value as 'ASC' | 'DESC')
+                  setPage(1)
+                }}
+                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+              >
+                <option value="DESC">Newest first (DESC)</option>
+                <option value="ASC">Oldest first (ASC)</option>
+              </select>
+            </label>
+
+            <label className="text-xs text-[#737692]">
+              Published Year From
+              <Input
+                type="number"
+                min={1900}
+                max={2100}
+                value={publishedYearFrom}
+                onChange={(e) => {
+                  setPublishedYearFrom(e.target.value)
+                  setPage(1)
+                }}
+                placeholder="e.g. 2024"
+                className="mt-1 h-10 rounded-xl border-gray-200"
+              />
+            </label>
+
+            <label className="text-xs text-[#737692]">
+              Published Year To
+              <Input
+                type="number"
+                min={1900}
+                max={2100}
+                value={publishedYearTo}
+                onChange={(e) => {
+                  setPublishedYearTo(e.target.value)
+                  setPage(1)
+                }}
+                placeholder="e.g. 2026"
+                className="mt-1 h-10 rounded-xl border-gray-200"
+              />
+            </label>
+
+            <label className="text-xs text-[#737692]">
+              Per Page
+              <select
+                value={perPage}
+                onChange={(e) => {
+                  setPerPage(Number(e.target.value))
+                  setPage(1)
+                }}
+                className="mt-1 w-full h-10 rounded-xl border border-gray-200 px-3 text-sm text-[#000000] bg-white"
+              >
+                <option value={9}>9</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
         {/* Tag filters */}
         {tags && tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => {
-                setSelectedTag("");
+                setSelectedTags([]);
                 setPage(1);
               }}
               className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                selectedTag
+                selectedTags.length > 0
                   ? "bg-white text-[#737692] border-gray-200 hover:border-[#D52B1E] hover:text-[#D52B1E]"
                   : "bg-[#D52B1E] text-white border-[#D52B1E]"
               }`}
@@ -1105,7 +1358,7 @@ export function News() {
                 key={tag.id}
                 onClick={() => handleTagClick(tag.name)}
                 className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                  selectedTag === tag.name
+                  selectedTags.includes(tag.name)
                     ? "bg-[#D52B1E] text-white border-[#D52B1E]"
                     : "bg-white text-[#737692] border-gray-200 hover:border-[#D52B1E] hover:text-[#D52B1E]"
                 }`}
@@ -1113,6 +1366,32 @@ export function News() {
                 {tag.name}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Active filters summary */}
+        {activeFilterChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+            <span className="text-xs font-semibold text-[#737692]">Active filters:</span>
+            {activeFilterChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={chip.onRemove}
+                className="inline-flex items-center gap-1 rounded-full border border-[#D52B1E]/25 bg-[#D52B1E]/8 px-2.5 py-1 text-xs text-[#D52B1E] hover:bg-[#D52B1E]/14"
+                title={`Remove ${chip.label}`}
+              >
+                <span>{chip.label}</span>
+                <X className="h-3 w-3" />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="ml-auto text-xs font-semibold text-[#737692] hover:text-[#D52B1E]"
+            >
+              Clear all
+            </button>
           </div>
         )}
 

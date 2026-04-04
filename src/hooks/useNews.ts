@@ -18,6 +18,7 @@ export interface NewsItem {
   tagNames: string[]
   publishedAt: string | null
   viewCount: number
+  isFeatured?: boolean
   createdAt: string
   tags: NewsTag[]
   author?: {
@@ -47,6 +48,9 @@ export interface NewsFilters {
   status?: 'draft' | 'published'
   tags?: string[]
   order?: 'ASC' | 'DESC'
+  isFeatured?: boolean
+  publishedYearFrom?: number
+  publishedYearTo?: number
 }
 
 export const useNews = (filters: NewsFilters = {}) => {
@@ -60,7 +64,10 @@ export const useNews = (filters: NewsFilters = {}) => {
       }
       if (filters.search) params.search = filters.search
       if (filters.status) params.status = filters.status
-      if (filters.tags?.length) params['tags[]'] = filters.tags
+      if (filters.tags?.length) params.tags = filters.tags.join(',')
+      if (typeof filters.isFeatured === 'boolean') params.isFeatured = filters.isFeatured
+      if (typeof filters.publishedYearFrom === 'number') params.publishedYearFrom = filters.publishedYearFrom
+      if (typeof filters.publishedYearTo === 'number') params.publishedYearTo = filters.publishedYearTo
       const response = await api.get('/news', { params })
       return response.data
     },
