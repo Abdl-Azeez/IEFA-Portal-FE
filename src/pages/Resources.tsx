@@ -102,6 +102,84 @@ interface LocalRegulatoryBody {
   readonly description: string;
 }
 
+const REGULATOR_LOGO_BY_CODE: Record<string, string> = {
+  CBN: "/regulators/cbn.png",
+  NAICOM: "/regulators/naicom.png",
+  SEC: "/regulators/sec.png",
+  NDIC: "/regulators/ndic.png",
+  PENCOM: "https://logo.clearbit.com/pencom.gov.ng",
+  FRC: "https://logo.clearbit.com/frcnigeria.org",
+  FRCN: "https://logo.clearbit.com/frcnigeria.org",
+};
+
+const REGULATOR_LOGO_BY_NAME_KEYWORD: Array<[string, string]> = [
+  ["central bank of nigeria", REGULATOR_LOGO_BY_CODE.CBN],
+  ["naicom", REGULATOR_LOGO_BY_CODE.NAICOM],
+  ["national insurance commission", REGULATOR_LOGO_BY_CODE.NAICOM],
+  ["securities and exchange commission", REGULATOR_LOGO_BY_CODE.SEC],
+  ["sec nigeria", REGULATOR_LOGO_BY_CODE.SEC],
+  ["nigeria deposit insurance", REGULATOR_LOGO_BY_CODE.NDIC],
+  ["ndic", REGULATOR_LOGO_BY_CODE.NDIC],
+  ["national pension commission", REGULATOR_LOGO_BY_CODE.PENCOM],
+  ["pencom", REGULATOR_LOGO_BY_CODE.PENCOM],
+  ["financial reporting council", REGULATOR_LOGO_BY_CODE.FRC],
+  ["frc nigeria", REGULATOR_LOGO_BY_CODE.FRC],
+];
+
+const FORCE_FALLBACK_CODES = new Set(["CBN", "NAICOM", "NDIC", "SEC"]);
+
+function getRegulatoryCode(body: Pick<LocalRegulatoryBody, "name" | "fullName">): string {
+  const code = body.name.trim().toUpperCase();
+  if (REGULATOR_LOGO_BY_CODE[code]) return code;
+
+  const searchable = `${body.name} ${body.fullName}`.toLowerCase();
+  if (
+    searchable.includes("central bank of nigeria") ||
+    searchable.includes(" cbn") ||
+    searchable.startsWith("cbn")
+  ) {
+    return "CBN";
+  }
+  if (
+    searchable.includes("naicom") ||
+    searchable.includes("national insurance commission")
+  ) {
+    return "NAICOM";
+  }
+  if (
+    searchable.includes("securities and exchange commission") ||
+    searchable.includes(" sec") ||
+    searchable.startsWith("sec")
+  ) {
+    return "SEC";
+  }
+  if (
+    searchable.includes("nigeria deposit insurance") ||
+    searchable.includes("ndic")
+  ) {
+    return "NDIC";
+  }
+  return "";
+}
+
+function getRegulatoryLogoFallback(body: Pick<LocalRegulatoryBody, "name" | "fullName">): string {
+  const code = getRegulatoryCode(body) || body.name.trim().toUpperCase();
+  if (REGULATOR_LOGO_BY_CODE[code]) return REGULATOR_LOGO_BY_CODE[code];
+
+  const searchable = `${body.name} ${body.fullName}`.toLowerCase();
+  const byKeyword = REGULATOR_LOGO_BY_NAME_KEYWORD.find(([keyword]) =>
+    searchable.includes(keyword),
+  );
+  return byKeyword?.[1] ?? "";
+}
+
+function getRegulatoryLogoSrc(body: LocalRegulatoryBody): string {
+  const fallback = getRegulatoryLogoFallback(body);
+  const code = getRegulatoryCode(body);
+  if (code && FORCE_FALLBACK_CODES.has(code) && fallback) return fallback;
+  return body.logoUrl || fallback;
+}
+
 interface DocumentTypeConfig {
   readonly id: string;
   readonly label: string;
@@ -1306,11 +1384,16 @@ export default function Resources() {
                             style={{ backgroundColor: "#D52B1E10" }}
                           >
                             <img
-                              src={body.logoUrl}
+                              src={getRegulatoryLogoSrc(body)}
                               alt={body.name}
                               className="w-8 h-8 object-contain"
                               onError={(e) => {
                                 const t = e.currentTarget;
+                                const fallback = getRegulatoryLogoFallback(body);
+                                if (fallback && t.src !== fallback) {
+                                  t.src = fallback;
+                                  return;
+                                }
                                 t.style.display = "none";
                                 const p = t.parentElement;
                                 if (p && !p.querySelector(".reg-abbr-sm")) {
@@ -1421,11 +1504,16 @@ export default function Resources() {
                           style={{ backgroundColor: "#D52B1E08" }}
                         >
                           <img
-                            src={body.logoUrl}
+                            src={getRegulatoryLogoSrc(body)}
                             alt={`${body.name} logo`}
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
                               const t = e.currentTarget;
+                              const fallback = getRegulatoryLogoFallback(body);
+                              if (fallback && t.src !== fallback) {
+                                t.src = fallback;
+                                return;
+                              }
                               t.style.display = "none";
                               const parent = t.parentElement;
                               if (
