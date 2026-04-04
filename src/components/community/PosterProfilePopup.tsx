@@ -154,7 +154,7 @@ export default function PosterProfilePopup({
               </div>
 
               {/* Rating */}
-              {user.rating !== undefined && (
+              {/* {user.rating !== undefined && (
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2">
                     {[...Array(5)].map((_, i) => (
@@ -174,17 +174,17 @@ export default function PosterProfilePopup({
                     {user.rating?.toFixed(1)} / 5.0
                   </p>
                 </div>
-              )}
+              )} */}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
+              {/* <div className="flex gap-3 pt-4">
                 <Button variant="outline" className="flex-1 border-gray-200">
                   View Profile
                 </Button>
                 <Button className="flex-1 bg-[#D52B1E] hover:bg-[#B8241B] text-white">
                   Message
                 </Button>
-              </div>
+              </div> */}
 
               {user.isModerator && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-center">

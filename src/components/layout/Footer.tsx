@@ -6,7 +6,7 @@ export function Footer() {
 
   return (
     <motion.footer
-      className="w-full bg-[#111111] py-12 px-6 z-50 relative mt-auto"
+      className="w-full bg-[#111111] py-12 px-6 relative mt-auto"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
