@@ -27,8 +27,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth";
+import { toast } from "@/hooks/use-toast";
 
 /* ── Searchable navigation items ──────────────────────────────────────────── */
 type SearchItem = {
@@ -257,9 +258,10 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const storeUser = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+  const location = useLocation();
   const profileImageUrl = storeUser?.profilePhotoUrl ?? user?.profilePhotoUrl ?? "";
 
   const initials =
@@ -315,6 +317,12 @@ export function Header() {
         ).slice(0, 8)
       : [];
 
+  const isProtectedSearchPath = (path: string) => {
+    const publicPaths = new Set(["/", "/news", "/market-insights", "/community"]);
+    const basePath = path.split("?")[0];
+    return !publicPaths.has(basePath);
+  };
+
   return (
     <motion.header
       className="sticky top-0 z-30 flex h-16 items-center gap-4 px-6 transition-all duration-200 mt-8"
@@ -367,7 +375,20 @@ export function Header() {
                         key={item.label + item.path}
                         type="button"
                         onClick={() => {
-                          navigate(item.path);
+                          if (!isAuthenticated && isProtectedSearchPath(item.path)) {
+                            toast({
+                              title: "Login required",
+                              description: "Please login to access this feature.",
+                            });
+                            navigate("/login", {
+                              state: {
+                                from: `${location.pathname}${location.search}`,
+                                redirectTo: item.path,
+                              },
+                            });
+                          } else {
+                            navigate(item.path);
+                          }
                           setSearchQuery("");
                           setShowResults(false);
                         }}

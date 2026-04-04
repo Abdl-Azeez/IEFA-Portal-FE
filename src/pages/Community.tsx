@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   communityService,
   apiSortToUiSort,
@@ -139,7 +140,31 @@ export default function Community() {
     null,
   );
   const [posterProfileHydrating, setPosterProfileHydrating] = useState(false);
-  const { isModerator, user } = useAuth();
+  const { isModerator, user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const promptLoginForFeature = useCallback(
+    (feature: string) => {
+      toast({
+        title: "Login required",
+        description: `Please login to ${feature}.`,
+      });
+      navigate("/login", {
+        state: { from: `${location.pathname}${location.search}` },
+      });
+    },
+    [location.pathname, location.search, navigate],
+  );
+
+  const requireAuth = useCallback(
+    (feature: string) => {
+      if (isAuthenticated) return true;
+      promptLoginForFeature(feature);
+      return false;
+    },
+    [isAuthenticated, promptLoginForFeature],
+  );
 
   // state to track hover card
   const [hoverProfile, setHoverProfile] = useState<{
@@ -501,6 +526,7 @@ export default function Community() {
     date.toLocaleString("default", { month: "long", year: "numeric" });
 
   const toggleSavePost = useCallback(async (postId: string) => {
+    if (!requireAuth("save posts")) return;
     try {
       const isNowSaved = await communityService.toggleBookmark(postId);
       setSavedPosts((prev) =>
@@ -518,10 +544,11 @@ export default function Community() {
           : [...prev, postId],
       );
     }
-  }, []);
+  }, [requireAuth]);
 
   const toggleLikePost = useCallback(
     async (postId: string) => {
+      if (!requireAuth("like discussions")) return;
       const alreadyLiked = likedPosts.includes(postId);
       if (alreadyLiked) {
         const interactionId = likeInteractionIds.current.get(postId);
@@ -547,7 +574,7 @@ export default function Community() {
         }
       }
     },
-    [likedPosts],
+    [likedPosts, requireAuth],
   );
 
   const handleShare = async (post: DiscussionPost) => {
@@ -569,6 +596,7 @@ export default function Community() {
   };
 
   const handleReport = async (postId: string) => {
+    if (!requireAuth("report discussions")) return;
     if (reportedPosts.includes(postId)) {
       toast({
         title: "Already Reported",
@@ -794,6 +822,7 @@ export default function Community() {
       attachmentUrls: string[];
       mentions: string[];
     }) => {
+      if (!requireAuth("start a discussion")) return;
       try {
         const created = await communityService.createDiscussion({
           title: data.title,
@@ -813,7 +842,7 @@ export default function Community() {
         toast.error("Failed to create discussion. Please try again.");
       }
     },
-    [apiCategories],
+    [apiCategories, requireAuth],
   );
 
   const handleFlagToggle = useCallback(
@@ -928,10 +957,12 @@ export default function Community() {
         post={selectedPost}
         onBack={handleBack}
         isModerator={isModerator}
+        isAuthenticated={isAuthenticated}
         currentUserId={user?.id}
         initialIsLiked={initialLikeForDetail}
         initialLikeInteractionId={initialLikeIdForDetail}
         initialIsFlagged={!!selectedPost.isReported}
+        onAuthRequired={promptLoginForFeature}
         onPin={handlePinPost}
         onDelete={handleDeletePost}
         onReport={handleReport}
@@ -1053,7 +1084,10 @@ export default function Community() {
                   Filters
                 </Button>
                 <Button
-                  onClick={() => setShowStartDiscussionModal(true)}
+                  onClick={() => {
+                    if (!requireAuth("start a discussion")) return;
+                    setShowStartDiscussionModal(true);
+                  }}
                   className="bg-[#D52B1E] hover:bg-[#B8241B] text-white"
                 >
                   Start a Discussion
@@ -1072,7 +1106,16 @@ export default function Community() {
         <Tabs
           defaultValue="discussions"
           className="w-full"
-          onValueChange={setSelectedTab}
+          onValueChange={(value) => {
+            if (
+              (value === "bookmarks" || value === "flagged") &&
+              !isAuthenticated
+            ) {
+              promptLoginForFeature("view saved or moderated content");
+              return;
+            }
+            setSelectedTab(value);
+          }}
         >
           <TabsList className="bg-transparent h-auto p-0 mb-6 gap-2 border-b-0 w-full justify-start overflow-x-auto scrollbar-hide -mx-2 px-2 flex-nowrap md:flex-wrap md:overflow-visible md:px-0">
             <TabsTrigger
@@ -2070,6 +2113,7 @@ export default function Community() {
                           <Button
                             className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white"
                             onClick={async () => {
+                              if (!requireAuth("join or leave groups")) return;
                               try {
                                 if (group.isMember) {
                                   await communityService.leaveGroup(group.id);
@@ -2463,6 +2507,7 @@ export default function Community() {
                                 : "bg-[#D52B1E] hover:bg-[#B8241B] text-white"
                             }
                             onClick={async () => {
+                              if (!requireAuth("register for events")) return;
                               try {
                                 if (event.isRegistered) {
                                   await communityService.unregisterFromEvent(

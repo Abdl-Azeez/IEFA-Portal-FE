@@ -49,30 +49,9 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/" element={<MainLayout />}>
-            <Route
-              index
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="news"
-              element={
-                <ProtectedRoute>
-                  <News />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="market-insights"
-              element={
-                <ProtectedRoute>
-                  <MarketInsights />
-                </ProtectedRoute>
-              }
-            />
+            <Route index element={<Dashboard />} />
+            <Route path="news" element={<News />} />
+            <Route path="market-insights" element={<MarketInsights />} />
             <Route
               path="learning-zone"
               element={
@@ -81,14 +60,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="community"
-              element={
-                <ProtectedRoute>
-                  <Community />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="community" element={<Community />} />
             <Route
               path="directory"
               element={

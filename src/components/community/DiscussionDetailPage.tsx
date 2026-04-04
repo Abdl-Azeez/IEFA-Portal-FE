@@ -13,6 +13,8 @@ import { Dialog } from '@/components/ui/dialog'
 interface DiscussionDetailPageProps {
   post: DetailedDiscussionPost
   onBack: () => void
+  isAuthenticated?: boolean
+  onAuthRequired?: (feature: string) => void
   isModerator?: boolean
   currentUserId?: string
   initialIsLiked?: boolean
@@ -37,6 +39,8 @@ const categoryColors: Record<string, string> = {
 export default function DiscussionDetailPage({
   post,
   onBack,
+  isAuthenticated = false,
+  onAuthRequired,
   isModerator = false,
   currentUserId,
   initialIsLiked = false,
@@ -47,6 +51,12 @@ export default function DiscussionDetailPage({
   onReport,
   onFlagToggle,
 }: DiscussionDetailPageProps) {
+  const requireAuth = (feature: string) => {
+    if (isAuthenticated) return true
+    onAuthRequired?.(feature)
+    return false
+  }
+
   const [isLiked, setIsLiked] = useState(initialIsLiked)
   const [isSaved, setIsSaved] = useState(post.isSaved ?? false)
   const [isFlagged, setIsFlagged] = useState(initialIsFlagged)
@@ -59,6 +69,7 @@ export default function DiscussionDetailPage({
   const likeInteractionId = useRef<string | null>(initialLikeInteractionId ?? null)
 
   const handleLike = async () => {
+    if (!requireAuth('like this post')) return
     const nowLiked = !isLiked
     setIsLiked(nowLiked)
     setLikeCount(prev => nowLiked ? prev + 1 : prev - 1)
@@ -78,6 +89,7 @@ export default function DiscussionDetailPage({
   }
 
   const handleSave = async () => {
+    if (!requireAuth('save this post')) return
     const nowSaved = !isSaved
     setIsSaved(nowSaved)
     try {
@@ -108,6 +120,7 @@ export default function DiscussionDetailPage({
   }
 
   const handleAddReply = async () => {
+    if (!requireAuth('reply to discussions')) return
     if (!replyText.trim() || isSubmittingReply) return
     setIsSubmittingReply(true)
     try {
@@ -383,6 +396,7 @@ export default function DiscussionDetailPage({
                 <Button
                   variant="outline"
                   onClick={async () => {
+                    if (!requireAuth('report posts')) return;
                     if (isFlagged) return;
                     setIsFlagged(true);
                     try {

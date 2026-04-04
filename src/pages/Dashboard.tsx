@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { TrendingUp, ChevronUp, Play, Clock, BookOpen, ChevronRight, Calculator, Coins, Wrench, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { useExternalNews, type ExternalNewsArticle } from '@/hooks/useNews'
+import { toast } from '@/hooks/use-toast'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -343,6 +345,7 @@ function NewsCard({ news }: NewsCardProps) {
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   const { data: externalNews = [], isLoading: externalNewsLoading } = useExternalNews(DASHBOARD_NEWS_QUERY)
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
@@ -360,6 +363,16 @@ export function Dashboard() {
     () => externalNews.slice(0, 6).map(mapExternalArticleToDashboardNews),
     [externalNews],
   )
+
+  const requireAuth = (feature: string) => {
+    if (isAuthenticated) return true
+    toast({
+      title: 'Login required',
+      description: `Please login to ${feature}.`,
+    })
+    navigate('/login', { state: { from: `${location.pathname}${location.search}` } })
+    return false
+  }
 
   const infiniteNews = useMemo(() => {
     if (liveNews.length === 0) return []
@@ -566,7 +579,10 @@ export function Dashboard() {
                 <motion.button
                   className="text-sm text-[#D52B1E] font-medium flex items-center gap-1 hover:underline"
                   whileHover={{ x: 3 }}
-                  onClick={() => isAuthenticated ? navigate('/learning-zone') : navigate('/login')}
+                  onClick={() => {
+                    if (!requireAuth('view courses')) return
+                    navigate('/learning-zone')
+                  }}
                 >
                   See All <ChevronRight className="h-4 w-4" />
                 </motion.button>
@@ -593,7 +609,10 @@ export function Dashboard() {
                         className="px-4 py-2 bg-[#D52B1E] text-white text-sm font-medium rounded-lg hover:bg-[#B8241B] transition-colors"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => isAuthenticated ? navigate("/questionnaire") : navigate('/login')}
+                        onClick={() => {
+                          if (!requireAuth('start the questionnaire')) return
+                          navigate('/questionnaire')
+                        }}
                       >
                         Start now
                       </motion.button>
@@ -625,7 +644,10 @@ export function Dashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 + index * 0.1 }}
                         whileHover={{ y: -5 }}
-                        onClick={() => isAuthenticated ? navigate('/learning-zone') : navigate('/login')}
+                        onClick={() => {
+                          if (!requireAuth('open learning courses')) return
+                          navigate('/learning-zone')
+                        }}
                       >
                         <div className="relative rounded-xl overflow-hidden aspect-video mb-3">
                           <img
@@ -726,7 +748,10 @@ export function Dashboard() {
               <motion.button
                 className="text-sm text-[#D52B1E] font-medium flex items-center gap-1 hover:underline"
                 whileHover={{ x: 3 }}
-                onClick={() => navigate('/tools/zakat')}
+                onClick={() => {
+                  if (!requireAuth('open IEFA tools')) return
+                  navigate('/tools/zakat')
+                }}
               >
                 Open Tools <ChevronRight className="h-4 w-4" />
               </motion.button>
@@ -770,7 +795,10 @@ export function Dashboard() {
                   transition={{ delay: 0.3 + index * 0.1 }}
                   whileHover={{ y: -4, scale: 1.01 }}
                   className={`group cursor-pointer rounded-2xl bg-gradient-to-br ${tool.color} p-5 border border-transparent hover:border-[#D52B1E]/20 transition-all duration-200`}
-                  onClick={() => navigate(tool.href)}
+                  onClick={() => {
+                    if (!requireAuth('open IEFA tools')) return
+                    navigate(tool.href)
+                  }}
                 >
                   <div className={`w-10 h-10 rounded-xl ${tool.iconBg} flex items-center justify-center mb-3`}>
                     <tool.icon className={`h-5 w-5 ${tool.iconColor}`} />

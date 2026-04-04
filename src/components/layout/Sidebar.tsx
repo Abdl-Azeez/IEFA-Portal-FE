@@ -43,7 +43,11 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const isToolsActive = location.pathname.startsWith('/tools')
   const [toolsOpen, setToolsOpen] = useState(isToolsActive)
 
-  const visibleMenuNavigation = isAuthenticated ? menuNavigation : menuNavigation.filter(item => item.name === 'Dashboard')
+  const visibleMenuNavigation = isAuthenticated
+    ? menuNavigation
+    : menuNavigation.filter((item) =>
+        ['Dashboard', 'News', 'Market Insights', 'Community'].includes(item.name),
+      )
 
   return (
     <motion.aside 
