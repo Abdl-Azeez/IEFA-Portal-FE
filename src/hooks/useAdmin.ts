@@ -1481,6 +1481,33 @@ export type CareerLevel = "Early career" | "Mid career" | "Senior";
 export type ProfessionalScope = "Local" | "Global";
 export type VerificationStatus = "Verified" | "Pending" | "Unverified";
 
+type ApiCareerLevel = "Early (0-6 yrs)" | "Mid (7-14 yrs)" | "Senior (15+ yrs)";
+type ApiVerificationStatus = "approved" | "pending" | "rejected";
+
+interface ApiProfessional {
+  id: string;
+  fullName: string;
+  organization?: string;
+  linkedInUrl?: string;
+  linkedinUrl?: string;
+  role?: string;
+  location?: string;
+  description?: string;
+  seniority?: ApiCareerLevel | CareerLevel;
+  locationType?: ProfessionalScope;
+  scope?: ProfessionalScope;
+  resumeUrl?: string;
+  profileImageUrl?: string;
+  verificationStatus?: ApiVerificationStatus | VerificationStatus;
+  status?: ApiVerificationStatus;
+  approvalStatus?: ApiVerificationStatus;
+  isApproved?: boolean;
+  isVerified?: boolean;
+  rejectedReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface IFProfessional {
   id: string;
   fullName: string;
@@ -1494,6 +1521,7 @@ export interface IFProfessional {
   scope?: ProfessionalScope;
   verificationStatus?: VerificationStatus;
   isVerified?: boolean;
+  rejectedReason?: string;
   profileImageUrl?: string;
   createdAt: string;
   updatedAt: string;
@@ -1517,13 +1545,105 @@ export interface CreateIFProfessionalDto {
   profileImageUrl?: string;
 }
 
+interface ApiCreateProfessionalDto {
+  fullName: string;
+  organization?: string;
+  linkedInUrl?: string;
+  role?: string;
+  location?: string;
+  description?: string;
+  seniority?: ApiCareerLevel;
+  locationType?: ProfessionalScope;
+  profileImageUrl?: string;
+  resumeUrl?: string;
+}
+
+interface ApiRejectProfessionalDto {
+  reason: string;
+}
+
+const toUiCareerLevel = (
+  seniority?: ApiCareerLevel | CareerLevel,
+): CareerLevel | undefined => {
+  if (!seniority) return undefined;
+  if (seniority === "Early (0-6 yrs)") return "Early career";
+  if (seniority === "Mid (7-14 yrs)") return "Mid career";
+  if (seniority === "Senior (15+ yrs)") return "Senior";
+  return seniority;
+};
+
+const toApiCareerLevel = (
+  seniority?: CareerLevel,
+): ApiCareerLevel | undefined => {
+  if (!seniority) return undefined;
+  if (seniority === "Early career") return "Early (0-6 yrs)";
+  if (seniority === "Mid career") return "Mid (7-14 yrs)";
+  return "Senior (15+ yrs)";
+};
+
+const toUiVerificationStatus = (
+  profile: ApiProfessional,
+): VerificationStatus | undefined => {
+  const status =
+    profile.verificationStatus ?? profile.status ?? profile.approvalStatus;
+  if (status === "approved") return "Verified";
+  if (status === "pending") return "Pending";
+  if (status === "rejected") return "Unverified";
+  if (
+    status === "Verified" ||
+    status === "Pending" ||
+    status === "Unverified"
+  ) {
+    return status;
+  }
+  if (profile.isApproved === true || profile.isVerified === true)
+    return "Verified";
+  if (profile.isApproved === false || profile.isVerified === false)
+    return "Unverified";
+  return undefined;
+};
+
+const toUiProfessional = (profile: ApiProfessional): IFProfessional => ({
+  id: profile.id,
+  fullName: profile.fullName,
+  organization: profile.organization,
+  linkedinUrl: profile.linkedInUrl ?? profile.linkedinUrl,
+  role: profile.role,
+  location: profile.location,
+  description: profile.description,
+  seniority: toUiCareerLevel(profile.seniority),
+  resumeUrl: profile.resumeUrl,
+  scope: profile.locationType ?? profile.scope,
+  verificationStatus: toUiVerificationStatus(profile),
+  isVerified: profile.isVerified,
+  rejectedReason: profile.rejectedReason,
+  profileImageUrl: profile.profileImageUrl,
+  createdAt: profile.createdAt,
+  updatedAt: profile.updatedAt,
+});
+
+const toApiCreateDto = (
+  dto: Partial<CreateIFProfessionalDto>,
+): Partial<ApiCreateProfessionalDto> => ({
+  fullName: dto.fullName,
+  organization: dto.organization,
+  linkedInUrl: dto.linkedinUrl,
+  role: dto.role,
+  location: dto.location,
+  description: dto.description,
+  seniority: toApiCareerLevel(dto.seniority),
+  locationType: dto.scope,
+  profileImageUrl: dto.profileImageUrl,
+  resumeUrl: dto.resumeUrl,
+});
+
 // Public (user-facing) — GET /professionals returns array
 export const useProfessionals = () =>
   useQuery({
     queryKey: ["professionals"],
     queryFn: async () => {
-      const { data } = await api.get<IFProfessional[]>("/professionals");
-      return data;
+      const { data } = await api.get<ApiProfessional[]>("/professionals");
+      return data.map(toUiProfessional);
     },
   });
 
@@ -1531,13 +1651,20 @@ export const useCreateProfessionalProfile = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (dto: CreateIFProfessionalDto) => {
-      const { data } = await api.post<IFProfessional>("/professionals", dto);
-      return data;
+      const { data } = await api.post<ApiProfessional>(
+        "/professionals/add-yourself",
+        toApiCreateDto(dto),
+      );
+      return toUiProfessional(data);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["professionals"] });
       qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
-      toast({ title: "Profile submitted", description: "Your profile will appear after review." });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals", "pending"] });
+      toast({
+        title: "Profile submitted",
+        description: "Your profile will appear after review.",
+      });
     },
     onError: (e: any) =>
       toast({
@@ -1552,8 +1679,19 @@ export const useAdminIFProfessionals = () =>
   useQuery({
     queryKey: ["admin", "professionals"],
     queryFn: async () => {
-      const { data } = await api.get<IFProfessional[]>("/professionals");
-      return data;
+      const { data } = await api.get<ApiProfessional[]>("/professionals");
+      return data.map(toUiProfessional);
+    },
+  });
+
+export const useAdminPendingIFProfessionals = () =>
+  useQuery({
+    queryKey: ["admin", "professionals", "pending"],
+    queryFn: async () => {
+      const { data } = await api.get<ApiProfessional[]>(
+        "/professionals/pending",
+      );
+      return data.map(toUiProfessional);
     },
   });
 
@@ -1561,8 +1699,8 @@ export const useAdminGetProfessional = (id: string) =>
   useQuery({
     queryKey: ["admin", "professionals", id],
     queryFn: async () => {
-      const { data } = await api.get<IFProfessional>(`/professionals/${id}`);
-      return data;
+      const { data } = await api.get<ApiProfessional>(`/professionals/${id}`);
+      return toUiProfessional(data);
     },
     enabled: !!id,
   });
@@ -1571,11 +1709,15 @@ export const useAdminCreateIFProfessional = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (dto: CreateIFProfessionalDto) => {
-      const { data } = await api.post<IFProfessional>("/professionals", dto);
-      return data;
+      const { data } = await api.post<ApiProfessional>(
+        "/professionals",
+        toApiCreateDto(dto),
+      );
+      return toUiProfessional(data);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals", "pending"] });
       toast({ title: "Professional created" });
     },
     onError: (e: any) =>
@@ -1597,14 +1739,15 @@ export const useAdminUpdateIFProfessional = () => {
       id: string;
       dto: Partial<CreateIFProfessionalDto>;
     }) => {
-      const { data } = await api.patch<IFProfessional>(
+      const { data } = await api.patch<ApiProfessional>(
         `/professionals/${id}`,
-        dto,
+        toApiCreateDto(dto),
       );
-      return data;
+      return toUiProfessional(data);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals", "pending"] });
       toast({ title: "Professional updated" });
     },
     onError: (e: any) =>
@@ -1622,12 +1765,63 @@ export const useAdminDeleteIFProfessional = () => {
     mutationFn: async (id: string) => api.delete(`/professionals/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals", "pending"] });
       toast({ title: "Professional deleted" });
     },
     onError: (e: any) =>
       toast({
         title: "Error",
         description: e.response?.data?.message ?? "Delete failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminApproveIFProfessional = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.patch<ApiProfessional>(
+        `/professionals/${id}/approve`,
+      );
+      return toUiProfessional(data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals", "pending"] });
+      qc.invalidateQueries({ queryKey: ["professionals"] });
+      toast({ title: "Professional approved" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Approve failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminRejectIFProfessional = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const payload: ApiRejectProfessionalDto = { reason };
+      const { data } = await api.patch<ApiProfessional>(
+        `/professionals/${id}/reject`,
+        payload,
+      );
+      return toUiProfessional(data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals", "pending"] });
+      qc.invalidateQueries({ queryKey: ["professionals"] });
+      toast({ title: "Professional rejected" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Reject failed",
         variant: "destructive",
       }),
   });
