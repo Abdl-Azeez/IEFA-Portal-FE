@@ -32,6 +32,10 @@ import { Dialog } from '@/components/ui/dialog'
 import {
   useAdminResources,
   useAdminResourceCategories,
+  useAdminResourceRegulatoryBodies,
+  useAdminCreateResourceRegulatoryBody,
+  useAdminUpdateResourceRegulatoryBody,
+  useAdminDeleteResourceRegulatoryBody,
   useAdminGlossaryTerms,
   useAdminCreateResource,
   useAdminUpdateResource,
@@ -46,8 +50,10 @@ import {
   useAdminApproveResource,
   useAdminRejectResource,
   type AdminResource,
+  type AdminResourceStatus,
   type AdminGlossaryTerm,
   type AdminResourceCategory,
+  type AdminRegulatoryBody,
   type AdminResourceType,
   type CreateResourceDto,
   type CreateGlossaryTermDto,
@@ -67,7 +73,7 @@ const MAJOR_CATEGORIES: Array<{ id: MajorCategoryKey; label: string }> = [
   { id: 'regulatory', label: 'Regulatory' },
 ]
 
-const REGULATORY_BODIES = [
+const DEFAULT_REGULATORY_BODIES = [
   { id: 'cbn', name: 'CBN', fullName: 'Central Bank of Nigeria' },
   { id: 'sec', name: 'SEC', fullName: 'Securities & Exchange Commission' },
   { id: 'naicom', name: 'NAICOM', fullName: 'National Insurance Commission' },
@@ -97,9 +103,15 @@ const PENDING_STATUS_STYLE: Record<string, string> = {
 
 const STATUS_STYLE: Record<string, string> = {
   published: 'bg-green-50 text-green-700',
+  pending_review: 'bg-amber-50 text-amber-700',
   draft: 'bg-slate-100 text-slate-500',
   archived: 'bg-orange-50 text-orange-700',
 }
+
+type AdminStatusFilter = 'all' | AdminResourceStatus
+type AdminTypeFilter = 'all' | AdminResourceType
+type AdminPremiumFilter = 'all' | 'premium' | 'free'
+type AdminRegulatoryFilter = 'all' | 'yes' | 'no'
 
 /* ── Form types ─────────────────────────────────────────────────────────── */
 interface ResourceForm {
@@ -117,7 +129,7 @@ interface ResourceForm {
   customDocType: string
   coverImageUrl: string
   fileUrl: string
-  status: 'draft' | 'published' | 'archived'
+  status: AdminResourceStatus
   isPremium: boolean
 }
 
@@ -129,6 +141,166 @@ const EMPTY_FORM: ResourceForm = {
 
 interface GlossaryForm { term: string; definition: string; status: 'draft' | 'published' }
 const EMPTY_GLOSSARY_FORM: GlossaryForm = { term: '', definition: '', status: 'draft' }
+
+interface RegulatoryBodyForm {
+  name: string
+  fullName: string
+  description: string
+  logoUrl: string
+}
+
+interface RegulatoryBodyFormErrors {
+  name?: string
+  fullName?: string
+  logoUrl?: string
+}
+
+const EMPTY_REGULATORY_BODY_FORM: RegulatoryBodyForm = {
+  name: '',
+  fullName: '',
+  description: '',
+  logoUrl: '',
+}
+
+function getMainAction(
+  activeView: ViewKey,
+  openCreate: () => void,
+  openCreateGlossary: () => void,
+) {
+  if (activeView === 'glossary') {
+    return {
+      onClick: openCreateGlossary,
+      label: 'Add Term',
+    }
+  }
+  return {
+    onClick: openCreate,
+    label: 'Upload Resource',
+  }
+}
+
+function renderAdminResourcesSection(args: {
+  activeView: ViewKey
+  isLoading: boolean
+  filteredGlossary: AdminGlossaryTerm[]
+  openMenu: string | null
+  setOpenMenu: (id: string | null) => void
+  openEditGlossary: (g: AdminGlossaryTerm) => void
+  handleDeleteGlossary: (id: string) => Promise<void>
+  toggleGlossaryPublish: (g: AdminGlossaryTerm) => Promise<void>
+  deleteGlossaryPending: boolean
+  pendingData: import('@/hooks/useAdmin').PendingResourceSubmission[]
+  pendingLoading: boolean
+  approveResource: (id: string) => Promise<unknown>
+  openRejectModal: (id: string) => void
+  approvePending: boolean
+  items: AdminResource[]
+  openEdit: (r: AdminResource) => void
+  handleDeleteResource: (id: string) => Promise<void>
+  togglePublish: (r: AdminResource) => Promise<void>
+  deleteResourcePending: boolean
+}) {
+  if (args.isLoading) {
+    return (
+      <div className="py-16 flex items-center justify-center gap-2 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Loading…</span>
+      </div>
+    )
+  }
+
+  if (args.activeView === 'glossary') {
+    return (
+      <GlossaryTable entries={args.filteredGlossary} openMenu={args.openMenu} setOpenMenu={args.setOpenMenu}
+        onEdit={args.openEditGlossary} onDelete={args.handleDeleteGlossary} onTogglePublish={args.toggleGlossaryPublish}
+        deleting={args.deleteGlossaryPending} />
+    )
+  }
+
+  if (args.activeView === 'pending') {
+    return (
+      <PendingTable
+        items={args.pendingData}
+        loading={args.pendingLoading}
+        onApprove={id => args.approveResource(id)}
+        onReject={args.openRejectModal}
+        approving={args.approvePending}
+      />
+    )
+  }
+
+  return (
+    <ResourceTable items={args.items} openMenu={args.openMenu} setOpenMenu={args.setOpenMenu}
+      onEdit={args.openEdit} onDelete={args.handleDeleteResource} onTogglePublish={args.togglePublish}
+      deleting={args.deleteResourcePending} />
+  )
+}
+
+function buildAdminResourceDto(args: {
+  form: ResourceForm
+  coverImageUrl: string
+  fileUrl: string
+  categoryId?: string
+  tags: string[]
+}): CreateResourceDto {
+  const { form, coverImageUrl, fileUrl, categoryId, tags } = args
+  const autoSlug = form.title
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9\s-]/g, '')
+    .replaceAll(/\s+/g, '-')
+    .slice(0, 80)
+
+  return {
+    title: form.title.trim(),
+    slug: autoSlug || undefined,
+    description: form.briefIntro || undefined,
+    bodyHtml: form.briefIntro ? `<p>${form.briefIntro}</p>` : undefined,
+    resourceType: form.resourceType,
+    thumbnailUrl: coverImageUrl || undefined,
+    attachmentUrl: fileUrl || undefined,
+    language: 'en',
+    status: form.status,
+    publishedYear: new Date().getFullYear(),
+    isDownloadable: !!fileUrl,
+    isPremium: form.isPremium,
+    isFeatured: false,
+    ...(form.authorName && { authorName: form.authorName }),
+    ...(form.authorName && { publisher: form.authorName }),
+    ...(categoryId && { categoryId }),
+    ...(form.majorCategory === 'regulatory' && form.regulatoryBodyId
+      ? { regulatoryBodyId: form.regulatoryBodyId }
+      : {}),
+    ...(form.status === 'published'
+      ? { publishedAt: new Date().toISOString() }
+      : {}),
+    ...(tags.length > 0 && { tags }),
+  }
+}
+
+function deriveResourceTagsAndCategory(form: ResourceForm) {
+  const tags: string[] = [`major:${form.majorCategory}`]
+  const isGeneralCustomSub = form.majorCategory === 'general' && form.categoryId === '__custom__'
+  const isRegCustomDoc = form.majorCategory === 'regulatory' && form.docTypeId === '__custom__'
+
+  if (form.majorCategory === 'regulatory') {
+    if (form.regulatoryBodyId) tags.push(`reg-body:${form.regulatoryBodyId}`)
+    if (isRegCustomDoc && form.customDocType.trim()) {
+      tags.push(`doc-type-custom:${form.customDocType.trim()}`)
+    } else if (form.docTypeId) {
+      tags.push(`doc-type:${form.docTypeId}`)
+    }
+  }
+
+  if (isGeneralCustomSub && form.customSubCategory.trim()) {
+    tags.push(`general-sub-custom:${form.customSubCategory.trim()}`)
+  }
+
+  const categoryId = form.majorCategory === 'general' && !isGeneralCustomSub
+    ? (form.categoryId || undefined)
+    : undefined
+
+  return { tags, categoryId }
+}
 
 /* ── Component ──────────────────────────────────────────────────────────── */
 export default function AdminResources() {
@@ -144,6 +316,17 @@ export default function AdminResources() {
     validViews.includes(viewFromUrl) ? viewFromUrl : 'resources'
   )
   const [activeCategoryId, setActiveCategoryId] = useState<string>(categoryFromUrl)
+  const [search, setSearch] = useState('')
+  const [orderFilter, setOrderFilter] = useState<'ASC' | 'DESC'>('DESC')
+  const [statusFilter, setStatusFilter] = useState<AdminStatusFilter>('all')
+  const [resourceTypeFilter, setResourceTypeFilter] = useState<AdminTypeFilter>('all')
+  const [premiumFilter, setPremiumFilter] = useState<AdminPremiumFilter>('all')
+  const [regulatoryFilter, setRegulatoryFilter] = useState<AdminRegulatoryFilter>('all')
+  const [resourceTypesCsv, setResourceTypesCsv] = useState('')
+  const [languagesCsv, setLanguagesCsv] = useState('')
+  const [publishedYearFrom, setPublishedYearFrom] = useState('')
+  const [publishedYearTo, setPublishedYearTo] = useState('')
+  const [regulatoryBodyFilterId, setRegulatoryBodyFilterId] = useState('')
 
   const updateRoute = (nextView: ViewKey, nextCategoryId = activeCategoryId) => {
     const nextParams = new URLSearchParams()
@@ -167,15 +350,74 @@ export default function AdminResources() {
   }
 
   /* ── API hooks ──────────────────────────────────────────────────────── */
-  const resourceListParams =
-    activeCategoryId !== 'all' && activeCategoryId !== 'general' && activeCategoryId !== 'regulatory'
-      ? { perPage: 100, categoryId: activeCategoryId }
-      : { perPage: 100 }
+  const numericYearFrom = publishedYearFrom.trim() ? Number(publishedYearFrom) : undefined
+  const numericYearTo = publishedYearTo.trim() ? Number(publishedYearTo) : undefined
+
+  let isPremiumQuery: boolean | undefined
+  if (premiumFilter === 'premium') isPremiumQuery = true
+  else if (premiumFilter === 'free') isPremiumQuery = false
+
+  let isRegulatoryQuery: boolean | undefined
+  if (activeCategoryId === 'regulatory' || regulatoryFilter === 'yes') isRegulatoryQuery = true
+  else if (activeCategoryId === 'general' || regulatoryFilter === 'no') isRegulatoryQuery = false
+
+  const resourceListParams = useMemo(() => {
+    const base: Record<string, unknown> = {
+      page: 1,
+      perPage: 100,
+      order: orderFilter,
+    }
+    if (search.trim()) base.search = search.trim()
+    if (statusFilter !== 'all') base.status = statusFilter
+    if (resourceTypeFilter !== 'all') base.resourceType = resourceTypeFilter
+    if (resourceTypesCsv.trim()) base.resourceTypes = resourceTypesCsv.trim()
+    if (languagesCsv.trim()) base.languages = languagesCsv.trim()
+    if (Number.isFinite(numericYearFrom)) base.publishedYearFrom = numericYearFrom
+    if (Number.isFinite(numericYearTo)) base.publishedYearTo = numericYearTo
+    if (regulatoryBodyFilterId) base.regulatoryBodyId = regulatoryBodyFilterId
+    if (typeof isPremiumQuery === 'boolean') base.isPremium = isPremiumQuery
+    if (typeof isRegulatoryQuery === 'boolean') base.isRegulatory = isRegulatoryQuery
+
+    const isSpecificCategory =
+      activeCategoryId !== 'all' && activeCategoryId !== 'general' && activeCategoryId !== 'regulatory'
+    if (isSpecificCategory) base.categoryId = activeCategoryId
+
+    return base
+  }, [
+    activeCategoryId,
+    search,
+    orderFilter,
+    statusFilter,
+    resourceTypeFilter,
+    resourceTypesCsv,
+    languagesCsv,
+    numericYearFrom,
+    numericYearTo,
+    regulatoryBodyFilterId,
+    isPremiumQuery,
+    isRegulatoryQuery,
+  ])
+
   const { data: resourcesData, isLoading: resourcesLoading } = useAdminResources(resourceListParams)
   const { data: glossaryData, isLoading: glossaryLoading } = useAdminGlossaryTerms(
     activeView === 'glossary' ? {} : { letter: 'A' }
   )
   const { data: categories } = useAdminResourceCategories()
+  const { data: regulatoryBodiesData = [] } = useAdminResourceRegulatoryBodies()
+
+  const regulatoryBodies = useMemo(
+    () =>
+      regulatoryBodiesData.length > 0
+        ? regulatoryBodiesData.map((body) => ({
+            id: body.id,
+            name: body.name,
+            fullName: body.fullName ?? body.name,
+            description: body.description,
+            logoUrl: body.logoUrl,
+          }))
+        : DEFAULT_REGULATORY_BODIES.map((body) => ({ ...body })),
+    [regulatoryBodiesData],
+  )
 
   const { data: allResStats }   = useAdminResources({ perPage: 1 })
   const { data: allGlossStats } = useAdminGlossaryTerms()
@@ -196,9 +438,11 @@ export default function AdminResources() {
   const { data: pendingData, isLoading: pendingLoading } = useAdminPendingResources()
   const approveResource = useAdminApproveResource()
   const rejectResource  = useAdminRejectResource()
+  const createRegulatoryBody = useAdminCreateResourceRegulatoryBody()
+  const updateRegulatoryBody = useAdminUpdateResourceRegulatoryBody()
+  const deleteRegulatoryBody = useAdminDeleteResourceRegulatoryBody()
 
   /* ── Local UI state ─────────────────────────────────────────────────── */
-  const [search, setSearch]     = useState('')
   const [openMenu, setOpenMenu] = useState<string | null>(null)
 
   const [modalOpen, setModalOpen]           = useState(false)
@@ -220,6 +464,11 @@ export default function AdminResources() {
   const [editCatId, setEditCatId]         = useState<string | null>(null)
   const [catName, setCatName]             = useState('')
   const [catParentId, setCatParentId]     = useState('')         // '' = top-level
+
+  const [regBodyModalOpen, setRegBodyModalOpen] = useState(false)
+  const [editRegBodyId, setEditRegBodyId] = useState<string | null>(null)
+  const [regBodyForm, setRegBodyForm] = useState<RegulatoryBodyForm>(EMPTY_REGULATORY_BODY_FORM)
+  const [regBodyErrors, setRegBodyErrors] = useState<RegulatoryBodyFormErrors>({})
 
   /* ── Derived lists ──────────────────────────────────────────────────── */
   const lc = search.toLowerCase()
@@ -244,15 +493,12 @@ export default function AdminResources() {
     .filter(r => {
       if (activeCategoryId === 'all') return true
       if (activeCategoryId === 'general') return true
-      if (activeCategoryId === 'regulatory') {
-        return (r.tags ?? []).includes('major:regulatory')
-      }
+      if (activeCategoryId === 'regulatory') return true
       if (isKnownCategoryId.has(activeCategoryId)) {
         return r.categoryId === activeCategoryId || r.category?.id === activeCategoryId || r.category?.parentId === activeCategoryId
       }
       return true
     })
-    .filter(r => !search || r.title.toLowerCase().includes(lc) || (r.authorName ?? '').toLowerCase().includes(lc))
   const filteredGlossary = (glossaryData ?? []).filter(g =>
     !search || g.term.toLowerCase().includes(lc)
   )
@@ -318,37 +564,15 @@ export default function AdminResources() {
       if (coverImageFile) coverImageUrl = await uploadFile(coverImageFile)
       if (documentFile)   fileUrl       = await uploadFile(documentFile)
 
-      const tags: string[] = [`major:${form.majorCategory}`]
-      const isGeneralCustomSub = form.majorCategory === 'general' && form.categoryId === '__custom__'
-      const isRegCustomDoc = form.majorCategory === 'regulatory' && form.docTypeId === '__custom__'
+      const { tags, categoryId } = deriveResourceTagsAndCategory(form)
 
-      if (form.majorCategory === 'regulatory') {
-        if (form.regulatoryBodyId) tags.push(`reg-body:${form.regulatoryBodyId}`)
-        if (isRegCustomDoc && form.customDocType.trim()) tags.push(`doc-type-custom:${form.customDocType.trim()}`)
-        else if (form.docTypeId) tags.push(`doc-type:${form.docTypeId}`)
-      }
-      if (isGeneralCustomSub && form.customSubCategory.trim()) {
-        tags.push(`general-sub-custom:${form.customSubCategory.trim()}`)
-      }
-
-      const categoryId = form.majorCategory === 'general' && !isGeneralCustomSub
-        ? (form.categoryId || undefined)
-        : undefined
-
-      const dto: CreateResourceDto = {
-        title: form.title.trim(),
-        resourceType: form.resourceType,
-        status: form.status,
-        isPremium: form.isPremium,
-        ...(form.authorName && { authorName: form.authorName }),
-        ...(form.authorType && { authorType: form.authorType }),
-        ...(form.topic      && { topic: form.topic }),
-        ...(form.briefIntro && { briefIntro: form.briefIntro }),
-        ...(categoryId && { categoryId }),
-        ...(tags.length > 0 && { tags }),
-        ...(coverImageUrl   && { coverImageUrl }),
-        ...(fileUrl         && { fileUrl }),
-      }
+      const dto = buildAdminResourceDto({
+        form,
+        coverImageUrl,
+        fileUrl,
+        categoryId,
+        tags,
+      })
       if (editId) {
         await updateResource.mutateAsync({ id: editId, dto })
       } else {
@@ -431,6 +655,86 @@ export default function AdminResources() {
     await deleteCategory.mutateAsync(id)
   }
 
+  function openCreateRegulatoryBodyModal() {
+    setEditRegBodyId(null)
+    setRegBodyErrors({})
+    setRegBodyForm(EMPTY_REGULATORY_BODY_FORM)
+    setRegBodyModalOpen(true)
+  }
+
+  function openEditRegulatoryBodyModal(body: AdminRegulatoryBody) {
+    setEditRegBodyId(body.id)
+    setRegBodyErrors({})
+    setRegBodyForm({
+      name: body.name ?? '',
+      fullName: body.fullName ?? '',
+      description: body.description ?? '',
+      logoUrl: body.logoUrl ?? '',
+    })
+    setRegBodyModalOpen(true)
+  }
+
+  function validateRegulatoryBodyForm(formData: RegulatoryBodyForm): RegulatoryBodyFormErrors {
+    const errors: RegulatoryBodyFormErrors = {}
+    const name = formData.name.trim()
+    const fullName = formData.fullName.trim()
+    const logoUrl = formData.logoUrl.trim()
+
+    if (!name) {
+      errors.name = 'Short name is required.'
+    } else if (name.length > 20) {
+      errors.name = 'Short name must be 20 characters or less.'
+    }
+
+    if (!fullName) {
+      errors.fullName = 'Full name is required.'
+    }
+
+    if (logoUrl) {
+      try {
+        const parsed = new URL(logoUrl)
+        if (!(parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
+          errors.logoUrl = 'Logo URL must start with http:// or https://.'
+        }
+      } catch {
+        errors.logoUrl = 'Enter a valid URL.'
+      }
+    }
+
+    return errors
+  }
+
+  async function saveRegulatoryBody() {
+    const errors = validateRegulatoryBodyForm(regBodyForm)
+    setRegBodyErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    const dto = {
+      name: regBodyForm.name.trim(),
+      fullName: regBodyForm.fullName.trim(),
+      description: regBodyForm.description.trim() || undefined,
+      logoUrl: regBodyForm.logoUrl.trim() || undefined,
+    }
+
+    if (editRegBodyId) {
+      await updateRegulatoryBody.mutateAsync({ id: editRegBodyId, dto })
+    } else {
+      await createRegulatoryBody.mutateAsync(dto)
+    }
+
+    setRegBodyModalOpen(false)
+    setEditRegBodyId(null)
+    setRegBodyForm(EMPTY_REGULATORY_BODY_FORM)
+    setRegBodyErrors({})
+  }
+
+  async function handleDeleteRegulatoryBody(id: string) {
+    const confirmed = globalThis.confirm('Delete this regulatory body? This action cannot be undone.')
+    if (!confirmed) return
+    await deleteRegulatoryBody.mutateAsync(id)
+    setOpenMenu(null)
+  }
+
   /* ── Reject reason state ───────────────────────────────────────────── */
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectTargetId, setRejectTargetId]   = useState<string | null>(null)
@@ -455,40 +759,29 @@ export default function AdminResources() {
   let documentDisplayName = documentFile?.name ?? 'Choose file\u2026'
   if (!documentFile && form.fileUrl) documentDisplayName = 'Replace file\u2026'
 
-  let mainActionClick: (() => void) = openCreate
-  let mainActionLabel = 'Upload Resource'
-  if (activeView === 'glossary') { mainActionClick = openCreateGlossary; mainActionLabel = 'Add Term' }
+  const mainAction = getMainAction(activeView, openCreate, openCreateGlossary)
 
-  let sectionContent: React.ReactNode
-  if (isCurrentLoading) {
-    sectionContent = (
-      <div className="py-16 flex items-center justify-center gap-2 text-slate-400">
-        <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Loading\u2026</span>
-      </div>
-    )
-  } else if (activeView === 'glossary') {
-    sectionContent = (
-      <GlossaryTable entries={filteredGlossary} openMenu={openMenu} setOpenMenu={setOpenMenu}
-        onEdit={openEditGlossary} onDelete={handleDeleteGlossary} onTogglePublish={toggleGlossaryPublish}
-        deleting={deleteGlossTerm.isPending} />
-    )
-  } else if (activeView === 'pending') {
-    sectionContent = (
-      <PendingTable
-        items={pendingData ?? []}
-        loading={pendingLoading}
-        onApprove={id => approveResource.mutateAsync(id)}
-        onReject={openRejectModal}
-        approving={approveResource.isPending}
-      />
-    )
-  } else {
-    sectionContent = (
-      <ResourceTable items={items} openMenu={openMenu} setOpenMenu={setOpenMenu}
-        onEdit={openEdit} onDelete={handleDeleteResource} onTogglePublish={togglePublish}
-        deleting={deleteResource.isPending} />
-    )
-  }
+  const sectionContent = renderAdminResourcesSection({
+    activeView,
+    isLoading: isCurrentLoading,
+    filteredGlossary,
+    openMenu,
+    setOpenMenu,
+    openEditGlossary,
+    handleDeleteGlossary,
+    toggleGlossaryPublish,
+    deleteGlossaryPending: deleteGlossTerm.isPending,
+    pendingData: pendingData ?? [],
+    pendingLoading,
+    approveResource: id => approveResource.mutateAsync(id),
+    openRejectModal,
+    approvePending: approveResource.isPending,
+    items,
+    openEdit,
+    handleDeleteResource,
+    togglePublish,
+    deleteResourcePending: deleteResource.isPending,
+  })
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -518,9 +811,9 @@ export default function AdminResources() {
           )}
           {(activeView !== 'pending') && (
             <Button size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
-              onClick={mainActionClick}>
+              onClick={mainAction.onClick}>
               <Plus className="h-3.5 w-3.5" />
-              {mainActionLabel}
+              {mainAction.label}
             </Button>
           )}
         </div>
@@ -616,7 +909,7 @@ export default function AdminResources() {
             {activeCategoryId === 'regulatory' && (
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="text-slate-400 uppercase tracking-wide">Regulatory bodies</span>
-                {REGULATORY_BODIES.map(body => (
+                {regulatoryBodies.map(body => (
                   <span key={body.id} className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-slate-500">
                     {body.name}
                   </span>
@@ -647,6 +940,64 @@ export default function AdminResources() {
               className="pl-9 h-9 text-sm rounded-lg"
             />
           </div>
+          {activeView === 'resources' && (
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              <Select value={orderFilter} onChange={e => setOrderFilter(e.target.value as 'ASC' | 'DESC')}>
+                <option value="DESC">Order: DESC</option>
+                <option value="ASC">Order: ASC</option>
+              </Select>
+              <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value as AdminStatusFilter)}>
+                <option value="all">Status: All</option>
+                <option value="draft">Draft</option>
+                <option value="pending_review">Pending Review</option>
+                <option value="published">Published</option>
+                <option value="archived">Archived</option>
+              </Select>
+              <Select value={resourceTypeFilter} onChange={e => setResourceTypeFilter(e.target.value as AdminTypeFilter)}>
+                <option value="all">Type: All</option>
+                <option value="guide">Guide</option>
+                <option value="research">Research</option>
+                <option value="standard">Standard</option>
+                <option value="tool">Tool</option>
+              </Select>
+              <Select value={premiumFilter} onChange={e => setPremiumFilter(e.target.value as AdminPremiumFilter)}>
+                <option value="all">Premium: All</option>
+                <option value="premium">Premium</option>
+                <option value="free">Free</option>
+              </Select>
+              <Select value={regulatoryFilter} onChange={e => setRegulatoryFilter(e.target.value as AdminRegulatoryFilter)}>
+                <option value="all">Regulatory: All</option>
+                <option value="yes">Regulatory: Yes</option>
+                <option value="no">Regulatory: No</option>
+              </Select>
+              <Select value={regulatoryBodyFilterId} onChange={e => setRegulatoryBodyFilterId(e.target.value)}>
+                <option value="">Regulatory body: All</option>
+                {regulatoryBodies.map(body => (
+                  <option key={body.id} value={body.id}>{body.name}</option>
+                ))}
+              </Select>
+              <Input
+                value={resourceTypesCsv}
+                onChange={e => setResourceTypesCsv(e.target.value)}
+                placeholder="resourceTypes CSV: guide,research"
+              />
+              <Input
+                value={languagesCsv}
+                onChange={e => setLanguagesCsv(e.target.value)}
+                placeholder="languages CSV: english,arabic"
+              />
+              <Input
+                value={publishedYearFrom}
+                onChange={e => setPublishedYearFrom(e.target.value)}
+                placeholder="publishedYearFrom"
+              />
+              <Input
+                value={publishedYearTo}
+                onChange={e => setPublishedYearTo(e.target.value)}
+                placeholder="publishedYearTo"
+              />
+            </div>
+          )}
         </div>
 
         {sectionContent}
@@ -670,6 +1021,13 @@ export default function AdminResources() {
 
         <CategoriesPanel
           categories={categories ?? []}
+          regulatoryBodies={regulatoryBodies}
+          onCreateRegulatoryBody={openCreateRegulatoryBodyModal}
+          onEditRegulatoryBody={openEditRegulatoryBodyModal}
+          onDeleteRegulatoryBody={handleDeleteRegulatoryBody}
+          creatingRegulatoryBody={createRegulatoryBody.isPending}
+          updatingRegulatoryBody={updateRegulatoryBody.isPending}
+          deletingRegulatoryBody={deleteRegulatoryBody.isPending}
           openMenu={openMenu}
           setOpenMenu={setOpenMenu}
           onEdit={openEditCategory}
@@ -756,7 +1114,7 @@ export default function AdminResources() {
                 <label htmlFor="res-reg-body" className="block text-xs font-medium text-slate-600 mb-1">Regulatory Body</label>
                 <Select id="res-reg-body" value={form.regulatoryBodyId} onChange={e => setForm(f => ({ ...f, regulatoryBodyId: e.target.value }))}>
                   <option value="">— Select body —</option>
-                  {REGULATORY_BODIES.map(b => (
+                  {regulatoryBodies.map(b => (
                     <option key={b.id} value={b.id}>{b.name} — {b.fullName}</option>
                   ))}
                 </Select>
@@ -815,6 +1173,7 @@ export default function AdminResources() {
               <label htmlFor="res-status" className="block text-xs font-medium text-slate-600 mb-1">Status</label>
               <Select id="res-status" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ResourceForm['status'] }))}>
                 <option value="draft">Draft</option>
+                <option value="pending_review">Pending Review</option>
                 <option value="published">Published</option>
                 <option value="archived">Archived</option>
               </Select>
@@ -891,6 +1250,109 @@ export default function AdminResources() {
         </div>
       </Dialog>
 
+      {/* Regulatory Body Modal */}
+      <Dialog
+        open={regBodyModalOpen}
+        onClose={() => {
+          setRegBodyModalOpen(false)
+          setEditRegBodyId(null)
+        }}
+        title={editRegBodyId ? 'Edit Regulatory Body' : 'Add Regulatory Body'}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="rb-name" className="block text-xs font-medium text-slate-600 mb-1">Short Name <span className="text-red-500">*</span></label>
+            <Input
+              id="rb-name"
+              value={regBodyForm.name}
+              onChange={e => {
+                const value = e.target.value
+                setRegBodyForm(f => ({ ...f, name: value }))
+                if (regBodyErrors.name) {
+                  setRegBodyErrors(prev => ({ ...prev, name: undefined }))
+                }
+              }}
+              placeholder="e.g. CBN"
+              className="h-9 text-sm"
+            />
+            {regBodyErrors.name && <p className="mt-1 text-xs text-red-600">{regBodyErrors.name}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="rb-full-name" className="block text-xs font-medium text-slate-600 mb-1">Full Name <span className="text-red-500">*</span></label>
+            <Input
+              id="rb-full-name"
+              value={regBodyForm.fullName}
+              onChange={e => {
+                const value = e.target.value
+                setRegBodyForm(f => ({ ...f, fullName: value }))
+                if (regBodyErrors.fullName) {
+                  setRegBodyErrors(prev => ({ ...prev, fullName: undefined }))
+                }
+              }}
+              placeholder="e.g. Central Bank of Nigeria"
+              className="h-9 text-sm"
+            />
+            {regBodyErrors.fullName && <p className="mt-1 text-xs text-red-600">{regBodyErrors.fullName}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="rb-description" className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+            <textarea
+              id="rb-description"
+              value={regBodyForm.description}
+              onChange={e => setRegBodyForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Optional notes about this regulatory body..."
+              rows={3}
+              className="w-full bg-background text-foreground text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none placeholder:text-muted-foreground focus:outline-none focus:border-[#D52B1E]"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="rb-logo-url" className="block text-xs font-medium text-slate-600 mb-1">Logo URL</label>
+            <Input
+              id="rb-logo-url"
+              value={regBodyForm.logoUrl}
+              onChange={e => {
+                const value = e.target.value
+                setRegBodyForm(f => ({ ...f, logoUrl: value }))
+                if (regBodyErrors.logoUrl) {
+                  setRegBodyErrors(prev => ({ ...prev, logoUrl: undefined }))
+                }
+              }}
+              placeholder="https://example.com/logo.png"
+              className="h-9 text-sm"
+            />
+            {regBodyErrors.logoUrl && <p className="mt-1 text-xs text-red-600">{regBodyErrors.logoUrl}</p>}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => {
+                setRegBodyModalOpen(false)
+                setEditRegBodyId(null)
+              }}
+              disabled={createRegulatoryBody.isPending || updateRegulatoryBody.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
+              onClick={saveRegulatoryBody}
+              disabled={createRegulatoryBody.isPending || updateRegulatoryBody.isPending}
+            >
+              {(createRegulatoryBody.isPending || updateRegulatoryBody.isPending) && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {editRegBodyId ? 'Save Changes' : 'Create Body'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
       {/* Reject Reason Modal */}
       <Dialog open={rejectModalOpen} onClose={() => setRejectModalOpen(false)} title="Reject Submission" maxWidth="max-w-sm">
         <div className="space-y-4">
@@ -939,6 +1401,13 @@ export default function AdminResources() {
 /* ── Categories Panel sub-component ────────────────────────────────────── */
 interface CategoriesPanelProps {
   readonly categories: AdminResourceCategory[]
+  readonly regulatoryBodies: Array<{ id: string; name: string; fullName?: string; description?: string; logoUrl?: string }>
+  readonly onCreateRegulatoryBody: () => void
+  readonly onEditRegulatoryBody: (body: AdminRegulatoryBody) => void
+  readonly onDeleteRegulatoryBody: (id: string) => Promise<void>
+  readonly creatingRegulatoryBody: boolean
+  readonly updatingRegulatoryBody: boolean
+  readonly deletingRegulatoryBody: boolean
   readonly openMenu: string | null
   readonly setOpenMenu: (id: string | null) => void
   readonly onEdit: (cat: AdminResourceCategory) => void
@@ -947,7 +1416,22 @@ interface CategoriesPanelProps {
   readonly deleting: boolean
 }
 
-function CategoriesPanel({ categories, openMenu, setOpenMenu, onEdit, onDelete, onCreateSub, deleting }: CategoriesPanelProps) {
+function CategoriesPanel({
+  categories,
+  regulatoryBodies,
+  onCreateRegulatoryBody,
+  onEditRegulatoryBody,
+  onDeleteRegulatoryBody,
+  creatingRegulatoryBody,
+  updatingRegulatoryBody,
+  deletingRegulatoryBody,
+  openMenu,
+  setOpenMenu,
+  onEdit,
+  onDelete,
+  onCreateSub,
+  deleting,
+}: CategoriesPanelProps) {
   const generalSubCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name))
 
   return (
@@ -1010,20 +1494,68 @@ function CategoriesPanel({ categories, openMenu, setOpenMenu, onEdit, onDelete, 
             <FolderTree className="h-4 w-4 text-[#D52B1E]" />
             <span className="font-semibold text-slate-800 text-sm">Regulatory</span>
             <span className="text-[11px] font-medium text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-full">Group</span>
-            <span className="text-xs text-slate-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full">FE-defined</span>
-            <span className="text-xs text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">{REGULATORY_BODIES.length} bodies</span>
+            <span className="text-xs text-slate-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full">API-managed</span>
+            <span className="text-xs text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">{regulatoryBodies.length} bodies</span>
             <span className="text-xs text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">{DOCUMENT_TYPES.length} doc types</span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Regulatory bodies and document types are currently frontend-defined until backend support is ready.</p>
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">Regulatory bodies are loaded from API; document types remain frontend-defined.</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-xs border-[#D52B1E] text-[#D52B1E] hover:bg-[#FFEFEF]"
+              onClick={onCreateRegulatoryBody}
+              disabled={creatingRegulatoryBody}
+            >
+              {creatingRegulatoryBody ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Plus className="h-3 w-3" />
+              )}
+              Add Body
+            </Button>
+          </div>
         </div>
         <div className="px-4 py-3 space-y-3 text-sm">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">Bodies</p>
-            <div className="flex flex-wrap gap-2">
-              {REGULATORY_BODIES.map(body => (
-                <span key={body.id} className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-slate-600">
-                  {body.name}
-                </span>
+            <div className="space-y-2">
+              {regulatoryBodies.map(body => (
+                <div key={body.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5">
+                  <div className="min-w-0">
+                    <p className="text-slate-700 text-sm truncate">{body.name}{body.fullName ? ` - ${body.fullName}` : ''}</p>
+                    {body.description && (
+                      <p className="text-[11px] text-slate-400 truncate">{body.description}</p>
+                    )}
+                  </div>
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setOpenMenu(openMenu === `rb-${body.id}` ? null : `rb-${body.id}`)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                    {openMenu === `rb-${body.id}` && (
+                      <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-100 rounded-xl shadow-xl z-10 py-1 text-sm">
+                        <button
+                          onClick={() => onEditRegulatoryBody(body as AdminRegulatoryBody)}
+                          disabled={updatingRegulatoryBody || deletingRegulatoryBody}
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700 disabled:opacity-50"
+                        >
+                          <Edit className="h-3.5 w-3.5 text-blue-600" /> Edit
+                        </button>
+                        <hr className="my-1 border-gray-100" />
+                        <button
+                          onClick={() => onDeleteRegulatoryBody(body.id)}
+                          disabled={deletingRegulatoryBody || creatingRegulatoryBody || updatingRegulatoryBody}
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

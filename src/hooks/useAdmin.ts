@@ -850,6 +850,11 @@ export const useAdminDeleteReportCategory = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type AdminResourceType = "guide" | "research" | "standard" | "tool";
+export type AdminResourceStatus =
+  | "draft"
+  | "pending_review"
+  | "published"
+  | "archived";
 
 export interface AdminResourceCategory {
   id: string;
@@ -873,9 +878,18 @@ export interface AdminResource {
   previewUrl: string | null;
   categoryId: string | null;
   category: AdminResourceCategory | null;
+  subCategoryId?: string | null;
+  subCategory?: AdminResourceCategory | null;
+  languages?: string[];
+  publishedYear?: number | null;
+  regulatoryBodyId?: string | null;
+  regulatoryBody?: { id: string; name: string } | null;
+  isRegulatory?: boolean;
+  documentType?: string | null;
+  documentFormat?: string | null;
   isPremium: boolean;
   isFeatured: boolean;
-  status: "draft" | "published" | "archived";
+  status: AdminResourceStatus;
   tags: string[];
   viewCount: number;
   downloadCount: number;
@@ -896,8 +910,20 @@ export interface AdminGlossaryTerm {
 
 export interface CreateResourceDto {
   title: string;
+  slug?: string;
+  description?: string;
+  bodyHtml?: string;
   resourceType: AdminResourceType;
+  thumbnailUrl?: string;
+  attachmentUrl?: string;
+  externalUrl?: string;
+  fileSizeKb?: number;
+  pageCount?: number;
+  language?: string;
   authorName?: string;
+  publisher?: string;
+  publishedYear?: number;
+  isDownloadable?: boolean;
   authorType?: "individual" | "organization";
   topic?: string;
   briefIntro?: string;
@@ -905,9 +931,16 @@ export interface CreateResourceDto {
   fileUrl?: string;
   previewUrl?: string;
   categoryId?: string;
+  subCategoryId?: string;
+  languages?: string[];
+  regulatoryBodyId?: string;
+  isRegulatory?: boolean;
+  documentType?: string;
+  documentFormat?: string;
   isPremium?: boolean;
   isFeatured?: boolean;
-  status?: "draft" | "published" | "archived";
+  status?: AdminResourceStatus;
+  publishedAt?: string;
   tags?: string[];
 }
 
@@ -920,10 +953,16 @@ export interface CreateGlossaryTermDto {
 }
 
 export interface ResourceListParams extends ListParams {
-  status?: "draft" | "published" | "archived";
+  status?: AdminResourceStatus;
   resourceType?: AdminResourceType;
+  resourceTypes?: string;
   categoryId?: string;
   isPremium?: boolean;
+  languages?: string;
+  publishedYearFrom?: number;
+  publishedYearTo?: number;
+  regulatoryBodyId?: string;
+  isRegulatory?: boolean;
 }
 
 export interface GlossaryListParams {
@@ -953,6 +992,105 @@ export const useAdminResourceCategories = () =>
       return data;
     },
   });
+
+export interface AdminRegulatoryBody {
+  id: string;
+  name: string;
+  fullName?: string;
+  logoUrl?: string;
+  color?: string;
+  description?: string;
+}
+
+export interface CreateRegulatoryBodyDto {
+  name: string;
+  fullName?: string;
+  description?: string;
+  logoUrl?: string;
+}
+
+export const useAdminResourceRegulatoryBodies = () =>
+  useQuery({
+    queryKey: ["admin", "resources", "regulatory-bodies"],
+    queryFn: async () => {
+      const { data } = await api.get<AdminRegulatoryBody[]>(
+        "/resources/regulatory-bodies",
+      );
+      return data;
+    },
+  });
+
+export const useAdminCreateResourceRegulatoryBody = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: CreateRegulatoryBodyDto) => {
+      const { data } = await api.post<AdminRegulatoryBody>(
+        "/resources/regulatory-bodies",
+        dto,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources", "regulatory-bodies"] });
+      qc.invalidateQueries({ queryKey: ["resources", "regulatory-bodies"] });
+      toast({ title: "Regulatory body created" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Create failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminUpdateResourceRegulatoryBody = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: Partial<CreateRegulatoryBodyDto>;
+    }) => {
+      const { data } = await api.patch<AdminRegulatoryBody>(
+        `/resources/regulatory-bodies/${id}`,
+        dto,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources", "regulatory-bodies"] });
+      qc.invalidateQueries({ queryKey: ["resources", "regulatory-bodies"] });
+      toast({ title: "Regulatory body updated" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Update failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminDeleteResourceRegulatoryBody = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => api.delete(`/resources/regulatory-bodies/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "resources", "regulatory-bodies"] });
+      qc.invalidateQueries({ queryKey: ["resources", "regulatory-bodies"] });
+      toast({ title: "Regulatory body deleted" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Delete failed",
+        variant: "destructive",
+      }),
+  });
+};
 
 export const useAdminGlossaryTerms = (params: GlossaryListParams = {}) =>
   useQuery({

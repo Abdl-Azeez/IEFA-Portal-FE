@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Bitcoin,
   Search,
+  SlidersHorizontal,
   X,
   Plus,
   Loader2,
@@ -24,17 +25,18 @@ import { DownloadEmailModal } from "@/components/resources/DownloadEmailModal";
 import { GlossarySection } from "@/components/resources/GlossarySection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
   useResources,
   useResourceCategories,
+  useResourceRegulatoryBodies,
   useGlossaryTerms,
+  useDownloadResource,
   useTrackResourceDownload,
   useSubmitUserResource,
 } from "@/hooks/useResources";
 import { toast } from "@/hooks/use-toast";
-import type { ResourceItem } from "@/types/resources";
+import type { ResourceItem, ResourceType } from "@/types/resources";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -91,54 +93,14 @@ const SUB_CATEGORIES: SubCategoryConfig[] = [
   { key: "glossary", label: "Glossary", icon: BookA },
 ];
 
-/* ── Regulatory bodies ────────────────────────────────────────────────────── */
-interface RegulatoryBody {
+/* ── Regulatory bodies — API driven, no static fallback ─────────────────── */
+interface LocalRegulatoryBody {
   readonly id: string;
   readonly name: string;
   readonly fullName: string;
   readonly logoUrl: string;
-  readonly color: string;
   readonly description: string;
 }
-
-const REGULATORY_BODIES: RegulatoryBody[] = [
-  {
-    id: "cbn",
-    name: "CBN",
-    fullName: "Central Bank of Nigeria",
-    logoUrl: "https://www.cbn.gov.ng/images/cbn_logo.png",
-    color: "#006847",
-    description:
-      "Nigeria's apex monetary authority responsible for financial system stability.",
-  },
-  {
-    id: "sec",
-    name: "SEC",
-    fullName: "Securities & Exchange Commission",
-    logoUrl: "https://sec.gov.ng/wp-content/uploads/2021/03/sec-logo.png",
-    color: "#003082",
-    description:
-      "Regulator of the Nigerian capital market and investment activities.",
-  },
-  {
-    id: "naicom",
-    name: "NAICOM",
-    fullName: "National Insurance Commission",
-    logoUrl: "https://naicom.gov.ng/images/logo.png",
-    color: "#8B0000",
-    description:
-      "Supervisory and regulatory authority for the insurance industry.",
-  },
-  {
-    id: "ndic",
-    name: "NDIC",
-    fullName: "Nigeria Deposit Insurance Corporation",
-    logoUrl: "https://ndic.gov.ng/wp-content/uploads/2020/09/NDIC-logo.png",
-    color: "#1a4b8c",
-    description:
-      "Protects depositors and maintains confidence in the banking system.",
-  },
-];
 
 interface DocumentTypeConfig {
   readonly id: string;
@@ -207,32 +169,401 @@ function CategoryChip({ label, count, active, onClick }: CategoryChipProps) {
 }
 
 type SortBy = "date" | "views" | "downloads";
-
-interface UploadForm {
-  title: string;
-  briefIntro: string;
-  categoryId: string;
-  resourceType: string;
-  subCategoryId: string;
-  customSubCategory: string;
-  docTypeId: string;
-  customDocType: string;
-  authorName: string;
-}
-
-const EMPTY_UPLOAD_FORM: UploadForm = {
-  title: "",
-  briefIntro: "",
-  categoryId: "",
-  resourceType: "",
-  subCategoryId: "",
-  customSubCategory: "",
-  docTypeId: "",
-  customDocType: "",
-  authorName: "",
-};
+type StatusFilter = "all" | "draft" | "pending_review" | "published" | "archived";
+type PremiumFilter = "all" | "premium" | "free";
+type RegulatoryFilter = "all" | "yes" | "no";
+type ResourceTypeFilter = "all" | ResourceType;
 
 const PAGE_SIZE = 9;
+
+/* ════ ContributeResourceModal ══════════════════════════════════════════════════════════════════ */
+interface ContributeResourceModalProps {
+  open: boolean;
+  onClose: () => void;
+  categories: import("@/types/resources").ResourceCategory[];
+  regulatoryBodies: LocalRegulatoryBody[];
+}
+
+const EMPTY_CONTRIBUTE_FORM = {
+  title: "",
+  description: "",
+  categoryId: "",
+  resourceType: "" as ResourceType | "",
+  regulatoryBodyId: "",
+  authorName: "",
+  publisher: "",
+  publishedYear: "",
+  language: "en",
+  pageCount: "",
+  externalUrl: "",
+  tagsRaw: "",
+};
+
+function ContributeResourceModal({
+  open,
+  onClose,
+  categories,
+  regulatoryBodies,
+}: ContributeResourceModalProps) {
+  const submitResource = useSubmitUserResource();
+  const [form, setForm] = useState({ ...EMPTY_CONTRIBUTE_FORM });
+  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [fileSizeKb, setFileSizeKb] = useState<number | undefined>(undefined);
+  const [attachPending, setAttachPending] = useState(false);
+  const [thumbPending, setThumbPending] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const parentCategories = useMemo(() => categories.filter((c) => !c.parentId), [categories]);
+
+  const clearErr = (key: string) =>
+    setErrors((p) => (p[key] ? { ...p, [key]: "" } : p));
+
+  const field = <K extends keyof typeof form>(key: K) => ({
+    value: form[key] as string,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      setForm((p) => ({ ...p, [key]: e.target.value }));
+      clearErr(key as string);
+    },
+  });
+
+  const closeAndReset = () => {
+    if (submitting) return;
+    setForm({ ...EMPTY_CONTRIBUTE_FORM });
+    setAttachmentUrl("");
+    setThumbnailUrl("");
+    setFileSizeKb(undefined);
+    setErrors({});
+    onClose();
+  };
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!form.title.trim()) e.title = "Title is required.";
+    if (!form.resourceType) e.resourceType = "Resource type is required.";
+    if (!attachmentUrl && !form.externalUrl.trim())
+      e.attachment = "Provide a file upload or an external URL.";
+    if (attachPending || thumbPending)
+      e.pending = "Please wait for uploads to finish.";
+    return e;
+  };
+
+  const handleSubmit = async () => {
+    const e = validate();
+    if (Object.keys(e).length) {
+      setErrors(e);
+      toast.error("Please fix the highlighted fields.");
+      return;
+    }
+    setErrors({});
+    setSubmitting(true);
+    try {
+      const slug = form.title
+        .trim()
+        .toLowerCase()
+        .replaceAll(/[^a-z0-9\s-]/g, "")
+        .replaceAll(/\s+/g, "-")
+        .slice(0, 80);
+      const tags = form.tagsRaw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      await submitResource.mutateAsync({
+        title: form.title.trim(),
+        slug,
+        description: form.description.trim() || undefined,
+        categoryId: form.categoryId || parentCategories[0]?.id || "general",
+        resourceType: (form.resourceType as ResourceType) || "guide",
+        thumbnailUrl: thumbnailUrl || undefined,
+        attachmentUrl: attachmentUrl || undefined,
+        externalUrl: form.externalUrl.trim() || undefined,
+        fileSizeKb: fileSizeKb,
+        pageCount: form.pageCount.trim() ? Number(form.pageCount) : undefined,
+        language: form.language.trim() || "en",
+        authorName: form.authorName.trim() || undefined,
+        publisher: form.publisher.trim() || undefined,
+        publishedYear: form.publishedYear.trim() ? Number(form.publishedYear) : undefined,
+        isDownloadable: undefined,
+        isPremium: undefined,
+        isFeatured: false,
+        tags: tags.length ? tags : undefined,
+        status: "draft",
+        regulatoryBodyId: form.regulatoryBodyId || undefined,
+      });
+      toast({
+        title: "Resource submitted!",
+        description: "Your resource is pending admin review.",
+      });
+      closeAndReset();
+    } catch {
+      /* handled by mutation */
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!open) return null;
+
+  const sectionLabel = (text: string) => (
+    <div className="md:col-span-2 mt-2">
+      <p className="text-[11px] font-bold text-[#737692] uppercase tracking-widest mb-1">
+        {text}
+      </p>
+      <hr className="border-gray-100" />
+    </div>
+  );
+
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[100] h-[100dvh] w-screen flex items-end sm:items-center justify-center p-0 sm:p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="absolute inset-0 h-[100dvh] w-screen bg-black/50 backdrop-blur-sm"
+        onClick={closeAndReset}
+      />
+      <motion.div
+        className="relative bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-3xl max-h-[92dvh] overflow-y-auto shadow-2xl"
+        initial={{ y: 60, opacity: 0, scale: 0.97 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: 60, opacity: 0, scale: 0.97 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white z-10 px-6 pt-6 pb-4 border-b border-gray-100">
+          <button
+            onClick={closeAndReset}
+            disabled={submitting}
+            className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-gray-100 text-gray-400"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-[#D52B1E]/10 flex items-center justify-center">
+              <Plus className="h-5 w-5 text-[#D52B1E]" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Contribute a Resource</h2>
+              <p className="text-sm text-gray-500">
+                Submitted as draft — requires admin approval before publishing.
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-3">
+            <span className="text-red-500 font-semibold">*</span> Required fields
+          </p>
+        </div>
+
+        {/* Form body */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* ─ Basic Information ─ */}
+          {sectionLabel("Basic Information")}
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Title <span className="text-red-500">*</span>
+            </label>
+            <Input
+              placeholder="e.g. Global Economic Outlook 2026"
+              {...field("title")}
+              className={errors.title ? "border-red-400 focus-visible:ring-red-300" : undefined}
+            />
+            {errors.title && <p className="text-xs text-red-600 mt-1">{errors.title}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Resource Type <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.resourceType}
+              onChange={(e) => { setForm((p) => ({ ...p, resourceType: e.target.value as ResourceType | "" })); clearErr("resourceType"); }}
+              className={`w-full h-10 rounded-md border px-3 text-sm bg-white text-gray-900 ${
+                errors.resourceType ? "border-red-400" : "border-gray-200"
+              }`}
+            >
+              <option value="">Select type…</option>
+              <option value="guide">Educational Guide</option>
+              <option value="research">Research &amp; Publication</option>
+              <option value="standard">Standards &amp; Governance</option>
+              <option value="tool">Tools &amp; Practical</option>
+            </select>
+            {errors.resourceType && <p className="text-xs text-red-600 mt-1">{errors.resourceType}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
+            <select
+              value={form.categoryId}
+              onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value }))}
+              className="w-full h-10 rounded-md border border-gray-200 px-3 text-sm bg-white text-gray-900"
+            >
+              <option value="">None / General</option>
+              {parentCategories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Regulatory Body</label>
+            <select
+              value={form.regulatoryBodyId}
+              onChange={(e) => setForm((p) => ({ ...p, regulatoryBodyId: e.target.value }))}
+              className="w-full h-10 rounded-md border border-gray-200 px-3 text-sm bg-white text-gray-900"
+            >
+              <option value="">None</option>
+              {regulatoryBodies.map((b) => (
+                <option key={b.id} value={b.id}>{b.name} — {b.fullName}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* ─ Content ─ */}
+          {sectionLabel("Content")}
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Briefly describe what this resource covers…"
+              rows={4}
+              className="w-full bg-white text-gray-900 text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Tags <span className="text-gray-400 font-normal">(comma-separated)</span></label>
+            <Input placeholder="economics, islamic finance, halal" {...field("tagsRaw")} />
+          </div>
+
+          {/* ─ Attribution ─ */}
+          {sectionLabel("Attribution")}
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Author Name</label>
+            <Input placeholder="Dr. Ahmed Hassan" {...field("authorName")} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Publisher</label>
+            <Input placeholder="IEFA Research Institute" {...field("publisher")} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Published Year</label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder={String(new Date().getFullYear())}
+              value={form.publishedYear}
+              onChange={(e) => setForm((p) => ({ ...p, publishedYear: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Language</label>
+            <select
+              value={form.language}
+              onChange={(e) => setForm((p) => ({ ...p, language: e.target.value }))}
+              className="w-full h-10 rounded-md border border-gray-200 px-3 text-sm bg-white text-gray-900"
+            >
+              <option value="en">English</option>
+              <option value="ar">Arabic</option>
+              <option value="fr">French</option>
+              <option value="ms">Malay</option>
+              <option value="ur">Urdu</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {/* ─ Files &amp; Links ─ */}
+          {sectionLabel("Files & Links")}
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Resource File
+              {!form.externalUrl.trim() && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <ImageUpload
+              value={attachmentUrl}
+              onChange={(url) => { setAttachmentUrl(url); clearErr("attachment"); }}
+              onUploadPendingChange={setAttachPending}
+              onFileSizeKb={setFileSizeKb}
+              mode="document"
+              label="Click to upload file (PDF, DOCX, XLSX…)"
+              accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.pptx,.ppt"
+              previewHeight="h-24"
+            />
+            {errors.attachment && <p className="text-xs text-red-600 mt-1">{errors.attachment}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Cover / Thumbnail</label>
+            <ImageUpload
+              value={thumbnailUrl}
+              onChange={setThumbnailUrl}
+              onUploadPendingChange={setThumbPending}
+              mode="image"
+              previewHeight="h-24"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              External URL
+              {!attachmentUrl && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <Input
+              type="url"
+              placeholder="https://external-publisher.com/resource"
+              {...field("externalUrl")}
+            />
+            <p className="text-[11px] text-gray-400 mt-1">Required only if no file is uploaded above.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Page Count</label>
+            <Input type="number" placeholder="42" {...field("pageCount")} />
+          </div>
+
+          {errors.pending && (
+            <div className="md:col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              {errors.pending}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-400">
+            Submissions are reviewed before publishing.
+          </p>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={closeAndReset} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#D52B1E] hover:bg-[#B8241B] text-white"
+              onClick={handleSubmit}
+              disabled={submitting || attachPending || thumbPending}
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Submit for Review
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
 
 /* ════════════════════════════════════════════════════════════════════════════ */
 export default function Resources() {
@@ -245,6 +576,17 @@ export default function Resources() {
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("date");
+  const [order, setOrder] = useState<"ASC" | "DESC">("DESC");
+  const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("published");
+  const [typeFilter, setTypeFilter] = useState<ResourceTypeFilter>("all");
+  const [premiumFilter, setPremiumFilter] = useState<PremiumFilter>("all");
+  const [regulatoryFilter, setRegulatoryFilter] = useState<RegulatoryFilter>("all");
+  const [resourceTypesCsv, setResourceTypesCsv] = useState("");
+  const [languagesCsv, setLanguagesCsv] = useState("");
+  const [publishedYearFrom, setPublishedYearFrom] = useState("");
+  const [publishedYearTo, setPublishedYearTo] = useState("");
+  const [selectedRegulatoryBodyId, setSelectedRegulatoryBodyId] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [geography, setGeography] = useState<"all" | "local" | "global">("all");
 
@@ -253,22 +595,16 @@ export default function Resources() {
     null,
   );
 
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadForm, setUploadForm] = useState<UploadForm>(EMPTY_UPLOAD_FORM);
-  const [resourceFileUrl, setResourceFileUrl] = useState("");
-  const [coverImageUrl, setCoverImageUrl] = useState("");
-  const [resourceUploadPending, setResourceUploadPending] = useState(false);
-  const [coverUploadPending, setCoverUploadPending] = useState(false);
-  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
-  const [uploading, setUploading] = useState(false);
+  const [contributeOpen, setContributeOpen] = useState(false);
 
   /* ── Regulatory drill-down state ── */
   const [activeRegBody, setActiveRegBody] = useState<string>(""); // '' = overview
   const [activeDocType, setActiveDocType] = useState<string>("all"); // document type filter
 
   const { data: categoriesData } = useResourceCategories();
+  const { data: regulatoryBodiesData = [] } = useResourceRegulatoryBodies();
   const trackDownload = useTrackResourceDownload();
-  const submitResource = useSubmitUserResource();
+  const downloadResourceMutation = useDownloadResource();
 
   /* ── Two fixed top-level categories; all current API data is General ── */
   const TOP_CATEGORIES = [
@@ -276,11 +612,35 @@ export default function Resources() {
     { id: "regulatory", name: "Regulatory" },
   ] as const;
 
+  const regulatoryBodies = useMemo<LocalRegulatoryBody[]>(
+    () =>
+      regulatoryBodiesData.map((b) => ({
+        id: b.id,
+        name: b.name,
+        fullName: b.fullName ?? b.name,
+        logoUrl: b.logoUrl ?? "",
+        description: b.description ?? "",
+      })),
+    [regulatoryBodiesData],
+  );
+
   /* ── Sub-categories from API (used for General resources) ── */
-  const apiSubCategories = useMemo(
+  const apiCategories = useMemo(
     () => (categoriesData ?? []).sort((a, b) => a.name.localeCompare(b.name)),
     [categoriesData],
   );
+
+  const parentApiCategories = useMemo(
+    () => apiCategories.filter((c) => !c.parentId),
+    [apiCategories],
+  );
+
+  const childApiCategories = useMemo(
+    () => apiCategories.filter((c) => !!c.parentId),
+    [apiCategories],
+  );
+
+  const [selectedParentCategory, setSelectedParentCategory] = useState("");
 
   /* ── resourceType filter from active built-in sub-category ── */
   const activeResourceType = useMemo(
@@ -288,25 +648,65 @@ export default function Resources() {
     [activeSubCategory],
   );
 
-  /* ── Resources query ── */
-  const { data: resourcesData, isLoading: resourcesLoading } = useResources(
-    activeSubCategory === "glossary"
-      ? { page: 1, perPage: 1, status: "published" }
-      : {
-          ...(activeResourceType ? { resourceType: activeResourceType } : {}),
-          ...(search ? { search } : {}),
-          ...(selectedApiCategory ? { categoryId: selectedApiCategory } : {}),
-          order: "DESC",
-        },
-  );
+  const effectiveResourceType =
+    activeResourceType ?? (typeFilter === "all" ? undefined : typeFilter);
 
+  const queryCategoryId = selectedApiCategory || selectedParentCategory || undefined;
+
+  const numericYearFrom = publishedYearFrom.trim()
+    ? Number(publishedYearFrom)
+    : undefined;
+  const numericYearTo = publishedYearTo.trim()
+    ? Number(publishedYearTo)
+    : undefined;
+
+  const statusQuery = statusFilter === "all" ? undefined : statusFilter;
+
+  let isRegulatoryQuery: boolean | undefined;
+  if (activeTopCategory === "regulatory" || regulatoryFilter === "yes") {
+    isRegulatoryQuery = true;
+  } else if (regulatoryFilter === "no") {
+    isRegulatoryQuery = false;
+  }
+
+  let isPremiumQuery: boolean | undefined;
+  if (premiumFilter === "premium") {
+    isPremiumQuery = true;
+  } else if (premiumFilter === "free") {
+    isPremiumQuery = false;
+  }
+
+  const resourcesQueryFilters =
+    activeSubCategory === "glossary"
+      ? { page: 1, perPage: 1, status: "published" as const }
+      : {
+          ...(effectiveResourceType ? { resourceType: effectiveResourceType } : {}),
+          ...(search ? { search } : {}),
+          ...(queryCategoryId ? { categoryId: queryCategoryId } : {}),
+          ...(statusQuery ? { status: statusQuery } : {}),
+          ...(resourceTypesCsv.trim() ? { resourceTypes: resourceTypesCsv.trim() } : {}),
+          ...(languagesCsv.trim() ? { languages: languagesCsv.trim() } : {}),
+          ...(Number.isFinite(numericYearFrom) ? { publishedYearFrom: numericYearFrom } : {}),
+          ...(Number.isFinite(numericYearTo) ? { publishedYearTo: numericYearTo } : {}),
+          ...(selectedRegulatoryBodyId ? { regulatoryBodyId: selectedRegulatoryBodyId } : {}),
+          ...(typeof isRegulatoryQuery === "boolean" ? { isRegulatory: isRegulatoryQuery } : {}),
+          ...(typeof isPremiumQuery === "boolean" ? { isPremium: isPremiumQuery } : {}),
+          order,
+          page: 1,
+          perPage: 100,
+        };
+
+  /* ── Resources query ── */
+  const { data: resourcesData, isLoading: resourcesLoading } = useResources(resourcesQueryFilters);
+
+  /* ── Unfiltered total query to power top-level counts when isRegulatory filter is off ── */
   const { data: allResourcesData } = useResources({
     page: 1,
     perPage: 100,
     order: "DESC",
+    status: "published",
   });
 
-  // Use all returned resources — status filtering is not yet functional on this API
   const publishedResources = useMemo(
     () => allResourcesData?.data ?? [],
     [allResourcesData?.data],
@@ -378,9 +778,11 @@ export default function Resources() {
   /* ── Reset on category change ── */
   useEffect(() => {
     setSearch("");
+    setSelectedParentCategory("");
     setSelectedApiCategory("");
     setSortBy("date");
     setVisibleCount(PAGE_SIZE);
+    setSelectedRegulatoryBodyId("");
     if (activeTopCategory !== "regulatory") {
       setActiveRegBody("");
       setActiveDocType("all");
@@ -389,61 +791,147 @@ export default function Resources() {
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, sortBy, selectedApiCategory, geography]);
+  }, [
+    search,
+    sortBy,
+    selectedApiCategory,
+    selectedParentCategory,
+    geography,
+    statusFilter,
+    typeFilter,
+    premiumFilter,
+    regulatoryFilter,
+    resourceTypesCsv,
+    languagesCsv,
+    publishedYearFrom,
+    publishedYearTo,
+    selectedRegulatoryBodyId,
+    order,
+  ]);
 
-  /* ── Sub-category counts — per API category + glossary ── */
+  /* ── API-driven counts (prefer response.counts, fall back to local tallying) ── */
+  const apiCounts = allResourcesData?.counts;
+
   const subCategoryCounts = useMemo(() => {
-    const isRegulatory = activeTopCategory === "regulatory";
-    const allItems = isRegulatory ? [] : geoPublishedResources;
+    if (apiCounts?.byCategory) {
+      const counts: Record<string, number> = {
+        all: apiCounts.total ?? geoPublishedResources.length,
+        ...apiCounts.byCategory,
+      };
+      counts["glossary"] = glossaryData?.length ?? 0;
+      return counts;
+    }
+    // local fallback
+    const allItems = geoPublishedResources;
     const counts: Record<string, number> = { all: allItems.length };
     for (const item of allItems) {
-      if (item.categoryId)
-        counts[item.categoryId] = (counts[item.categoryId] ?? 0) + 1;
+      if (item.categoryId) counts[item.categoryId] = (counts[item.categoryId] ?? 0) + 1;
+      const parentId = item.category?.parentId;
+      if (parentId) counts[parentId] = (counts[parentId] ?? 0) + 1;
     }
-    counts["glossary"] = isRegulatory ? 0 : (glossaryData?.length ?? 0);
+    counts["glossary"] = glossaryData?.length ?? 0;
     return counts;
-  }, [geoPublishedResources, glossaryData?.length, activeTopCategory]);
+  }, [apiCounts, geoPublishedResources, glossaryData?.length]);
 
-  /* ── Top-level category counts ── */
   const topCategoryCounts = useMemo(() => {
+    if (apiCounts) {
+      return {
+        all: apiCounts.total ?? geoPublishedResources.length,
+        general: apiCounts.general ?? 0,
+        regulatory: apiCounts.regulatory ?? 0,
+      };
+    }
     const total = geoPublishedResources.length;
-    return {
-      all: total,
-      general: total, // all current API data belongs to General
-      regulatory: 0, // no regulatory data yet
-    };
-  }, [geoPublishedResources.length]);
+    const regulatoryCount = geoPublishedResources.filter((item) =>
+      item.isRegulatory === true || !!item.regulatoryBodyId,
+    ).length;
+    return { all: total, general: total - regulatoryCount, regulatory: regulatoryCount };
+  }, [apiCounts, geoPublishedResources]);
+
+  const regulatoryBodyCounts = useMemo(() => {
+    if (apiCounts?.byRegulatoryBody) return apiCounts.byRegulatoryBody;
+    const counts: Record<string, number> = {};
+    for (const item of geoPublishedResources) {
+      const bodyId = item.regulatoryBodyId ?? "";
+      if (!bodyId) continue;
+      counts[bodyId] = (counts[bodyId] ?? 0) + 1;
+    }
+    return counts;
+  }, [apiCounts, geoPublishedResources]);
+
+  const getTagValue = (resource: ResourceItem, prefix: string) =>
+    (resource.tags ?? []).find((tag) => tag.startsWith(prefix))?.slice(prefix.length);
+
+  const getResourceRegBody = (resource: ResourceItem) =>
+    resource.regulatoryBodyId ?? getTagValue(resource, "reg-body:") ?? "";
+
+  const getResourceDocType = (resource: ResourceItem) =>
+    resource.documentType ?? getTagValue(resource, "doc-type:") ?? "";
 
   /* ── Sorted & filtered resources ── */
   const currentResources = useMemo(() => {
-    // Regulatory has no API data yet — return empty
-    if (activeTopCategory === "regulatory") return [];
     const items = [...applyGeographyFilter(resourcesData?.data ?? [])];
-    if (sortBy === "views") items.sort((a, b) => b.viewCount - a.viewCount);
+    const isRegSignal = (item: ResourceItem) =>
+      item.isRegulatory === true ||
+      !!item.regulatoryBodyId ||
+      (item.tags ?? []).some((tag) => tag.startsWith("reg-body:"));
+
+    let scopedItems = items;
+    if (activeTopCategory === "regulatory") {
+      scopedItems = items.filter(isRegSignal);
+    } else if (activeTopCategory === "general") {
+      scopedItems = items.filter((item) => !isRegSignal(item));
+    }
+
+    const regulatoryFiltered = scopedItems.filter((item) => {
+      if (!selectedRegulatoryBodyId) return true;
+      return getResourceRegBody(item) === selectedRegulatoryBodyId;
+    });
+
+    const docTypeFiltered = regulatoryFiltered.filter((item) => {
+      if (activeDocType === "all") return true;
+      return getResourceDocType(item) === activeDocType;
+    });
+
+    const finalItems = [...docTypeFiltered];
+    if (sortBy === "views") finalItems.sort((a, b) => b.viewCount - a.viewCount);
     else if (sortBy === "downloads")
-      items.sort((a, b) => b.downloadCount - a.downloadCount);
+      finalItems.sort((a, b) => b.downloadCount - a.downloadCount);
     else
-      items.sort(
+      finalItems.sort(
         (a, b) =>
           new Date(b.publishedAt ?? b.createdAt).getTime() -
           new Date(a.publishedAt ?? a.createdAt).getTime(),
       );
-    return items;
-  }, [resourcesData?.data, sortBy, activeTopCategory, geography]);
+    return finalItems;
+  }, [
+    resourcesData?.data,
+    sortBy,
+    activeTopCategory,
+    geography,
+    selectedRegulatoryBodyId,
+    activeDocType,
+  ]);
 
-  const apiCategoryChips = useMemo(
-    () =>
-      apiSubCategories
-        .map((c) => ({ id: c.id, name: c.name }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [apiSubCategories],
+  const parentCategoryChips = useMemo(
+    () => parentApiCategories.map((c) => ({ id: c.id, name: c.name })),
+    [parentApiCategories],
   );
+
+  const activeChildCategoryChips = useMemo(() => {
+    if (!selectedParentCategory) return childApiCategories;
+    return childApiCategories.filter((c) => c.parentId === selectedParentCategory);
+  }, [childApiCategories, selectedParentCategory]);
+
+
 
   /* ── Navigation helpers ── */
   function switchTopCategory(catId: string) {
     setActiveTopCategory(catId);
     setActiveSubCategory("all");
+    setSelectedParentCategory("");
     setSelectedApiCategory("");
+    setSelectedRegulatoryBodyId("");
     const p = new URLSearchParams(searchParams);
     p.set("category", catId);
     p.delete("sub");
@@ -452,65 +940,11 @@ export default function Resources() {
 
   function switchSubCategory(key: SubCategoryKey) {
     setActiveSubCategory(key);
+    setSelectedParentCategory("");
     setSelectedApiCategory("");
     const p = new URLSearchParams(searchParams);
     p.set("sub", key);
     setSearchParams(p);
-  }
-
-  /* ── Submit handler ── */
-  async function handleSubmitResource() {
-    const nextErrors: Record<string, string> = {};
-    if (!uploadForm.title.trim()) nextErrors.title = "Title is required.";
-    if (!uploadForm.categoryId) nextErrors.categoryId = "Category is required.";
-    if (!resourceFileUrl)
-      nextErrors.resourceFileUrl = "Resource file is required.";
-    if (resourceUploadPending || coverUploadPending)
-      nextErrors.uploadPending = "Please wait for uploads to finish.";
-    if (Object.keys(nextErrors).length > 0) {
-      setUploadErrors(nextErrors);
-      toast.error("Please complete required fields before submitting.");
-      return;
-    }
-    setUploadErrors({});
-    try {
-      setUploading(true);
-      const isCustomSub = uploadForm.subCategoryId === "__custom__";
-      const isCustomDoc = uploadForm.docTypeId === "__custom__";
-      await submitResource.mutateAsync({
-        title: uploadForm.title.trim(),
-        briefIntro: uploadForm.briefIntro || undefined,
-        categoryId: uploadForm.categoryId,
-        resourceType:
-          (uploadForm.resourceType as import("@/types/resources").ResourceType) ||
-          undefined,
-        subCategoryId: isCustomSub
-          ? undefined
-          : uploadForm.subCategoryId || undefined,
-        suggestedSubCategoryName: isCustomSub
-          ? uploadForm.customSubCategory.trim() || undefined
-          : undefined,
-        suggestedDocTypeName: isCustomDoc
-          ? uploadForm.customDocType.trim() || undefined
-          : undefined,
-        fileUrl: resourceFileUrl,
-        coverImageUrl: coverImageUrl || undefined,
-        authorName: uploadForm.authorName || undefined,
-      });
-      toast({
-        title: "Resource submitted!",
-        description: "Your resource is pending admin review.",
-      });
-      setUploadOpen(false);
-      setUploadForm(EMPTY_UPLOAD_FORM);
-      setResourceFileUrl("");
-      setCoverImageUrl("");
-      setUploadErrors({});
-    } catch {
-      // handled by mutation
-    } finally {
-      setUploading(false);
-    }
   }
 
   if (previewResourceId) {
@@ -525,9 +959,6 @@ export default function Resources() {
   const isLoading =
     activeSubCategory === "glossary" ? glossaryLoading : resourcesLoading;
   const totalCount = publishedResources.length + (glossaryData?.length ?? 0);
-
-  const uploadSubCats =
-    uploadForm.categoryId === "general" ? apiSubCategories : [];
 
   return (
     <>
@@ -582,7 +1013,7 @@ export default function Resources() {
 
                 <div className="pt-2">
                   <Button
-                    onClick={() => setUploadOpen(true)}
+                    onClick={() => setContributeOpen(true)}
                     className="bg-[#D52B1E] hover:bg-[#B8241B] text-white rounded-xl gap-2"
                   >
                     <Plus className="h-4 w-4" />
@@ -636,26 +1067,6 @@ export default function Resources() {
                 </div>
               </div>
 
-              {/* Search */}
-              <div className="shrink-0 w-full md:w-72">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search resources..."
-                    className="w-full pl-12 pr-10 h-12 rounded-2xl bg-white border-0 shadow-xl text-gray-800 placeholder:text-gray-400 text-sm focus:outline-none"
-                  />
-                  {search && (
-                    <button
-                      onClick={() => setSearch("")}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
             </div>
 
             <div className="pointer-events-none absolute right-8 bottom-4 opacity-5 text-white select-none hidden md:block">
@@ -669,51 +1080,86 @@ export default function Resources() {
           variants={itemVariants}
           className="bg-white border border-gray-100 rounded-xl shadow-sm sticky top-16 z-20 overflow-hidden"
         >
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide py-3 px-4">
-            {/* All */}
-            <button
-              onClick={() => switchTopCategory("all")}
-              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
-                activeTopCategory === "all"
-                  ? "bg-[#D52B1E] text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-              }`}
-            >
-              <Library className="h-4 w-4" />
-              All Resources
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${
-                  activeTopCategory === "all"
-                    ? "bg-white/20 text-white"
-                    : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {topCategoryCounts["all"] ?? 0}
-              </span>
-            </button>
-
-            {TOP_CATEGORIES.map((cat) => (
+          <div className="flex items-center gap-1 px-4 py-2">
+            {/* Category tabs — scrollable */}
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 py-1">
+              {/* All */}
               <button
-                key={cat.id}
-                onClick={() => switchTopCategory(cat.id)}
+                onClick={() => switchTopCategory("all")}
                 className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
-                  activeTopCategory === cat.id
+                  activeTopCategory === "all"
                     ? "bg-[#D52B1E] text-white shadow-sm"
                     : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                 }`}
               >
-                {cat.name}
+                <Library className="h-4 w-4" />
+                All Resources
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full ${
-                    activeTopCategory === cat.id
+                    activeTopCategory === "all"
                       ? "bg-white/20 text-white"
                       : "bg-gray-100 text-gray-500"
                   }`}
                 >
-                  {topCategoryCounts[cat.id] ?? 0}
+                  {topCategoryCounts["all"] ?? 0}
                 </span>
               </button>
-            ))}
+
+              {TOP_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => switchTopCategory(cat.id)}
+                  className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
+                    activeTopCategory === cat.id
+                      ? "bg-[#D52B1E] text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                  }`}
+                >
+                  {cat.name}
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      activeTopCategory === cat.id
+                        ? "bg-white/20 text-white"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {topCategoryCounts[cat.id] ?? 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Search + filter — always visible */}
+            <div className="shrink-0 flex items-center gap-2 pl-2 border-l border-gray-100 ml-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="w-40 sm:w-52 pl-9 pr-7 h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder:text-gray-400 text-sm focus:outline-none focus:border-[#D52B1E] focus:bg-white transition-colors"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setShowFilterDrawer((s) => !s)}
+                className={`flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold border transition-all ${
+                  showFilterDrawer
+                    ? "bg-[#D52B1E] text-white border-[#D52B1E]"
+                    : "bg-white text-[#737692] border-gray-200 hover:border-[#D52B1E] hover:text-[#D52B1E]"
+                }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                <span className="hidden sm:inline">Filters</span>
+              </button>
+            </div>
           </div>
         </motion.div>
 
@@ -729,23 +1175,29 @@ export default function Resources() {
                 {/* All chip */}
                 <CategoryChip
                   label="All"
-                  active={activeSubCategory === "all" && !selectedApiCategory}
+                  active={
+                    activeSubCategory === "all" &&
+                    !selectedParentCategory &&
+                    !selectedApiCategory
+                  }
                   count={subCategoryCounts["all"] ?? 0}
                   onClick={() => {
                     setActiveSubCategory("all");
+                    setSelectedParentCategory("");
                     setSelectedApiCategory("");
                   }}
                 />
 
-                {/* API category chips */}
-                {apiCategoryChips.map((chip) => (
+                {/* Parent category chips */}
+                {parentCategoryChips.map((chip) => (
                   <CategoryChip
                     key={chip.id}
                     label={chip.name}
-                    active={selectedApiCategory === chip.id}
+                    active={selectedParentCategory === chip.id && !selectedApiCategory}
                     count={subCategoryCounts[chip.id] ?? 0}
                     onClick={() => {
-                      setSelectedApiCategory(chip.id);
+                      setSelectedParentCategory(chip.id);
+                      setSelectedApiCategory("");
                       setActiveSubCategory("all");
                     }}
                   />
@@ -759,6 +1211,7 @@ export default function Resources() {
                   count={subCategoryCounts["glossary"] ?? 0}
                   onClick={() => {
                     switchSubCategory("glossary");
+                    setSelectedParentCategory("");
                     setSelectedApiCategory("");
                   }}
                 />
@@ -776,6 +1229,35 @@ export default function Resources() {
               </select>
             </motion.div>
           )}
+
+          {activeTopCategory !== "regulatory" &&
+            activeSubCategory !== "glossary" &&
+            activeChildCategoryChips.length > 0 && (
+              <motion.div variants={itemVariants} className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+                <CategoryChip
+                  label={selectedParentCategory ? "All in Selected" : "All Sub-categories"}
+                  active={!selectedApiCategory}
+                  count={
+                    selectedParentCategory
+                      ? subCategoryCounts[selectedParentCategory] ?? 0
+                      : subCategoryCounts["all"] ?? 0
+                  }
+                  onClick={() => setSelectedApiCategory("")}
+                />
+                {activeChildCategoryChips.map((chip) => (
+                  <CategoryChip
+                    key={chip.id}
+                    label={chip.name}
+                    active={selectedApiCategory === chip.id}
+                    count={subCategoryCounts[chip.id] ?? 0}
+                    onClick={() => {
+                      setSelectedApiCategory(chip.id);
+                      setActiveSubCategory("all");
+                    }}
+                  />
+                ))}
+              </motion.div>
+            )}
           {/* ── Regulatory content ── */}
           {activeTopCategory === "regulatory" && (
             <AnimatePresence mode="wait">
@@ -791,13 +1273,16 @@ export default function Resources() {
                 >
                   {/* Back + body header */}
                   {(() => {
-                    const body = REGULATORY_BODIES.find(
+                    const body = regulatoryBodies.find(
                       (b) => b.id === activeRegBody,
                     )!;
                     return (
                       <div className="flex items-center gap-4">
                         <button
-                          onClick={() => setActiveRegBody("")}
+                          onClick={() => {
+                            setActiveRegBody("");
+                            setSelectedRegulatoryBodyId("");
+                          }}
                           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
                         >
                           <svg
@@ -818,7 +1303,7 @@ export default function Resources() {
                         <div className="flex items-center gap-3">
                           <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center border border-gray-100 bg-white shadow-sm overflow-hidden"
-                            style={{ backgroundColor: `${body.color}10` }}
+                            style={{ backgroundColor: "#D52B1E10" }}
                           >
                             <img
                               src={body.logoUrl}
@@ -831,8 +1316,8 @@ export default function Resources() {
                                 if (p && !p.querySelector(".reg-abbr-sm")) {
                                   const s = document.createElement("span");
                                   s.className =
-                                    "reg-abbr-sm text-xs font-black";
-                                  s.style.color = body.color;
+                                    "reg-abbr-sm text-xs font-black text-[#D52B1E]";
+                                  s.style.color = "";
                                   s.textContent = body.name;
                                   p.appendChild(s);
                                 }
@@ -856,7 +1341,7 @@ export default function Resources() {
                   <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
                     <CategoryChip
                       label="All"
-                      count={0}
+                      count={currentResources.length}
                       active={activeDocType === "all"}
                       onClick={() => setActiveDocType("all")}
                     />
@@ -864,7 +1349,7 @@ export default function Resources() {
                       <CategoryChip
                         key={dt.id}
                         label={dt.label}
-                        count={0}
+                        count={currentResources.filter((r) => getResourceDocType(r) === dt.id).length}
                         active={activeDocType === dt.id}
                         onClick={() => setActiveDocType(dt.id)}
                       />
@@ -884,20 +1369,29 @@ export default function Resources() {
                       ) : null;
                     })()}
 
-                  {/* Empty state — no API data wired yet */}
-                  <div className="py-16 text-center bg-white rounded-2xl border border-gray-100">
-                    <Shield className="h-12 w-12 mx-auto mb-3 text-gray-200" />
-                    <p className="text-gray-500 text-sm font-medium">
-                      No publications yet
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {
-                        REGULATORY_BODIES.find((b) => b.id === activeRegBody)
-                          ?.name
-                      }{" "}
-                      publications will appear here once uploaded.
-                    </p>
-                  </div>
+                  {currentResources.length === 0 ? (
+                    <div className="py-16 text-center bg-white rounded-2xl border border-gray-100">
+                      <Shield className="h-12 w-12 mx-auto mb-3 text-gray-200" />
+                      <p className="text-gray-500 text-sm font-medium">
+                        No publications found
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Try adjusting regulatory body or document type filters.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {currentResources.slice(0, visibleCount).map((resource, idx) => (
+                        <ResourceCard
+                          key={resource.id}
+                          resource={resource}
+                          index={idx}
+                          onPreview={setPreviewResourceId}
+                          onDownload={(r) => setDownloadResource(r)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 /* Body selector overview grid */
@@ -912,18 +1406,19 @@ export default function Resources() {
                     Select a regulatory body to browse its publications.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {REGULATORY_BODIES.map((body) => (
+                    {regulatoryBodies.map((body) => (
                       <button
                         key={body.id}
                         onClick={() => {
                           setActiveRegBody(body.id);
+                          setSelectedRegulatoryBodyId(body.id);
                           setActiveDocType("all");
                         }}
                         className="group flex flex-col items-center gap-4 p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all text-center"
                       >
                         <div
                           className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-100 bg-white shadow-sm group-hover:scale-105 transition-transform"
-                          style={{ backgroundColor: `${body.color}08` }}
+                          style={{ backgroundColor: "#D52B1E08" }}
                         >
                           <img
                             src={body.logoUrl}
@@ -938,8 +1433,8 @@ export default function Resources() {
                                 !parent.querySelector(".reg-abbr")
                               ) {
                                 const span = document.createElement("span");
-                                span.className = "reg-abbr text-2xl font-black";
-                                span.style.color = body.color;
+                                span.className = "reg-abbr text-2xl font-black text-[#D52B1E]";
+                                span.style.color = "";
                                 span.textContent = body.name;
                                 parent.appendChild(span);
                               }
@@ -960,11 +1455,11 @@ export default function Resources() {
                         <span
                           className="mt-auto text-xs font-semibold px-3 py-1 rounded-full"
                           style={{
-                            backgroundColor: `${body.color}15`,
-                            color: body.color,
+                            backgroundColor: "#D52B1E15",
+                            color: "#D52B1E",
                           }}
                         >
-                          Browse publications →
+                          {(regulatoryBodyCounts[body.id] ?? 0)} publications →
                         </span>
                       </button>
                     ))}
@@ -1088,8 +1583,7 @@ export default function Resources() {
                                 index={idx}
                                 onPreview={setPreviewResourceId}
                                 onDownload={(r) => {
-                                  trackDownload.mutate(r.id);
-                                  setDownloadResource(r);
+                                    setDownloadResource(r);
                                 }}
                               />
                             ))}
@@ -1122,366 +1616,210 @@ export default function Resources() {
         </div>
       </motion.div>
 
+      {/* ── Right-side filter drawer ── */}
+      {createPortal(
+        <AnimatePresence>
+          {showFilterDrawer && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-sm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowFilterDrawer(false)}
+              />
+              {/* Drawer panel */}
+              <motion.div
+                className="fixed top-0 right-0 z-[90] h-full w-full max-w-sm bg-white shadow-2xl flex flex-col"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <h2 className="font-bold text-gray-900 flex items-center gap-2">
+                    <SlidersHorizontal className="h-4 w-4 text-[#D52B1E]" />
+                    Filters
+                  </h2>
+                  <button
+                    onClick={() => setShowFilterDrawer(false)}
+                    className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Scrollable filter body */}
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Order</label>
+                    <select
+                      value={order}
+                      onChange={(e) => setOrder(e.target.value as "ASC" | "DESC")}
+                      className="w-full h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:border-[#D52B1E]"
+                    >
+                      <option value="DESC">Newest first (DESC)</option>
+                      <option value="ASC">Oldest first (ASC)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                      className="w-full h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:border-[#D52B1E]"
+                    >
+                      <option value="all">All</option>
+                      <option value="draft">Draft</option>
+                      <option value="pending_review">Pending Review</option>
+                      <option value="published">Published</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Resource Type</label>
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value as ResourceTypeFilter)}
+                      className="w-full h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:border-[#D52B1E]"
+                    >
+                      <option value="all">All</option>
+                      <option value="guide">Guide</option>
+                      <option value="research">Research</option>
+                      <option value="standard">Standard</option>
+                      <option value="tool">Tool</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Premium</label>
+                    <select
+                      value={premiumFilter}
+                      onChange={(e) => setPremiumFilter(e.target.value as PremiumFilter)}
+                      className="w-full h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:border-[#D52B1E]"
+                    >
+                      <option value="all">All</option>
+                      <option value="premium">Premium only</option>
+                      <option value="free">Free only</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Regulatory</label>
+                    <select
+                      value={regulatoryFilter}
+                      onChange={(e) => setRegulatoryFilter(e.target.value as RegulatoryFilter)}
+                      className="w-full h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:border-[#D52B1E]"
+                    >
+                      <option value="all">All</option>
+                      <option value="yes">Regulatory only</option>
+                      <option value="no">Non-regulatory only</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Regulatory Body</label>
+                    <select
+                      value={selectedRegulatoryBodyId}
+                      onChange={(e) => {
+                        setSelectedRegulatoryBodyId(e.target.value);
+                        if (e.target.value) setActiveRegBody(e.target.value);
+                      }}
+                      className="w-full h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:border-[#D52B1E]"
+                    >
+                      <option value="">All bodies</option>
+                      {regulatoryBodies.map((body) => (
+                        <option key={body.id} value={body.id}>{body.name} — {body.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Resource Types (comma-separated)</label>
+                    <Input
+                      value={resourceTypesCsv}
+                      onChange={(e) => setResourceTypesCsv(e.target.value)}
+                      placeholder="guide,research"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#737692] mb-1.5">Languages (comma-separated)</label>
+                    <Input
+                      value={languagesCsv}
+                      onChange={(e) => setLanguagesCsv(e.target.value)}
+                      placeholder="english,arabic"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#737692] mb-1.5">Published From</label>
+                      <Input
+                        value={publishedYearFrom}
+                        onChange={(e) => setPublishedYearFrom(e.target.value)}
+                        placeholder="2019"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#737692] mb-1.5">Published To</label>
+                      <Input
+                        value={publishedYearTo}
+                        onChange={(e) => setPublishedYearTo(e.target.value)}
+                        placeholder="2026"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-gray-100">
+                  <Button
+                    variant="outline"
+                    className="w-full border-gray-200 text-gray-500"
+                    onClick={() => {
+                      setOrder("DESC");
+                      setStatusFilter("published");
+                      setTypeFilter("all");
+                      setPremiumFilter("all");
+                      setRegulatoryFilter("all");
+                      setSelectedRegulatoryBodyId("");
+                      setResourceTypesCsv("");
+                      setLanguagesCsv("");
+                      setPublishedYearFrom("");
+                      setPublishedYearTo("");
+                    }}
+                  >
+                    Reset filters
+                  </Button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+
       {/* ── Download modal ── */}
       {downloadResource && (
         <DownloadEmailModal
           open={!!downloadResource}
           resourceTitle={downloadResource.title}
           onClose={() => setDownloadResource(null)}
+          onSubmit={async () => {
+            await downloadResourceMutation.mutateAsync({
+              id: downloadResource.id,
+              fallbackTitle: downloadResource.title,
+            });
+            trackDownload.mutate(downloadResource.id);
+            toast.success("Download started");
+          }}
         />
       )}
 
-      {/* ── Submit Resource modal ── */}
-      <AnimatePresence>
-        {uploadOpen &&
-          createPortal(
-            <motion.div
-              className="fixed inset-0 z-[100] h-[100dvh] w-screen flex items-end sm:items-center justify-center p-0 sm:p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="absolute inset-0 h-[100dvh] w-screen bg-black/50 backdrop-blur-sm"
-                onClick={() => {
-                  if (uploading) return;
-                  setUploadOpen(false);
-                  setUploadForm(EMPTY_UPLOAD_FORM);
-                  setResourceFileUrl("");
-                  setCoverImageUrl("");
-                  setUploadErrors({});
-                }}
-              />
-              <motion.div
-                className="relative bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-3xl max-h-[92dvh] overflow-y-auto shadow-2xl"
-                initial={{ y: 60, opacity: 0, scale: 0.97 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                exit={{ y: 60, opacity: 0, scale: 0.97 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              >
-                <div className="p-6 border-b border-gray-100">
-                  <button
-                    onClick={() => {
-                      if (uploading) return;
-                      setUploadOpen(false);
-                      setUploadForm(EMPTY_UPLOAD_FORM);
-                      setResourceFileUrl("");
-                      setCoverImageUrl("");
-                      setUploadErrors({});
-                    }}
-                    disabled={uploading}
-                    className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-gray-100 text-gray-400"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Submit a Resource
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    All submissions are reviewed by admin before publishing.
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    <span className="text-red-500 font-semibold">*</span>{" "}
-                    Required fields
-                  </p>
-                </div>
-
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Title <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      value={uploadForm.title}
-                      onChange={(e) => {
-                        setUploadForm((f) => ({ ...f, title: e.target.value }));
-                        if (uploadErrors.title)
-                          setUploadErrors((p) => ({ ...p, title: "" }));
-                      }}
-                      placeholder="Resource title"
-                      className={
-                        uploadErrors.title
-                          ? "border-red-400 focus-visible:ring-red-300"
-                          : undefined
-                      }
-                    />
-                    {uploadErrors.title && (
-                      <p className="text-xs text-red-600 mt-1">
-                        {uploadErrors.title}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Category <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={uploadForm.categoryId}
-                      onChange={(e) => {
-                        setUploadForm((f) => ({
-                          ...f,
-                          categoryId: e.target.value,
-                          resourceType: "",
-                          subCategoryId: "",
-                          docTypeId: "",
-                        }));
-                        if (uploadErrors.categoryId)
-                          setUploadErrors((p) => ({ ...p, categoryId: "" }));
-                      }}
-                      className={`w-full h-10 rounded-md border px-3 text-sm bg-white text-gray-900 ${uploadErrors.categoryId ? "border-red-400" : "border-gray-200"}`}
-                    >
-                      <option value="">- Select category -</option>
-                      <option value="general">General</option>
-                      <option value="regulatory">Regulatory</option>
-                    </select>
-                    {uploadErrors.categoryId && (
-                      <p className="text-xs text-red-600 mt-1">
-                        {uploadErrors.categoryId}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Sub-Category
-                    </label>
-                    <Select
-                      value={uploadForm.subCategoryId}
-                      onChange={(e) =>
-                        setUploadForm((f) => ({
-                          ...f,
-                          subCategoryId: e.target.value,
-                          customSubCategory: "",
-                          docTypeId: "",
-                        }))
-                      }
-                      disabled={!uploadForm.categoryId}
-                    >
-                      <option value="">- Select sub-category -</option>
-                      {uploadForm.categoryId === "regulatory" ? (
-                        REGULATORY_BODIES.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name} - {b.fullName}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          {uploadSubCats.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                          <option value="__custom__">
-                            Other / Not listed...
-                          </option>
-                        </>
-                      )}
-                    </Select>
-                    {uploadForm.categoryId !== "regulatory" &&
-                      uploadForm.subCategoryId === "__custom__" && (
-                        <div className="mt-2">
-                          <Input
-                            value={uploadForm.customSubCategory}
-                            onChange={(e) =>
-                              setUploadForm((f) => ({
-                                ...f,
-                                customSubCategory: e.target.value,
-                              }))
-                            }
-                            placeholder="Enter your sub-category name..."
-                            className="h-9 text-sm"
-                          />
-                        </div>
-                      )}
-                  </div>
-
-                  {uploadForm.categoryId === "general" && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Resource Type
-                      </label>
-                      <Select
-                        value={uploadForm.resourceType}
-                        onChange={(e) =>
-                          setUploadForm((f) => ({
-                            ...f,
-                            resourceType: e.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">- Select type (optional) -</option>
-                        <option value="guide">Educational Guide</option>
-                        <option value="research">
-                          Research &amp; Publication
-                        </option>
-                        <option value="standard">
-                          Standards &amp; Governance
-                        </option>
-                        <option value="tool">Tools &amp; Practical</option>
-                      </Select>
-                    </div>
-                  )}
-
-                  {uploadForm.categoryId === "regulatory" &&
-                    uploadForm.subCategoryId && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Document Type
-                        </label>
-                        <Select
-                          value={uploadForm.docTypeId}
-                          onChange={(e) =>
-                            setUploadForm((f) => ({
-                              ...f,
-                              docTypeId: e.target.value,
-                              customDocType: "",
-                            }))
-                          }
-                        >
-                          <option value="">- Select document type -</option>
-                          {DOCUMENT_TYPES.map((dt) => (
-                            <option key={dt.id} value={dt.id}>
-                              {dt.label}
-                            </option>
-                          ))}
-                          <option value="__custom__">
-                            Other / Not listed...
-                          </option>
-                        </Select>
-                        {uploadForm.docTypeId === "__custom__" && (
-                          <div className="mt-2">
-                            <Input
-                              value={uploadForm.customDocType}
-                              onChange={(e) =>
-                                setUploadForm((f) => ({
-                                  ...f,
-                                  customDocType: e.target.value,
-                                }))
-                              }
-                              placeholder="Enter document type name..."
-                              className="h-9 text-sm"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Your Name / Organisation
-                    </label>
-                    <Input
-                      value={uploadForm.authorName}
-                      onChange={(e) =>
-                        setUploadForm((f) => ({
-                          ...f,
-                          authorName: e.target.value,
-                        }))
-                      }
-                      placeholder="Author or organisation name"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Brief Description
-                    </label>
-                    <textarea
-                      value={uploadForm.briefIntro}
-                      onChange={(e) =>
-                        setUploadForm((f) => ({
-                          ...f,
-                          briefIntro: e.target.value,
-                        }))
-                      }
-                      placeholder="Briefly describe what this resource covers..."
-                      rows={3}
-                      className="w-full bg-white text-gray-900 text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Resource File Upload{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <ImageUpload
-                      value={resourceFileUrl}
-                      onChange={(url) => {
-                        setResourceFileUrl(url);
-                        if (uploadErrors.resourceFileUrl)
-                          setUploadErrors((p) => ({
-                            ...p,
-                            resourceFileUrl: "",
-                          }));
-                      }}
-                      onUploadPendingChange={setResourceUploadPending}
-                      mode="document"
-                      label="Click to upload resource file"
-                      accept=".pdf,.doc,.docx,.csv,.xlsx,.xls"
-                      previewHeight="h-24"
-                    />
-                    {uploadErrors.resourceFileUrl && (
-                      <p className="text-xs text-red-600 mt-1">
-                        {uploadErrors.resourceFileUrl}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Cover Image Upload
-                    </label>
-                    <ImageUpload
-                      value={coverImageUrl}
-                      onChange={setCoverImageUrl}
-                      onUploadPendingChange={setCoverUploadPending}
-                      mode="image"
-                      previewHeight="h-24"
-                    />
-                  </div>
-
-                  {uploadErrors.uploadPending && (
-                    <div className="md:col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                      {uploadErrors.uploadPending}
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (uploading) return;
-                      setUploadOpen(false);
-                      setUploadForm(EMPTY_UPLOAD_FORM);
-                      setResourceFileUrl("");
-                      setCoverImageUrl("");
-                      setUploadErrors({});
-                    }}
-                    disabled={uploading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="bg-[#D52B1E] hover:bg-[#B8241B] text-white"
-                    disabled={
-                      uploading || resourceUploadPending || coverUploadPending
-                    }
-                    onClick={handleSubmitResource}
-                  >
-                    {uploading && (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    )}
-                    Submit for Review
-                  </Button>
-                </div>
-              </motion.div>
-            </motion.div>,
-            document.body,
-          )}
-      </AnimatePresence>
+      {/* ── Contribute Resource modal ── */}
+      <ContributeResourceModal
+        open={contributeOpen}
+        onClose={() => setContributeOpen(false)}
+        categories={apiCategories}
+        regulatoryBodies={regulatoryBodies}
+      />
     </>
   );
 }

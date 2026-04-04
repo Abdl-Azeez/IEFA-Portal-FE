@@ -7,6 +7,17 @@ export type ResourceSection =
 
 /** Maps API resourceType enum → UI tab section */
 export type ResourceType = 'guide' | 'research' | 'standard' | 'tool'
+export type ResourceStatus = 'draft' | 'pending_review' | 'published' | 'archived'
+
+export interface RegulatoryBody {
+  id: string
+  name: string
+  fullName?: string
+  logoUrl?: string
+  description?: string
+  createdAt?: string
+  updatedAt?: string
+}
 
 export const RESOURCE_TYPE_TO_SECTION: Record<ResourceType, ResourceSection> = {
   guide: 'educational-guides',
@@ -26,6 +37,9 @@ export interface ResourceCategory {
   id: string
   name: string
   slug: string
+  description?: string | null
+  sortOrder?: number
+  isRegulatory?: boolean
   parentId?: string | null
   parent?: ResourceCategory | null
   children?: ResourceCategory[]
@@ -45,9 +59,18 @@ export interface ResourceItem {
   previewUrl: string | null
   categoryId: string | null
   category: ResourceCategory | null
+  subCategoryId?: string | null
+  subCategory?: ResourceCategory | null
+  languages?: string[]
+  publishedYear?: number | null
+  regulatoryBodyId?: string | null
+  regulatoryBody?: RegulatoryBody | null
+  isRegulatory?: boolean
+  documentType?: string | null
+  documentFormat?: string | null
   isPremium: boolean
   isFeatured: boolean
-  status: 'draft' | 'published' | 'archived'
+  status: ResourceStatus
   tags: string[]
   viewCount: number
   downloadCount: number
@@ -70,10 +93,16 @@ export interface ResourceFilters {
   page?: number
   perPage?: number
   search?: string
-  status?: 'draft' | 'published' | 'archived'
+  status?: ResourceStatus
   resourceType?: ResourceType
+  resourceTypes?: string
   categoryId?: string
   isPremium?: boolean
+  languages?: string
+  publishedYearFrom?: number
+  publishedYearTo?: number
+  regulatoryBodyId?: string
+  isRegulatory?: boolean
   order?: 'ASC' | 'DESC'
 }
 
@@ -118,21 +147,38 @@ export interface PaginatedResponse<T> {
     hasPreviousPage: boolean
     hasNextPage: boolean
   }
+  counts?: {
+    total: number
+    general: number
+    regulatory: number
+    byCategory?: Record<string, number>
+    byRegulatoryBody?: Record<string, number>
+  }
 }
 
 export interface SubmitUserResourceDto {
   title: string
-  briefIntro?: string
+  slug?: string
+  description?: string
+  bodyHtml?: string
   categoryId: string
-  subCategoryId?: string
-  resourceType?: ResourceType
-  /** Free-text sub-category name when user selects "Other" on General resources */
-  suggestedSubCategoryName?: string
-  /** Free-text document type name when user selects "Other" on Regulatory resources */
-  suggestedDocTypeName?: string
-  fileUrl: string
-  coverImageUrl?: string
+  resourceType: ResourceType
+  thumbnailUrl?: string
+  attachmentUrl?: string
+  externalUrl?: string
+  fileSizeKb?: number
+  pageCount?: number
+  language?: string
   authorName?: string
+  publisher?: string
+  publishedYear?: number
+  isDownloadable?: boolean
+  isPremium?: boolean
+  isFeatured?: boolean
+  tags?: string[]
+  status?: 'draft' | 'pending_review' | 'published' | 'archived'
+  publishedAt?: string
+  regulatoryBodyId?: string
 }
 
 export interface UserResourceSubmission {

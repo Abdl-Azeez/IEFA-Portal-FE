@@ -8,27 +8,45 @@ interface DownloadEmailModalProps {
   readonly open: boolean
   readonly onClose: () => void
   readonly resourceTitle: string
+  readonly onSubmit?: (email: string) => Promise<void> | void
 }
 
-export function DownloadEmailModal({ open, onClose, resourceTitle }: DownloadEmailModalProps) {
+export function DownloadEmailModal({ open, onClose, resourceTitle, onSubmit }: DownloadEmailModalProps) {
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const emailIsValid = (value: string) => /\S+@\S+\.\S+/.test(value)
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!email.trim()) return
+    if (!emailIsValid(email.trim())) {
+      setError('Enter a valid email address')
+      return
+    }
 
     setIsSubmitting(true)
-    // Simulate API call – replace with real endpoint later
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsSubmitting(false)
-    setSubmitted(true)
+    setError('')
+    try {
+      if (onSubmit) {
+        await onSubmit(email.trim())
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+      setSubmitted(true)
+    } catch {
+      setError('Unable to complete download. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleClose = () => {
     setEmail('')
     setSubmitted(false)
+    setError('')
     onClose()
   }
 
@@ -108,11 +126,17 @@ export function DownloadEmailModal({ open, onClose, resourceTitle }: DownloadEma
                         type="email"
                         placeholder="Enter your email address"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value)
+                          if (error) setError('')
+                        }}
                         className="pl-10 h-12"
                         required
                       />
                     </div>
+                    {error && (
+                      <p className="text-xs text-red-600">{error}</p>
+                    )}
                     <Button
                       type="submit"
                       disabled={isSubmitting || !email.trim()}

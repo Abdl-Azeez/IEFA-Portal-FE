@@ -6,6 +6,7 @@ interface ImageUploadProps {
   readonly value: string;
   readonly onChange: (url: string) => void;
   readonly onUploadPendingChange?: (isPending: boolean) => void;
+  readonly onFileSizeKb?: (kb: number) => void;
   readonly id?: string;
   readonly previewHeight?: string;
   /** 'image' (default) shows an image preview; 'document' shows a filename + link preview */
@@ -23,6 +24,7 @@ export function ImageUpload({
   value,
   onChange,
   onUploadPendingChange,
+  onFileSizeKb,
   id,
   previewHeight = "h-36",
   mode = "image",
@@ -120,6 +122,7 @@ export function ImageUpload({
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (!file) return;
+          if (onFileSizeKb) onFileSizeKb(Math.round(file.size / 1024));
           uploadMutation.mutate(file, { onSuccess: (url) => onChange(url) });
           e.target.value = "";
         }}

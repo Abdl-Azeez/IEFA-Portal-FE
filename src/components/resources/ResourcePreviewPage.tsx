@@ -4,7 +4,8 @@ import { ArrowLeft, Download, Calendar, Eye, User } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DownloadEmailModal } from '@/components/resources/DownloadEmailModal'
-import { useResource } from '@/hooks/useResources'
+import { toast } from '@/hooks/use-toast'
+import { useDownloadResource, useResource, useTrackResourceDownload } from '@/hooks/useResources'
 
 interface ResourcePreviewPageProps {
   readonly resourceId: string
@@ -14,6 +15,8 @@ interface ResourcePreviewPageProps {
 export function ResourcePreviewPage({ resourceId, onBack }: ResourcePreviewPageProps) {
   const [downloadOpen, setDownloadOpen] = useState(false)
   const { data: resource, isLoading } = useResource(resourceId)
+  const trackDownload = useTrackResourceDownload()
+  const downloadResource = useDownloadResource()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -184,6 +187,14 @@ export function ResourcePreviewPage({ resourceId, onBack }: ResourcePreviewPageP
         open={downloadOpen}
         onClose={() => setDownloadOpen(false)}
         resourceTitle={resource.title}
+        onSubmit={async () => {
+          await downloadResource.mutateAsync({
+            id: resource.id,
+            fallbackTitle: resource.title,
+          })
+          trackDownload.mutate(resource.id)
+          toast.success('Download started')
+        }}
       />
     </motion.div>
   )
