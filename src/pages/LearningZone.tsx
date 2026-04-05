@@ -1,1590 +1,1132 @@
-import { motion } from 'framer-motion'
-import { useEffect } from "react";
-import { BookOpen, Video, FileText, Award, Clock, Users, CheckCircle, Star, TrendingUp, Calendar, AlertCircle, Megaphone, GraduationCap, BarChart3, Download, RefreshCw } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
+import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Award,
+  BarChart3,
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  Download,
+  GraduationCap,
+  Megaphone,
+  PlayCircle,
+  RefreshCw,
+  Search,
+  Star,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { useMe } from "@/hooks/useAuth";
+import {
+  useEnrollInLearningCourse,
+  useLearningAnnouncements,
+  useLearningCourses,
+  useLearningDashboard,
+  useLearningMyCourses,
+  useLearningPayments,
+  useLearningResults,
+  useLearningUpcomingActivities,
+  useUnenrollFromLearningCourse,
+} from "@/hooks/useLearning";
+import type { StudentCourseDto, StudentEnrollmentDto } from "@/types/learning";
 
+/* ── Animation variants ──────────────────────────────────────────────────── */
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-}
+  visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
+};
 
 const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { duration: 0.5 }
-  }
+  hidden: { y: 18, opacity: 0 },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.4 } },
+};
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function formatMoney(amountCents: number, currency: string) {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(amountCents / 100);
+}
+
+function durationLabel(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function stripHtml(html: string): string {
+  if (!html) return "";
+  if (typeof document === "undefined") return html;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return (tmp.textContent ?? "").split(/\s+/).filter(Boolean).join(" ");
+}
+
+function formatActivityType(type: string): string {
+  return type
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+}
+
+/* ── Tab chip — matches category chips in Resources/Directory ─────────────── */
+function TabChip({
+  label,
+  icon: Icon,
+  active,
+  onClick,
+}: Readonly<{
+  label: string;
+  icon: React.ElementType;
+  active: boolean;
+  onClick: () => void;
+}>) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 border shrink-0 ${
+        active
+          ? "bg-[#D52B1E] text-white border-[#D52B1E] shadow-sm"
+          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-800 hover:bg-gray-50"
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </button>
+  );
+}
+
+/* ── Enrollment card ────────────────────────────────────────────────────────── */
+function EnrollmentCard({
+  item,
+  courseTitle,
+}: Readonly<{ item: StudentEnrollmentDto; courseTitle?: string }>) {
+  const programmeName = (item.programme as { title?: string } | null)?.title;
+  const displayName = courseTitle ?? programmeName ?? `${item.itemType} enrollment`;
+
+  const statusStyle: Record<string, { bg: string; text: string }> = {
+    completed: { bg: "bg-emerald-50", text: "text-emerald-700" },
+    active: { bg: "bg-blue-50", text: "text-blue-700" },
+    in_progress: { bg: "bg-amber-50", text: "text-amber-700" },
+  };
+  const ss = statusStyle[item.status] ?? { bg: "bg-gray-100", text: "text-gray-600" };
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ y: -2 }}
+      className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden"
+    >
+      <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex-1 min-w-0">
+            <span
+              className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${ss.bg} ${ss.text}`}
+            >
+              {item.status.replaceAll("_", " ")}
+            </span>
+            <h3 className="font-semibold text-gray-900 mt-2 line-clamp-2 group-hover:text-[#D52B1E] transition-colors text-sm">
+              {displayName}
+            </h3>
+          </div>
+          <div className="h-10 w-10 shrink-0 rounded-full bg-[#D52B1E]/10 flex items-center justify-center">
+            <BookOpen className="h-4 w-4 text-[#D52B1E]" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5 mb-4">
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400 flex items-center gap-1">
+              <Clock className="h-3 w-3" /> {formatDate(item.lastActivityAt)}
+            </span>
+            <span className="font-bold text-[#D52B1E]">{item.progressPercent}%</span>
+          </div>
+          <Progress
+            value={item.progressPercent}
+            className="h-1.5 bg-gray-100 [&>div]:bg-gradient-to-r [&>div]:from-[#D52B1E] [&>div]:to-orange-400"
+          />
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+          <span className="text-xs text-gray-400">
+            {item.completedLessonIds?.length ?? 0} lessons done
+          </span>
+          <button className="flex items-center gap-1 text-xs font-semibold text-[#D52B1E] hover:gap-2 transition-all">
+            Continue <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Course card — mirrors OrgCard styling from Directory ───────────────────── */
+function CourseCard({
+  course,
+  isEnrolled,
+  onEnroll,
+  onUnenroll,
+  mutating,
+}: Readonly<{
+  course: StudentCourseDto;
+  isEnrolled: boolean;
+  onEnroll: () => void;
+  onUnenroll: () => void;
+  mutating: boolean;
+}>) {
+  const levelColor: Record<string, string> = {
+    beginner: "#059669",
+    intermediate: "#d97706",
+    advanced: "#D52B1E",
+  };
+  const lc = levelColor[course.level?.toLowerCase() ?? ""] ?? "#6d28d9";
+
+  return (
+    <motion.div variants={itemVariants} whileHover={{ y: -3 }} className="group">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full">
+        {/* Cover */}
+        <div className="h-44 relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+          {course.coverImageUrl ? (
+            <img
+              src={course.coverImageUrl}
+              alt={course.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <BookOpen className="w-14 h-14 text-gray-300" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+          <div className="absolute top-3 left-3 flex gap-1.5">
+            <span
+              className="text-xs px-2.5 py-1 rounded-full font-semibold text-white"
+              style={{ backgroundColor: lc }}
+            >
+              {course.level}
+            </span>
+            {course.isFree && (
+              <span className="text-xs px-2.5 py-1 rounded-full font-semibold text-white bg-emerald-500">
+                Free
+              </span>
+            )}
+          </div>
+          {course.educator?.profilePhotoUrl && (
+            <div className="absolute bottom-3 right-3">
+              <Avatar className="h-8 w-8 border-2 border-white shadow">
+                <AvatarImage src={course.educator.profilePhotoUrl} />
+                <AvatarFallback className="text-xs bg-white text-gray-700 font-bold">
+                  {course.educator.name?.slice(0, 2).toUpperCase() ?? "??"}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          )}
+        </div>
+
+        <div className="p-5 flex flex-col flex-1">
+          <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 group-hover:text-[#D52B1E] transition-colors mb-1">
+            {course.title}
+          </h3>
+          <p className="text-xs text-gray-400 mb-1">{course.educator?.name || "IEFA Educator"}</p>
+          <p className="text-xs text-gray-500 line-clamp-2 mb-4 flex-1">{stripHtml(course.description)}</p>
+
+          {/* Meta */}
+          <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
+            <span className="flex items-center gap-1">
+              <PlayCircle className="h-3 w-3" /> {course.videoCount} lessons
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" /> {durationLabel(course.totalDurationMinutes)}
+            </span>
+            <span className="flex items-center gap-1">
+              <Users className="h-3 w-3" /> {course.enrolledCount.toLocaleString()}
+            </span>
+          </div>
+
+          {/* Rating + Price */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-1">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <span className="text-xs font-semibold text-gray-700">{course.rating.toFixed(1)}</span>
+              <span className="text-xs text-gray-400">({course.reviewCount})</span>
+            </div>
+            {!course.isFree && (
+              <span className="text-sm font-bold text-gray-900">${course.priceUsd}</span>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="pt-3 border-t border-gray-50">
+            {isEnrolled ? (
+              <div className="flex items-center justify-between">
+                <button className="flex items-center gap-1 text-xs font-semibold text-[#D52B1E] hover:gap-2 transition-all">
+                  Resume <ChevronRight className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={onUnenroll}
+                  disabled={mutating}
+                  className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                >
+                  Unenroll
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onEnroll}
+                disabled={mutating}
+                className="w-full flex items-center justify-center gap-1.5 text-sm font-semibold text-[#D52B1E] py-1.5 rounded-full border border-[#D52B1E]/30 hover:bg-[#D52B1E]/5 transition-colors"
+              >
+                Enroll Now <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* -------------------- Main Component ---------------------------------------- */
 export function LearningZone() {
-  // Scroll to top on page load
+  const [courseSearch, setCourseSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("my-learning");
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  const { data: me } = useMe();
+  const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } = useLearningDashboard();
+  const { data: myCourses = [], isLoading: myCoursesLoading, refetch: refetchMyCourses } = useLearningMyCourses();
+  const { data: upcoming = [], isLoading: upcomingLoading, refetch: refetchUpcoming } = useLearningUpcomingActivities();
+  const { data: announcements = [], isLoading: announcementsLoading, refetch: refetchAnnouncements } = useLearningAnnouncements();
+  const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments } = useLearningPayments();
+  const { data: results, isLoading: resultsLoading, refetch: refetchResults } = useLearningResults();
+  const { data: courseList, isLoading: coursesLoading, refetch: refetchCourses } = useLearningCourses({
+    page: 1,
+    perPage: 24,
+    search: courseSearch || undefined,
+  });
+
+  const enrollMutation = useEnrollInLearningCourse();
+  const unenrollMutation = useUnenrollFromLearningCourse();
+
+  const enrolledCourseIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const item of myCourses) {
+      if (typeof item.currentCourseId === "number") ids.add(item.currentCourseId);
+      const n = Number(item.itemId);
+      if (Number.isFinite(n)) ids.add(n);
+    }
+    return ids;
+  }, [myCourses]);
+
+  const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(" ").trim();
+  const welcomeName = fullName || me?.username || "Learner";
+
+  const onRefreshAll = async () => {
+    await Promise.all([
+      refetchDashboard(),
+      refetchMyCourses(),
+      refetchUpcoming(),
+      refetchAnnouncements(),
+      refetchPayments(),
+      refetchResults(),
+      refetchCourses(),
+    ]);
+  };
+
+  const TABS = [
+    { id: "my-learning", label: "My Learning",    icon: BookOpen },
+    { id: "courses",     label: "Browse Courses",  icon: GraduationCap },
+    { id: "payments",    label: "Payments",         icon: CreditCard },
+    { id: "results",     label: "Results & Certs",  icon: Award },
+  ] as const;
+
+  const hasCourses        = (courseList?.data?.length ?? 0) > 0;
+  const hasPaymentHistory = (payments?.paymentHistory?.length ?? 0) > 0;
+  const totalLearners = (courseList?.data ?? []).reduce((sum, c) => sum + (c.enrolledCount || 0), 0);
+  const totalLearningHours = Math.round(
+    (courseList?.data ?? []).reduce((sum, c) => sum + (c.totalDurationMinutes || 0), 0) / 60,
+  );
+  const avgCourseRating =
+    (courseList?.data?.length ?? 0) > 0
+      ? (courseList?.data ?? []).reduce((sum, c) => sum + (c.rating || 0), 0) / (courseList?.data?.length ?? 1)
+      : 0;
+
   return (
     <motion.div
-      className="space-y-6"
+      className="space-y-6 pb-12"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
     >
+      {/* Hero banner */}
       <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
-          My Learning
-        </h1>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-[#1c0505] to-gray-900 p-8 md:p-12 min-h-[220px] flex items-center">
+          <div className="pointer-events-none absolute -top-16 -right-16 h-72 w-72 rounded-full bg-[#D52B1E]/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-12 -left-12 h-56 w-56 rounded-full bg-[#D52B1E]/10 blur-3xl" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-8 w-full">
+            <div className="flex-1 space-y-4">
+              <span className="inline-flex items-center gap-1.5 bg-[#D52B1E]/20 text-[#D52B1E] text-xs font-bold px-3 py-1.5 rounded-full border border-[#D52B1E]/30 tracking-widest uppercase">
+                <GraduationCap className="h-3 w-3" /> IEFA Learning Zone
+              </span>
+              <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+                Build your <span className="text-[#D52B1E]">Islamic Finance</span> mastery
+              </h1>
+              <p className="text-gray-400 text-sm md:text-base leading-relaxed max-w-2xl">
+                Track progress, continue lessons, manage subscriptions, and review your certifications from one learning workspace.
+              </p>
+              <div className="flex flex-wrap items-center gap-5 text-sm text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <BookOpen className="h-4 w-4 text-gray-600" /> {myCourses.length} Active Enrollments
+                </span>
+                <span className="h-1 w-1 bg-gray-700 rounded-full" />
+                <span className="flex items-center gap-1.5">
+                  <Award className="h-4 w-4 text-gray-600" /> {dashboard?.stats?.certificatesEarned ?? 0} Certificates
+                </span>
+                <span className="h-1 w-1 bg-gray-700 rounded-full" />
+                <span className="flex items-center gap-1.5">
+                  <BarChart3 className="h-4 w-4 text-gray-600" /> {dashboard?.stats?.weeklyProgress ?? 0}% Weekly Progress
+                </span>
+              </div>
+            </div>
+
+            <div className="flex md:flex-col gap-3 shrink-0">
+              <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
+                <p className="text-2xl font-bold text-white">{myCourses.length}</p>
+                <p className="text-xs text-gray-500">Enrolled</p>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
+                <p className="text-2xl font-bold text-[#D52B1E]">{dashboard?.stats?.coursesCompleted ?? 0}</p>
+                <p className="text-xs text-gray-500">Completed</p>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
+                <p className="text-2xl font-bold text-emerald-400">{dashboard?.stats?.weeklyProgress ?? 0}%</p>
+                <p className="text-xs text-gray-500">This Week</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pointer-events-none absolute right-8 bottom-4 opacity-5 text-white select-none hidden md:block">
+            <GraduationCap className="h-52 w-52" />
+          </div>
+        </div>
       </motion.div>
 
-      {/* Main Tabs */}
-      <Tabs defaultValue="my-learning" className="w-full">
-        <TabsList className="bg-transparent h-auto p-0 mb-6 gap-2 border-b w-full justify-start overflow-x-auto scrollbar-hide -mx-2 px-2 flex-nowrap md:gap-0 md:overflow-visible md:px-0 md:flex-wrap">
-          <TabsTrigger
-            value="my-learning"
-            className="bg-transparent px-4 pb-3 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent shrink-0"
+      {/* Page header */}
+      <motion.div variants={itemVariants}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-widest mb-1">
+              IEFA Learning Portal
+            </p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Welcome back, {welcomeName}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {dashboardLoading
+                ? "Loading your progress..."
+                : `${dashboard?.stats?.weeklyProgress ?? 0}% weekly progress | ${dashboard?.stats?.coursesCompleted ?? 0} courses completed`}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-full border-gray-200 text-gray-600 hover:border-[#D52B1E]/40 hover:text-[#D52B1E] self-start sm:self-auto"
+            onClick={() => void onRefreshAll()}
           >
-            My Learning
-          </TabsTrigger>
-          <TabsTrigger
-            value="programs"
-            className="bg-transparent px-4 pb-3 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent shrink-0"
-          >
-            Programs and Certifications
-          </TabsTrigger>
-          <TabsTrigger
-            value="paths"
-            className="bg-transparent px-4 pb-3 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent shrink-0"
-          >
-            Learning Paths
-          </TabsTrigger>
-          <TabsTrigger
-            value="assessments"
-            className="bg-transparent px-4 pb-3 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent shrink-0"
-          >
-            Assessments
-          </TabsTrigger>
-          <TabsTrigger
-            value="payments"
-            className="bg-transparent px-4 pb-3 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent shrink-0"
-          >
-            Payments
-          </TabsTrigger>
-          <TabsTrigger
-            value="results"
-            className="bg-transparent px-4 pb-3 text-sm font-medium data-[state=active]:bg-transparent data-[state=active]:text-[#D52B1E] data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#D52B1E] rounded-none text-[#737692] hover:bg-transparent shrink-0"
-          >
-            Results
-          </TabsTrigger>
-        </TabsList>
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </Button>
+        </div>
+      </motion.div>
 
-        {/* My Learning Tab */}
-        <TabsContent value="my-learning" className="mt-0">
-          <div className="space-y-6">
-            {/* Welcome Message */}
-            <motion.div
-              key="welcome-msg"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="bg-gradient-to-r from-[#FFF5F5] to-[#FFF0F0] p-6 rounded-xl"
-            >
-              <p className="text-[#737692] text-sm">
-                Welcome back{" "}
-                <span className="font-semibold text-[#D52B1E]">
-                  Ibrahim Shehu!
-                </span>{" "}
-                You've completed 15% more this week!
+      {/* Stat cards */}
+      <motion.div variants={containerVariants} className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Courses Completed",   value: dashboard?.stats?.coursesCompleted ?? 0,     icon: BookOpen,  color: "#2563eb", bg: "#EFF6FF" },
+          { label: "Certificates Earned", value: dashboard?.stats?.certificatesEarned ?? 0,    icon: Award,     color: "#d97706", bg: "#FFFBEB" },
+          { label: "Weekly Progress",     value: `${dashboard?.stats?.weeklyProgress ?? 0}%`,  icon: BarChart3, color: "#059669", bg: "#ECFDF5" },
+        ].map((s) => (
+          <motion.div
+            key={s.label}
+            variants={itemVariants}
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden"
+          >
+            <div className="h-1 w-full" style={{ backgroundColor: s.color }} />
+            <div className="p-5 flex items-center gap-4">
+              <div
+                className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: s.bg, color: s.color }}
+              >
+                <s.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {dashboardLoading
+                    ? <span className="inline-block h-6 w-12 bg-gray-100 rounded animate-pulse" />
+                    : s.value}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Continue Learning banner */}
+      {dashboard?.continueLearning && (
+        <motion.div
+          variants={itemVariants}
+          className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300"
+        >
+          <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
+          <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            <div className="h-14 w-14 shrink-0 rounded-xl bg-[#D52B1E]/10 flex items-center justify-center">
+              <PlayCircle className="h-7 w-7 text-[#D52B1E]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-widest mb-0.5">Up Next</p>
+              <h3 className="font-semibold text-gray-900 truncate">{dashboard.continueLearning.courseTitle}</h3>
+              <p className="text-xs text-gray-400 truncate mt-0.5">
+                {dashboard.continueLearning.moduleTitle} &mdash; {dashboard.continueLearning.lessonTitle}
               </p>
-            </motion.div>
-
-            {/* Continue Learning */}
-            <motion.div
-              key="continue-learning"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <h2 className="text-xl font-bold text-[#000000] mb-4">
-                Continue Learning
-              </h2>
-              <Card className="overflow-hidden bg-gradient-to-r from-black to-gray-800 text-white border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center">
-                    <div className="flex-1 p-6">
-                      <h3 className="text-lg font-bold mb-2">
-                        Certified Islamic Finance Professional (CIFP)
-                      </h3>
-                      <p className="text-sm text-gray-300 mb-4">
-                        Module 4: Islamic Financial Contracts - Murabaha &
-                        Ijarah
-                      </p>
-                      <div className="space-y-2 mb-4">
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <motion.div
-                            className="h-full bg-[#D52B1E] rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: "62%" }}
-                            transition={{ duration: 1, delay: 0.3 }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          62% completed | Next up: Lesson 5 - Principles of
-                          Ijara (2mins)
-                        </p>
-                      </div>
-                      <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                        Resume
-                      </Button>
-                    </div>
-                    <div className="w-64 h-full hidden md:block">
-                      <img
-                        src="https://images.unsplash.com/photo-1591696205602-2f950c417cb9?w=300&h=200&fit=crop"
-                        alt="Islamic Architecture"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Active Enrollments */}
-            <motion.div
-              key="active-enrollments"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <h2 className="text-xl font-bold text-[#000000] mb-4">
-                Active Enrollments
-              </h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <GraduationCap className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-semibold text-[#000000]">
-                            CIFP Program
-                          </h4>
-                          <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-[#D52B1E]/20">
-                            Active
-                          </Badge>
-                        </div>
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
-                          <motion.div
-                            className="h-full bg-[#D52B1E] rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: "62%" }}
-                            transition={{ duration: 1, delay: 0.5 }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-[#737692]">Progress</span>
-                          <span className="font-semibold text-[#000000]">
-                            62%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                        <Award className="h-6 w-6 text-purple-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-semibold text-[#000000]">
-                            Ethical and ESG Finance Certificate
-                          </h4>
-                          <Badge className="bg-gray-500/10 text-gray-600 border-gray-500/20">
-                            Active
-                          </Badge>
-                        </div>
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
-                          <motion.div
-                            className="h-full bg-purple-600 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: "45%" }}
-                            transition={{ duration: 1, delay: 0.6 }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-[#737692]">Progress</span>
-                          <span className="font-semibold text-[#000000]">
-                            45%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </motion.div>
-
-            {/* Upcoming Activities */}
-            <motion.div
-              key="upcoming-activities"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <h2 className="text-xl font-bold text-[#000000] mb-4">
-                Upcoming Activities
-              </h2>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-100">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <Video className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-[#000000]">
-                            Live Session: Sukuk Structures
-                          </h4>
-                          <p className="text-sm text-[#737692]">
-                            Tomorrow • 10:00 AM (WAT)
-                          </p>
-                        </div>
-                      </div>
-                      <Button className="bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                        Join
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-100">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-orange-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-[#000000]">
-                            Assessment Deadline: Module 4 Quiz
-                          </h4>
-                          <p className="text-sm text-[#737692]">
-                            Due in 3 days
-                          </p>
-                        </div>
-                      </div>
-                      <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                        Due Soon
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Announcements */}
-            <motion.div
-              key="announcements"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-            >
-              <h2 className="text-xl font-bold text-[#000000] mb-4">
-                Announcements
-              </h2>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <Megaphone className="h-5 w-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-[#000000] mb-1">
-                        Instructor Update
-                      </h4>
-                      <p className="text-sm text-[#737692]">
-                        Please review the updated reading materials for Module 4
-                        before the live session.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-        </TabsContent>
-
-        {/* Programs and Certifications Tab */}
-        <TabsContent value="programs" className="mt-0">
-          <div className="space-y-6">
-            <p className="text-[#737692] mb-6">
-              Explore our comprehensive programs and professional certifications
-            </p>
-
-            {/* Professional Programs */}
-            <div>
-              <h3 className="text-xl font-bold text-[#000000] mb-4">
-                Professional Programs
-              </h3>
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card className="border-l-4 border-l-[#D52B1E] hover:shadow-xl transition-all">
-                  <CardHeader>
-                    <div className="flex flex-col gap-3 mb-2 sm:flex-row sm:items-center">
-                      <div className="h-14 w-14 rounded-lg bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center">
-                        <GraduationCap className="h-7 w-7 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-[#000000]">
-                          Certified Islamic Finance Professional (CIFP)
-                        </CardTitle>
-                        <CardDescription>
-                          Comprehensive professional certification program
-                        </CardDescription>
-                      </div>
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                        Enrolled
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-[#737692]">
-                      A comprehensive certification program covering Islamic
-                      banking, finance principles, investment strategies, and
-                      professional practice.
-                    </p>
-                    <div className="grid gap-3 text-sm sm:grid-cols-3">
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">
-                          8 Modules
-                        </p>
-                        <p className="text-xs text-[#737692]">Comprehensive</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">40 Hours</p>
-                        <p className="text-xs text-[#737692]">Learning Time</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">Advanced</p>
-                        <p className="text-xs text-[#737692]">Level</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#737692]">Your Progress</span>
-                        <span className="font-semibold">62%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#D52B1E] rounded-full"
-                          style={{ width: "62%" }}
-                        />
-                      </div>
-                    </div>
-                    <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                      Continue Learning
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="hover:shadow-xl transition-all">
-                  <CardHeader>
-                    <div className="flex flex-col gap-3 mb-2 sm:flex-row sm:items-center">
-                      <div className="h-14 w-14 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
-                        <BarChart3 className="h-7 w-7 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-[#000000]">
-                          ESG & Ethical Finance Program
-                        </CardTitle>
-                        <CardDescription>
-                          Environmental, Social, and Governance expertise
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-[#737692]">
-                      Master sustainable and ethical finance principles aligned
-                      with Islamic values and modern ESG frameworks.
-                    </p>
-                    <div className="grid gap-3 text-sm sm:grid-cols-3">
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">
-                          6 Modules
-                        </p>
-                        <p className="text-xs text-[#737692]">Focused Track</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">24 Hours</p>
-                        <p className="text-xs text-[#737692]">Learning Time</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">
-                          Intermediate
-                        </p>
-                        <p className="text-xs text-[#737692]">Level</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-                    >
-                      Enroll Now - $299
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="hover:shadow-xl transition-all">
-                  <CardHeader>
-                    <div className="flex flex-col gap-3 mb-2 sm:flex-row sm:items-center">
-                      <div className="h-14 w-14 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
-                        <Award className="h-7 w-7 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-[#000000]">
-                          Islamic Banking Operations Certificate
-                        </CardTitle>
-                        <CardDescription>
-                          Practical banking skills and operations
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-[#737692]">
-                      Develop hands-on expertise in Islamic banking operations,
-                      compliance, and customer service excellence.
-                    </p>
-                    <div className="grid gap-3 text-sm sm:grid-cols-3">
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">
-                          5 Modules
-                        </p>
-                        <p className="text-xs text-[#737692]">Practical</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">20 Hours</p>
-                        <p className="text-xs text-[#737692]">Learning Time</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">Beginner</p>
-                        <p className="text-xs text-[#737692]">Level</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-                    >
-                      Enroll Now - $199
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="hover:shadow-xl transition-all">
-                  <CardHeader>
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="h-14 w-14 rounded-lg bg-gradient-to-br from-orange-600 to-orange-800 flex items-center justify-center">
-                        <TrendingUp className="h-7 w-7 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-[#000000]">
-                          Sukuk & Islamic Capital Markets
-                        </CardTitle>
-                        <CardDescription>
-                          Specialized certification in Islamic securities
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-[#737692]">
-                      Become an expert in sukuk structuring, issuance, trading,
-                      and Islamic capital market instruments.
-                    </p>
-                    <div className="grid grid-cols-3 gap-3 text-sm">
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">
-                          4 Modules
-                        </p>
-                        <p className="text-xs text-[#737692]">Specialized</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">16 Hours</p>
-                        <p className="text-xs text-[#737692]">Learning Time</p>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="font-semibold text-[#000000]">Advanced</p>
-                        <p className="text-xs text-[#737692]">Level</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-                    >
-                      Enroll Now - $249
-                    </Button>
-                  </CardContent>
-                </Card>
+              <div className="mt-3 flex items-center gap-3">
+                <Progress
+                  value={dashboard.continueLearning.progress}
+                  className="flex-1 h-1.5 bg-gray-100 [&>div]:bg-gradient-to-r [&>div]:from-[#D52B1E] [&>div]:to-orange-400"
+                />
+                <span className="text-xs font-bold text-[#D52B1E] shrink-0">
+                  {dashboard.continueLearning.progress}%
+                </span>
               </div>
             </div>
-
-            {/* Specialized Certifications */}
-            <div>
-              <h3 className="text-xl font-bold text-[#000000] mb-4">
-                Specialized Certifications
-              </h3>
-              <div className="grid gap-4 md:grid-cols-3">
-                <Card className="hover:shadow-lg transition-all">
-                  <CardContent className="p-6">
-                    <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center mb-4">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <h4 className="font-semibold text-[#000000] mb-2">
-                      Shariah Compliance Officer
-                    </h4>
-                    <p className="text-sm text-[#737692] mb-4">
-                      12 hours • Intermediate
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-                    >
-                      Learn More
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="hover:shadow-lg transition-all">
-                  <CardContent className="p-6">
-                    <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <h4 className="font-semibold text-[#000000] mb-2">
-                      Islamic Wealth Management
-                    </h4>
-                    <p className="text-sm text-[#737692] mb-4">
-                      10 hours • Advanced
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-                    >
-                      Learn More
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="hover:shadow-lg transition-all">
-                  <CardContent className="p-6">
-                    <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4">
-                      <Star className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <h4 className="font-semibold text-[#000000] mb-2">
-                      Takaful Specialist
-                    </h4>
-                    <p className="text-sm text-[#737692] mb-4">
-                      8 hours • Intermediate
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-                    >
-                      Learn More
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Why Choose Our Programs */}
-            <Card className="bg-gradient-to-br from-gray-50 to-gray-100">
-              <CardHeader>
-                <CardTitle className="text-[#000000]">
-                  Why Choose Our Programs?
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="flex gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center flex-shrink-0">
-                      <Award className="h-5 w-5 text-[#D52B1E]" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-[#000000] mb-1">
-                        Industry-Recognized Credentials
-                      </h5>
-                      <p className="text-sm text-[#737692]">
-                        Earn certificates valued by leading Islamic financial
-                        institutions worldwide
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center flex-shrink-0">
-                      <Users className="h-5 w-5 text-[#D52B1E]" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-[#000000] mb-1">
-                        Expert Instructors
-                      </h5>
-                      <p className="text-sm text-[#737692]">
-                        Learn from experienced practitioners and renowned
-                        scholars
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center flex-shrink-0">
-                      <Clock className="h-5 w-5 text-[#D52B1E]" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-[#000000] mb-1">
-                        Flexible Learning
-                      </h5>
-                      <p className="text-sm text-[#737692]">
-                        Study at your own pace with lifetime access to course
-                        materials
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center flex-shrink-0">
-                      <CheckCircle className="h-5 w-5 text-[#D52B1E]" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-[#000000] mb-1">
-                        Practical Application
-                      </h5>
-                      <p className="text-sm text-[#737692]">
-                        Real-world case studies and hands-on projects
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Program Comparison */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-[#000000]">
-                  Compare Programs
-                </CardTitle>
-                <CardDescription className="text-[#737692]">
-                  Find the right certification for your career goals
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-semibold text-[#000000]">
-                          Program
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold text-[#000000]">
-                          Duration
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold text-[#000000]">
-                          Level
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold text-[#000000]">
-                          Price
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4 font-medium text-[#000000]">
-                          CIFP
-                        </td>
-                        <td className="py-3 px-4 text-[#737692]">40 hours</td>
-                        <td className="py-3 px-4">
-                          <Badge className="bg-red-100 text-red-800">
-                            Advanced
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-[#000000]">$299</td>
-                      </tr>
-                      <tr className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4 font-medium text-[#000000]">
-                          ESG & Ethical Finance
-                        </td>
-                        <td className="py-3 px-4 text-[#737692]">24 hours</td>
-                        <td className="py-3 px-4">
-                          <Badge className="bg-yellow-100 text-yellow-800">
-                            Intermediate
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-[#000000]">$299</td>
-                      </tr>
-                      <tr className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4 font-medium text-[#000000]">
-                          Islamic Banking Operations
-                        </td>
-                        <td className="py-3 px-4 text-[#737692]">20 hours</td>
-                        <td className="py-3 px-4">
-                          <Badge className="bg-green-100 text-green-800">
-                            Beginner
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-[#000000]">$199</td>
-                      </tr>
-                      <tr className="hover:bg-gray-50">
-                        <td className="py-3 px-4 font-medium text-[#000000]">
-                          Sukuk & Capital Markets
-                        </td>
-                        <td className="py-3 px-4 text-[#737692]">16 hours</td>
-                        <td className="py-3 px-4">
-                          <Badge className="bg-red-100 text-red-800">
-                            Advanced
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-[#000000]">$249</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+            <Button
+              size="sm"
+              className="bg-[#D52B1E] hover:bg-[#b82319] text-white rounded-full gap-1.5 shrink-0"
+            >
+              <PlayCircle className="h-3.5 w-3.5" /> Resume
+            </Button>
           </div>
-        </TabsContent>
+        </motion.div>
+      )}
 
-        {/* Learning Paths Tab */}
-        <TabsContent value="paths" className="mt-0">
-          <div className="space-y-6">
-            <p className="text-[#737692] mb-6">
-              Structured learning paths to guide your education journey
-            </p>
+      {/* Tab chips */}
+      <motion.div variants={itemVariants}>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {TABS.map((t) => (
+            <TabChip
+              key={t.id}
+              label={t.label}
+              icon={t.icon}
+              active={activeTab === t.id}
+              onClick={() => setActiveTab(t.id)}
+            />
+          ))}
+        </div>
+      </motion.div>
 
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className="hover:shadow-xl transition-all">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-[#000000]">
-                        Islamic Banking Fundamentals
-                      </CardTitle>
-                      <CardDescription>5 courses • 20 hours</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#737692]">Progress</span>
-                        <span className="font-semibold">0%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#D52B1E] rounded-full w-0" />
-                      </div>
-                    </div>
-                    <div className="space-y-2 pt-2">
-                      <h5 className="text-sm font-semibold text-[#000000]">
-                        Path Overview:
-                      </h5>
-                      <ul className="space-y-1.5">
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-gray-300" />
-                          Introduction to Islamic Finance
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-gray-300" />
-                          Islamic Banking Principles
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-gray-300" />
-                          Shariah Compliance
-                        </li>
-                      </ul>
-                    </div>
-                    <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                      Start Learning Path
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Tab panels */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.22 }}
+        >
 
-              <Card className="hover:shadow-xl transition-all">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-[#000000]">
-                        Investment & Portfolio Management
-                      </CardTitle>
-                      <CardDescription>4 courses • 16 hours</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#737692]">Progress</span>
-                        <span className="font-semibold">25%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full bg-[#D52B1E] rounded-full"
-                          initial={{ width: 0 }}
-                          animate={{ width: "25%" }}
-                          transition={{ duration: 1, delay: 0.3 }}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2 pt-2">
-                      <h5 className="text-sm font-semibold text-[#000000]">
-                        Path Overview:
-                      </h5>
-                      <ul className="space-y-1.5">
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          Halal Investment Strategies
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-gray-300" />
-                          Sukuk Investment
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-gray-300" />
-                          Portfolio Diversification
-                        </li>
-                      </ul>
-                    </div>
-                    <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                      Continue Path
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-xl transition-all">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <Award className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-[#000000]">
-                        Professional Certification Track
-                      </CardTitle>
-                      <CardDescription>8 courses • 40 hours</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#737692]">Progress</span>
-                        <span className="font-semibold">62%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full bg-[#D52B1E] rounded-full"
-                          initial={{ width: 0 }}
-                          animate={{ width: "62%" }}
-                          transition={{ duration: 1, delay: 0.4 }}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2 pt-2">
-                      <h5 className="text-sm font-semibold text-[#000000]">
-                        Path Overview:
-                      </h5>
-                      <ul className="space-y-1.5">
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          CIFP Module 1-4
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          Risk Management
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-gray-300" />
-                          Final Assessment
-                        </li>
-                      </ul>
-                    </div>
-                    <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                      Continue Path
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-xl transition-all">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-12 w-12 rounded-lg bg-orange-100 flex items-center justify-center">
-                      <BarChart3 className="h-6 w-6 text-orange-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-[#000000]">
-                        ESG & Ethical Finance
-                      </CardTitle>
-                      <CardDescription>6 courses • 24 hours</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#737692]">Progress</span>
-                        <span className="font-semibold">45%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full bg-[#D52B1E] rounded-full"
-                          initial={{ width: 0 }}
-                          animate={{ width: "45%" }}
-                          transition={{ duration: 1, delay: 0.5 }}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2 pt-2">
-                      <h5 className="text-sm font-semibold text-[#000000]">
-                        Path Overview:
-                      </h5>
-                      <ul className="space-y-1.5">
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          ESG Fundamentals
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          Sustainable Finance
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-[#737692]">
-                          <CheckCircle className="h-4 w-4 text-gray-300" />
-                          Impact Measurement
-                        </li>
-                      </ul>
-                    </div>
-                    <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-                      Continue Path
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Assessments Tab */}
-        <TabsContent value="assessments" className="mt-0">
-          <div className="space-y-6">
+          {/* -- My Learning ------------------------------ */}
+          {activeTab === "my-learning" && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-[#000000] mb-4">
-                  Upcoming Assessments
-                </h3>
-                <div className="grid gap-4">
-                  <Card className="hover:shadow-lg transition-all border-l-4 border-l-orange-500">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                              <FileText className="h-4 w-4 text-orange-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-[#000000]">
-                                CIFP Module 4 Final Exam
-                              </h4>
-                              <p className="text-sm text-[#737692]">
-                                Investment Planning & Portfolio Management
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-[#737692] sm:ml-12">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />2 hours
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              Due: Dec 30, 2024
-                            </span>
-                          </div>
-                        </div>
-                        <Button className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white sm:w-auto">
-                          Start Exam
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="hover:shadow-lg transition-all border-l-4 border-l-yellow-500">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-                              <FileText className="h-4 w-4 text-yellow-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-[#000000]">
-                                Sukuk Investment Quiz
-                              </h4>
-                              <p className="text-sm text-[#737692]">
-                                Module Assessment
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-[#737692] sm:ml-12">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              45 minutes
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              Due: Jan 5, 2025
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white sm:w-auto"
-                        >
-                          Start Quiz
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Enrollments */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-[#D52B1E]" /> Active Enrollments
+                    </h2>
+                    <span className="text-xs text-gray-400">{myCourses.length} enrolled</span>
+                  </div>
+                  {myCoursesLoading && (
+                    <div className="space-y-3">
+                      {[1, 2].map((i) => <div key={i} className="h-28 bg-gray-50 rounded-2xl animate-pulse" />)}
+                    </div>
+                  )}
+                  {!myCoursesLoading && myCourses.length > 0 && (
+                    <motion.div
+                      className="grid gap-4 sm:grid-cols-2"
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      {myCourses.map((item) => (
+                        <EnrollmentCard key={item.id} item={item} />
+                      ))}
+                    </motion.div>
+                  )}
+                  {!myCoursesLoading && myCourses.length === 0 && (
+                    <EmptyState
+                      icon={BookOpen}
+                      title="No active enrollments"
+                      description="Browse courses below and start learning today."
+                    />
+                  )}
                 </div>
-              </div>
 
-              <div>
-                <h3 className="text-lg font-semibold text-[#000000] mb-4">
-                  Completed Assessments
-                </h3>
-                <div className="grid gap-4">
-                  <Card className="hover:shadow-lg transition-all border-l-4 border-l-green-500">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-[#000000]">
-                                Islamic Banking Principles - Final Exam
-                              </h4>
-                              <p className="text-sm text-[#737692]">
-                                Completed on Dec 15, 2024
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm ml-13">
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                              Passed
-                            </Badge>
-                            <span className="font-semibold text-green-600">
-                              Score: 92%
-                            </span>
-                          </div>
-                        </div>
-                        <Button variant="ghost" className="text-[#D52B1E]">
-                          <Download className="h-4 w-4 mr-2" />
-                          Certificate
-                        </Button>
+                {/* Sidebar � schedule + announcements */}
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-[#D52B1E]" /> Schedule
+                    </h2>
+                    {upcomingLoading && (
+                      <div className="space-y-2">
+                        {[1, 2].map((i) => <div key={i} className="h-16 bg-gray-50 rounded-xl animate-pulse" />)}
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                    {!upcomingLoading && upcoming.length > 0 && (
+                      <div className="space-y-2">
+                        {upcoming.map((activity) => (
+                          <div
+                            key={activity.id}
+                            className="group flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-3.5 shadow-sm hover:shadow-md hover:border-[#D52B1E]/20 transition-all"
+                          >
+                            <div className="h-8 w-8 shrink-0 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center group-hover:bg-[#D52B1E] transition-colors">
+                              <Calendar className="h-3.5 w-3.5 text-[#D52B1E] group-hover:text-white transition-colors" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-gray-900 line-clamp-1">{activity.title}</p>
+                              <div className="flex flex-wrap gap-1.5 mt-1">
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                  {formatActivityType(activity.type)}
+                                </span>
+                                {(activity.dueAt ?? activity.scheduledAt) && (
+                                  <span className="text-xs bg-red-50 text-[#D52B1E] px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {formatDate(activity.dueAt ?? activity.scheduledAt)}
+                                  </span>
+                                )}
+                                {activity.durationMinutes && (
+                                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                                    {durationLabel(activity.durationMinutes)}
+                                  </span>
+                                )}
+                              </div>
+                              {activity.joinUrl && (
+                                <a
+                                  href={activity.joinUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-white bg-[#D52B1E] hover:bg-[#b82319] px-2.5 py-1 rounded-full transition-colors"
+                                >
+                                  <PlayCircle className="h-3 w-3" /> Join
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!upcomingLoading && upcoming.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-4">No upcoming activities</p>
+                    )}
+                  </div>
 
-                  <Card className="hover:shadow-lg transition-all border-l-4 border-l-green-500">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-[#000000]">
-                                Shariah Compliance Fundamentals
-                              </h4>
-                              <p className="text-sm text-[#737692]">
-                                Completed on Nov 28, 2024
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm ml-13">
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                              Passed
-                            </Badge>
-                            <span className="font-semibold text-green-600">
-                              Score: 88%
-                            </span>
-                          </div>
-                        </div>
-                        <Button variant="ghost" className="text-[#D52B1E]">
-                          <Download className="h-4 w-4 mr-2" />
-                          Certificate
-                        </Button>
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <Megaphone className="h-4 w-4 text-[#D52B1E]" /> Updates
+                    </h2>
+                    {announcementsLoading && (
+                      <div className="space-y-2">
+                        {[1, 2].map((i) => <div key={i} className="h-20 bg-gray-50 rounded-xl animate-pulse" />)}
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="hover:shadow-lg transition-all border-l-4 border-l-blue-500">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                              <RefreshCw className="h-4 w-4 text-blue-600" />
+                    )}
+                    {!announcementsLoading && announcements.length > 0 && (
+                      <div className="space-y-2">
+                        {announcements.map((a) => (
+                          <div
+                            key={a.id}
+                            className="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover:shadow-md transition-all"
+                          >
+                            <div className="absolute left-0 top-0 h-full w-1 bg-[#D52B1E]" />
+                            <div className="flex justify-between items-start mb-1 pl-1">
+                              <p className="text-sm font-semibold text-gray-900 line-clamp-1 pr-2">{a.title}</p>
+                              <span className="text-xs text-gray-400 shrink-0">{formatDate(a.publishedAt)}</span>
                             </div>
-                            <div>
-                              <h4 className="font-semibold text-[#000000]">
-                                Halal Investment Strategies
-                              </h4>
-                              <p className="text-sm text-[#737692]">
-                                Completed on Nov 20, 2024
-                              </p>
-                            </div>
+                            {a.course?.title && (
+                              <span className="ml-1 mb-1.5 inline-block text-xs bg-[#D52B1E]/10 text-[#D52B1E] px-2 py-0.5 rounded-full font-medium">
+                                {a.course.title}
+                              </span>
+                            )}
+                            <p className="text-xs text-gray-500 leading-relaxed pl-1 line-clamp-2">{a.message}</p>
                           </div>
-                          <div className="flex items-center gap-4 text-sm ml-13">
-                            <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                              Retake Available
-                            </Badge>
-                            <span className="font-semibold text-[#737692]">
-                              Score: 72%
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          className="border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
-                        >
-                          Retake
-                        </Button>
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                    {!announcementsLoading && announcements.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-4">No announcements</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </TabsContent>
+          )}
 
-        {/* Payments Tab */}
-        <TabsContent value="payments" className="mt-0">
-          <div className="space-y-6">
-            {/* Active Subscription */}
-            <Card className="border-l-4 border-l-[#D52B1E]">
-              <CardHeader>
-                <CardTitle className="text-[#000000]">
-                  Active Subscription
-                </CardTitle>
-                <CardDescription className="text-[#737692]">
-                  Your current plan and renewal information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center">
-                        <Award className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-[#000000]">
-                          CIFP Professional Package
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Full access to all courses and certifications
-                        </p>
-                      </div>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                      Active
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="text-sm text-[#737692]">
-                        Next Billing Date
-                      </p>
-                      <p className="font-semibold text-[#000000]">
-                        June 15, 2025
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-[#737692]">Amount</p>
-                      <p className="font-semibold text-[#000000]">$299.00</p>
-                    </div>
-                  </div>
+          {/* -- Browse Courses --------------------------- */}
+          {activeTab === "courses" && (
+            <div className="space-y-5">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    value={courseSearch}
+                    onChange={(e) => setCourseSearch(e.target.value)}
+                    placeholder="Search courses, topics..."
+                    className="pl-9 rounded-xl bg-gray-50 border-gray-200 focus-visible:ring-[#D52B1E]/30"
+                  />
+                </div>
+                {courseSearch && (
                   <Button
-                    variant="outline"
-                    className="w-full border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E] hover:text-white"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-xl text-gray-500"
+                    onClick={() => setCourseSearch("")}
                   >
-                    Manage Subscription
+                    Clear
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+                <span className="text-xs text-gray-400 shrink-0 self-center">
+                  {courseList?.data?.length ?? 0} courses
+                </span>
+              </div>
 
-            {/* Payment History */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-[#000000]">
-                  Payment History
-                </CardTitle>
-                <CardDescription className="text-[#737692]">
-                  View all your past transactions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-[#000000]">
-                          CIFP Program - Renewal
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Dec 15, 2024 • Visa ending in 4242
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-[#000000]">$299.00</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-[#D52B1E] h-auto p-0 mt-1"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Receipt
-                      </Button>
-                    </div>
-                  </div>
+              {coursesLoading && (
+                <motion.div
+                  className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <motion.div key={i} variants={itemVariants} className="h-80 bg-gray-50 rounded-2xl animate-pulse" />
+                  ))}
+                </motion.div>
+              )}
+              {!coursesLoading && hasCourses && (
+                <motion.div
+                  className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {courseList?.data.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      isEnrolled={enrolledCourseIds.has(course.id)}
+                      onEnroll={() => enrollMutation.mutate(course.id)}
+                      onUnenroll={() => unenrollMutation.mutate(course.id)}
+                      mutating={enrollMutation.isPending || unenrollMutation.isPending}
+                    />
+                  ))}
+                </motion.div>
+              )}
+              {!coursesLoading && !hasCourses && (
+                <EmptyState
+                  icon={GraduationCap}
+                  title="No courses found"
+                  description="Try a different search keyword."
+                />
+              )}
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-[#000000]">
-                          ESG Finance Course
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Nov 8, 2024 • Visa ending in 4242
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-[#000000]">$129.00</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-[#D52B1E] h-auto p-0 mt-1"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Receipt
-                      </Button>
-                    </div>
-                  </div>
+              <motion.div variants={itemVariants}>
+                <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                  <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] via-orange-400 to-amber-300" />
+                  <div className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-[#D52B1E]/10 blur-2xl" />
+                  <div className="pointer-events-none absolute -bottom-14 -left-12 h-44 w-44 rounded-full bg-blue-100/60 blur-2xl" />
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
+                  <div className="relative p-4 md:p-5 grid gap-4 lg:grid-cols-5">
+                    <div className="lg:col-span-3 space-y-3">
                       <div>
-                        <h4 className="font-semibold text-[#000000]">
-                          Sukuk Investment Strategies
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Oct 22, 2024 • Visa ending in 4242
+                        <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-widest mb-1">
+                          Why Choose Our Programs?
                         </p>
+                        <h3 className="text-lg md:text-xl font-bold text-gray-900">
+                          Built for career-ready Islamic finance professionals
+                        </h3>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-[#000000]">$89.00</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-[#D52B1E] h-auto p-0 mt-1"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Receipt
-                      </Button>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-[#000000]">
-                          CIFP Program - Initial
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Jun 15, 2024 • Visa ending in 4242
-                        </p>
+                      <div className="grid sm:grid-cols-3 gap-3">
+                        {[
+                          {
+                            icon: TrendingUp,
+                            title: "Market-Relevant Content",
+                            desc: "Courses align with real industry needs across banking, sukuk, and governance.",
+                          },
+                          {
+                            icon: BookOpen,
+                            title: "Structured Learning Paths",
+                            desc: "Clear beginner-to-advanced progression with practical modules.",
+                          },
+                          {
+                            icon: Award,
+                            title: "Recognized Outcomes",
+                            desc: "Assessments and certificates help demonstrate verified progress.",
+                          },
+                        ].map((feature) => (
+                          <div
+                            key={feature.title}
+                            className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 hover:bg-white hover:shadow-sm transition-all"
+                          >
+                            <div className="h-8 w-8 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center mb-2">
+                              <feature.icon className="h-4 w-4 text-[#D52B1E]" />
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900 leading-tight">{feature.title}</p>
+                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{feature.desc}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-[#000000]">$299.00</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-[#D52B1E] h-auto p-0 mt-1"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Receipt
-                      </Button>
+
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-3 self-start">
+                      <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Programs</p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">{courseList?.data?.length ?? 0}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Learners</p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">{totalLearners.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Avg. Rating</p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">{avgCourseRating.toFixed(1)}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Learning Hours</p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">{totalLearningHours}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+              </motion.div>
+            </div>
+          )}
 
-        {/* Results Tab */}
-        <TabsContent value="results" className="mt-0">
-          <div className="space-y-6">
-            {/* Certificates */}
-            <Card className="bg-gradient-to-br from-[#D52B1E] to-[#6F1610] text-white">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Earned Certificates
-                </CardTitle>
-                <CardDescription className="text-gray-100">
-                  Download and share your achievements
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 hover:bg-white/20 transition-colors">
-                    <div className="flex items-start justify-between mb-3">
+          {/* -- Payments --------------------------------- */}
+          {activeTab === "payments" && (
+            <div className="grid gap-5 lg:grid-cols-3">
+              {/* Subscription card */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
+                <div className="p-5">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Current Plan</p>
+                  {paymentsLoading && (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => <div key={i} className="h-8 bg-gray-50 rounded-lg animate-pulse" />)}
+                    </div>
+                  )}
+                  {!paymentsLoading && payments?.activeSubscription && (
+                    <div className="space-y-4">
                       <div>
-                        <h4 className="font-semibold text-white">
-                          Islamic Banking Principles
-                        </h4>
-                        <p className="text-sm text-gray-100">
-                          Certificate of Completion
-                        </p>
+                        <h3 className="text-xl font-bold text-gray-900">{payments.activeSubscription.planName}</h3>
+                        <span
+                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize mt-1.5 inline-block ${
+                            payments.activeSubscription.status === "active"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {payments.activeSubscription.status}
+                        </span>
                       </div>
-                      <Badge className="bg-white text-[#D52B1E] hover:bg-white">
-                        Verified
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-100 mb-3">
-                      Issued: Dec 15, 2024
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-white text-[#D52B1E] hover:bg-gray-100"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Download
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-white text-white hover:bg-white/10"
-                      >
-                        Share
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 hover:bg-white/20 transition-colors">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold text-white">
-                          Shariah Compliance
-                        </h4>
-                        <p className="text-sm text-gray-100">
-                          Certificate of Completion
-                        </p>
+                      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-50 text-sm">
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">Amount</p>
+                          <p className="font-semibold text-gray-900">
+                            {formatMoney(payments.activeSubscription.amountCents, payments.activeSubscription.currency)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">Renews</p>
+                          <p className="font-semibold text-gray-900">{formatDate(payments.activeSubscription.currentPeriodEnd)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">Started</p>
+                          <p className="font-semibold text-gray-900">{formatDate(payments.activeSubscription.currentPeriodStart)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">Type</p>
+                          <p className="font-semibold text-gray-900 capitalize">{payments.activeSubscription.planType}</p>
+                        </div>
                       </div>
-                      <Badge className="bg-white text-[#D52B1E] hover:bg-white">
-                        Verified
-                      </Badge>
                     </div>
-                    <p className="text-sm text-gray-100 mb-3">
-                      Issued: Nov 28, 2024
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-white text-[#D52B1E] hover:bg-gray-100"
-                      >
-                        <Download className="h-3 w-3 mr-1" />
-                        Download
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-white text-white hover:bg-white/10"
-                      >
-                        Share
+                  )}
+                  {!paymentsLoading && !payments?.activeSubscription && (
+                    <div className="py-6 text-center">
+                      <CreditCard className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                      <p className="text-sm text-gray-500 mb-3">No active subscription</p>
+                      <Button size="sm" className="bg-[#D52B1E] hover:bg-[#b82319] text-white rounded-full">
+                        View Plans
                       </Button>
                     </div>
-                  </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Assessment Results */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-[#000000]">
-                  Assessment Results
-                </CardTitle>
-                <CardDescription className="text-[#737692]">
-                  Track your performance across all assessments
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-[#000000]">
-                          Islamic Banking Principles - Final Exam
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Completed Dec 15, 2024
-                        </p>
-                      </div>
+              {/* Transaction history */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
+                <div className="p-5">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Transaction History</p>
+                  {paymentsLoading && (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => <div key={i} className="h-14 bg-gray-50 rounded-xl animate-pulse" />)}
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-green-600">92%</p>
-                      <p className="text-xs text-[#737692]">Passed</p>
-                    </div>
-                  </div>
+                  )}
+                  {!paymentsLoading && hasPaymentHistory && (
+                    <div className="space-y-2">
+                      {payments?.paymentHistory.map((payment) => {
+                        let paymentStatusClass = "bg-gray-100 text-gray-600";
+                        if (payment.status === "completed" || payment.status === "successful") {
+                          paymentStatusClass = "bg-emerald-50 text-emerald-700";
+                        } else if (payment.status === "failed" || payment.status === "refunded") {
+                          paymentStatusClass = "bg-red-50 text-red-700";
+                        }
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-[#000000]">
-                          Shariah Compliance Fundamentals
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Completed Nov 28, 2024
-                        </p>
-                      </div>
+                        return (
+                        <div
+                          key={payment.id}
+                          className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center shrink-0">
+                              <CreditCard className="h-4 w-4 text-[#D52B1E]" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">{payment.itemTitle}</p>
+                              <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                                <span>{formatDate(payment.paidAt)}</span>
+                                <span>&middot;</span>
+                                <span className="capitalize">{payment.paymentMethod}</span>
+                                {payment.cardLast4 && (
+                                  <>
+                                    <span>&middot;</span>
+                                    <span>****{payment.cardLast4}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-gray-900">
+                              {formatMoney(payment.amountCents, payment.currency)}
+                            </span>
+                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${paymentStatusClass}`}>
+                              {payment.status}
+                            </span>
+                            {payment.receiptUrl && (
+                              <a
+                                href={payment.receiptUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Download receipt"
+                                className="text-gray-400 hover:text-[#D52B1E] transition-colors"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        );
+                      })}
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-green-600">88%</p>
-                      <p className="text-xs text-[#737692]">Passed</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="h-10 w-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-                        <AlertCircle className="h-5 w-5 text-yellow-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-[#000000]">
-                          Halal Investment Strategies
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Completed Nov 20, 2024
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-yellow-600">72%</p>
-                      <p className="text-xs text-[#737692]">Retake Available</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-[#000000]">
-                          Introduction to Islamic Finance
-                        </h4>
-                        <p className="text-sm text-[#737692]">
-                          Completed Oct 15, 2024
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-green-600">95%</p>
-                      <p className="text-xs text-[#737692]">Passed</p>
-                    </div>
-                  </div>
+                  )}
+                  {!paymentsLoading && !hasPaymentHistory && (
+                    <EmptyState
+                      icon={CreditCard}
+                      title="No transactions yet"
+                      description="Your payment history will appear here."
+                    />
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+          )}
 
-            {/* Performance Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-[#000000]">
-                  Performance Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <p className="text-3xl font-bold text-green-600">89%</p>
-                    <p className="text-sm text-[#737692] mt-1">Average Score</p>
-                  </div>
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <p className="text-3xl font-bold text-blue-600">4/4</p>
-                    <p className="text-sm text-[#737692] mt-1">
-                      Assessments Completed
-                    </p>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <p className="text-3xl font-bold text-purple-600">2</p>
-                    <p className="text-sm text-[#737692] mt-1">
-                      Certificates Earned
-                    </p>
-                  </div>
+          {/* -- Results & Certificates ------------------- */}
+          {activeTab === "results" && (
+            <div className="space-y-5">
+              {resultsLoading && (
+                <div className="grid sm:grid-cols-3 gap-4 animate-pulse">
+                  {[1, 2, 3].map((i) => <div key={i} className="h-28 bg-gray-50 rounded-2xl" />)}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+              )}
+              {!resultsLoading && results && (
+                <>
+                  {/* Performance overview */}
+                  <motion.div
+                    className="grid sm:grid-cols-3 gap-4"
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    {[
+                      { label: "Avg. Score",        value: `${results.performanceOverview.averageScore}%`,    icon: Star,        color: "#2563eb", bg: "#EFF6FF" },
+                      { label: "Assessments Done",  value: results.performanceOverview.assessmentsCompleted,  icon: CheckCircle2, color: "#059669", bg: "#ECFDF5" },
+                      { label: "Certificates",      value: results.performanceOverview.certificatesEarned,    icon: Award,       color: "#d97706", bg: "#FFFBEB" },
+                    ].map((s) => (
+                      <motion.div
+                        key={s.label}
+                        variants={itemVariants}
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all overflow-hidden"
+                      >
+                        <div className="h-1 w-full" style={{ backgroundColor: s.color }} />
+                        <div className="p-5 flex items-center gap-4">
+                          <div
+                            className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: s.bg, color: s.color }}
+                          >
+                            <s.icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+                            <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+
+                  {/* Certificates */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
+                    <div className="p-5">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Earned Certificates</p>
+                      {results.earnedCertificates.length > 0 ? (
+                        <motion.div
+                          className="grid sm:grid-cols-2 gap-3"
+                          variants={containerVariants}
+                          initial="hidden"
+                          animate="visible"
+                        >
+                          {results.earnedCertificates.map((cert) => (
+                            <motion.div
+                              key={cert.id}
+                              variants={itemVariants}
+                              className="group flex items-center justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 shrink-0 rounded-xl bg-amber-50 flex items-center justify-center">
+                                  <Award className="h-5 w-5 text-amber-500" />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">{cert.name}</p>
+                                    {cert.isVerified && (
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-400 mt-0.5">{cert.type} &middot; {formatDate(cert.date)}</p>
+                                </div>
+                              </div>
+                              <a
+                                href={cert.downloadUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Download"
+                                className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#D52B1E] hover:bg-red-50 transition-colors"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      ) : (
+                        <EmptyState
+                          icon={Award}
+                          title="No certificates yet"
+                          description="Complete programmes to earn your certificates."
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Assessment results */}
+                  {results.assessmentResults.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                      <div className="h-1 w-full bg-gradient-to-r from-blue-500 to-indigo-500" />
+                      <div className="p-5">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Assessment Results</p>
+                        <div className="space-y-2">
+                          {results.assessmentResults.map((r) => {
+                            const statusLower = r.status.toLowerCase();
+                            let statusClass = "bg-gray-100 text-gray-600";
+                            if (statusLower === "passed") statusClass = "bg-emerald-50 text-emerald-700";
+                            else if (statusLower === "failed") statusClass = "bg-red-50 text-red-700";
+                            else if (statusLower.includes("retake")) statusClass = "bg-amber-50 text-amber-700";
+                            return (
+                              <div
+                                key={r.id}
+                                className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                                    <TrendingUp className="h-4 w-4 text-blue-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-semibold text-gray-900">{r.name}</p>
+                                    <p className="text-xs text-gray-400">{formatDate(r.date)}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <p className="text-lg font-bold text-gray-900">{r.score}%</p>
+                                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusClass}`}>
+                                    {r.status}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {!resultsLoading && !results && (
+                <EmptyState
+                  icon={BarChart3}
+                  title="No results yet"
+                  description="Complete assessments to see your results here."
+                />
+              )}
+            </div>
+          )}
+
+        </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 }

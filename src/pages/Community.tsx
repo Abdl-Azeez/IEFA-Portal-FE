@@ -25,9 +25,12 @@ import {
   getCommunityGroupMemberCount,
   getCommunityGroupIsMember,
   type DiscussionAPI,
+  type DiscussionAuthorAPI,
+  type DiscussionAuthorStatsAPI,
   type CommunityGroupAPI,
   type CommunityEventAPI,
   type CommunityCategoryAPI,
+  type DiscussionInteractionAPI,
   type GroupJoinRequestAPI,
 } from "@/lib/communityService";
 import type {
@@ -99,6 +102,122 @@ function apiDiscussionToPost(
     tags: undefined,
   };
 }
+
+function getAuthorDisplayName(author?: DiscussionAuthorAPI | null): string {
+  return (
+    [author?.firstName, author?.lastName].filter(Boolean).join(" ") ||
+    author?.username ||
+    author?.email ||
+    "Unknown"
+  );
+}
+
+function formatAuthorRole(role?: string | null): string {
+  if (!role) return "Member";
+  return role
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function getFallbackPosterProfile(post: DiscussionPost): UserProfile {
+  return {
+    id: post.posterId,
+    name: post.poster,
+    title: "Member",
+    displayPicture: post.posterAvatar || "",
+    bio: "",
+    joinedDate: post.createdAt,
+    totalPosts: 0,
+    totalViews: post.views,
+    totalReplies: post.replies,
+    totalLikes: post.likes,
+    isVerified: false,
+    isModerator: false,
+  };
+}
+
+function mapAuthorToUserProfile(
+  author: DiscussionAuthorAPI | undefined,
+  stats: DiscussionAuthorStatsAPI | undefined,
+  fallback: UserProfile,
+): UserProfile {
+  return {
+    id: author?.id ?? fallback.id,
+    name: getAuthorDisplayName(author) || fallback.name,
+    title: formatAuthorRole(author?.role),
+    displayPicture: author?.profilePhotoUrl ?? fallback.displayPicture,
+    bio: fallback.bio,
+    joinedDate: author?.createdAt ? new Date(author.createdAt) : fallback.joinedDate,
+    totalPosts: stats?.posts ?? fallback.totalPosts,
+    totalViews: stats?.views ?? fallback.totalViews,
+    totalReplies: stats?.replies ?? fallback.totalReplies,
+    totalLikes: stats?.likes ?? fallback.totalLikes,
+    isVerified: author?.isVerified ?? fallback.isVerified,
+    isModerator: author?.isModerator ?? fallback.isModerator,
+  };
+}
+
+function mapInteractionToReply(
+  interaction: DiscussionInteractionAPI,
+  postId: string,
+  currentUserId?: string,
+): import("@/types/community").Reply {
+  return {
+    id: interaction.id,
+    postId,
+    userId: interaction.user?.id ?? "",
+    userName: getAuthorDisplayName(interaction.user),
+    userAvatar: interaction.user?.profilePhotoUrl ?? "👤",
+    userTitle: formatAuthorRole(interaction.user?.role),
+    content: interaction.content ?? "",
+    createdAt: interaction.createdAt ? new Date(interaction.createdAt) : new Date(),
+    updatedAt: interaction.updatedAt ? new Date(interaction.updatedAt) : new Date(),
+    likes: 0,
+    isAuthor: interaction.user?.id === currentUserId,
+  };
+}
+
+function mapDiscussionAttachments(
+  attachments: DiscussionAPI["attachments"],
+): Attachment[] {
+  return (attachments ?? []).map((attachment, index) => {
+    if (typeof attachment === "string") {
+      return {
+        id: `attachment-${index}`,
+        type: /\.(png|jpe?g|gif|webp|svg)$/i.test(attachment) ? "image" : "file",
+        url: attachment,
+        name: attachment.split("/").pop() ?? `attachment-${index + 1}`,
+        size: 0,
+      };
+    }
+
+    const url = attachment.url;
+    return {
+      id: `attachment-${index}`,
+      type: /\.(png|jpe?g|gif|webp|svg)$/i.test(url) || attachment.mimeType?.startsWith("image/") ? "image" : "file",
+      url,
+      name: attachment.name ?? url.split("/").pop() ?? `attachment-${index + 1}`,
+      size: attachment.size ?? 0,
+    };
+  });
+}
+
+function getLastReply(interactions: DiscussionInteractionAPI[]) {
+  const comments = interactions.filter((interaction) => interaction.type === "comment");
+  if (comments.length === 0) return undefined;
+  const latest = [...comments].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  )[0];
+  return {
+    userId: latest.user?.id ?? "",
+    userName: getAuthorDisplayName(latest.user),
+    userAvatar: latest.user?.profilePhotoUrl ?? "👤",
+    createdAt: latest.createdAt ? new Date(latest.createdAt) : new Date(),
+  };
+}
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -168,33 +287,104 @@ export default function Community() {
 
   // state to track hover card
   const [hoverProfile, setHoverProfile] = useState<{
-    post: DiscussionPost;
+    discussionId: string;
     pos: "top" | "bottom";
     x: number;
     y: number;
+    profile: UserProfile;
+    isHydrating: boolean;
   } | null>(null);
+  const posterProfileCache = useRef<Map<string, UserProfile>>(new Map());
+  const hoverCloseTimeoutRef = useRef<number | null>(null);
+
+  const clearScheduledHoverClose = useCallback(() => {
+    if (hoverCloseTimeoutRef.current !== null) {
+      window.clearTimeout(hoverCloseTimeoutRef.current);
+      hoverCloseTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleProfileHoverClear = useCallback(() => {
+    clearScheduledHoverClose();
+    hoverCloseTimeoutRef.current = window.setTimeout(() => {
+      setHoverProfile(null);
+    }, 120);
+  }, [clearScheduledHoverClose]);
+
+  const hydratePosterProfile = useCallback(
+    async (post: DiscussionPost) => {
+      const cachedProfile = posterProfileCache.current.get(post.posterId);
+      if (cachedProfile) return cachedProfile;
+
+      const full = await communityService.getDiscussionById(post.id);
+      const fallbackProfile = getFallbackPosterProfile(post);
+      const profile = mapAuthorToUserProfile(
+        full.author,
+        full.authorStats,
+        fallbackProfile,
+      );
+
+      posterProfileCache.current.set(post.posterId, profile);
+      if (profile.id && profile.id !== post.posterId) {
+        posterProfileCache.current.set(profile.id, profile);
+      }
+
+      return profile;
+    },
+    [],
+  );
 
   const handleProfileHover = (
     post: DiscussionPost,
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
   ) => {
+    clearScheduledHoverClose();
     const rect = e.currentTarget.getBoundingClientRect();
     const cardHeight = 200; // approximate height of card
     const spaceBelow = window.innerHeight - rect.bottom;
     const pos = spaceBelow < cardHeight ? "top" : "bottom";
-    const x = rect.left;
+    const x = rect.left + rect.width / 2;
     const y = pos === "bottom" ? rect.bottom : rect.top;
-    setHoverProfile({ post, pos, x, y });
+    const fallbackProfile = getFallbackPosterProfile(post);
+    const cachedProfile = posterProfileCache.current.get(post.posterId);
+
+    setHoverProfile({
+      discussionId: post.id,
+      pos,
+      x,
+      y,
+      profile: cachedProfile ?? fallbackProfile,
+      isHydrating: !cachedProfile,
+    });
+
+    if (cachedProfile) return;
+
+    void hydratePosterProfile(post)
+      .then((profile) => {
+        setHoverProfile((current) => {
+          if (!current || current.discussionId !== post.id) return current;
+          return { ...current, profile, isHydrating: false };
+        });
+      })
+      .catch((error) => {
+        console.error("Failed to hydrate hover profile:", error);
+        setHoverProfile((current) => {
+          if (!current || current.discussionId !== post.id) return current;
+          return { ...current, isHydrating: false };
+        });
+      });
   };
 
   const clearProfileHover = () => {
-    setHoverProfile(null);
+    scheduleProfileHoverClear();
   };
 
   // Scroll to top on page load and when viewing discussion details
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [selectedPost]);
+
+  useEffect(() => () => clearScheduledHoverClose(), [clearScheduledHoverClose]);
 
   /* -- API state -- */
   const [apiCategories, setApiCategories] = useState<CommunityCategoryAPI[]>(
@@ -638,21 +828,8 @@ export default function Community() {
       initialIsLiked = full.hasLiked ?? !!myLike;
       initialLikeInteractionId = myLike?.id;
       repliesList = interactions
-        .filter((i) => i.type === "comment")
-        .map((i) => ({
-          id: i.id,
-          postId: post.id,
-          userId: i.user?.id ?? "",
-          userName:
-            [i.user?.firstName, i.user?.lastName].filter(Boolean).join(" ") ||
-            "Member",
-          userAvatar: i.user?.profilePhotoUrl ?? "👤",
-          userTitle: i.user?.role ?? "Member",
-          content: i.content ?? "",
-          createdAt: i.createdAt ? new Date(i.createdAt) : new Date(),
-          updatedAt: new Date(),
-          likes: 0,
-        }));
+        .filter((interaction) => interaction.type === "comment")
+        .map((interaction) => mapInteractionToReply(interaction, post.id, user?.id));
     } catch {
       // fall back to list-level data
     }
@@ -667,26 +844,24 @@ export default function Community() {
     setInitialLikeIdForDetail(initialLikeInteractionId);
 
     const stats = full?.authorStats;
-    const posterProfile: UserProfile = {
-      id: full?.author?.id ?? post.posterId,
-      name:
-        [full?.author?.firstName, full?.author?.lastName]
-          .filter(Boolean)
-          .join(" ") || post.poster,
-      title: full?.author?.role ?? "Member",
-      displayPicture: full?.author?.profilePhotoUrl || post.posterAvatar || "",
-      bio: "",
-      joinedDate: full?.author?.createdAt
-        ? new Date(full.author.createdAt)
-        : new Date(),
-      totalPosts: stats?.posts ?? 0,
-      totalViews: stats?.views ?? full?.viewCount ?? post.views,
-      totalReplies: stats?.replies ?? freshReplyCount,
-      totalLikes: stats?.likes ?? freshLikeCount,
-      isVerified: full?.author?.isVerified ?? false,
-      isModerator: full?.author?.isModerator ?? false,
-      rating: 4.5,
-    };
+    const fallbackPosterProfile = getFallbackPosterProfile(post);
+    const posterProfile = mapAuthorToUserProfile(
+      full?.author,
+      stats,
+      {
+        ...fallbackPosterProfile,
+        totalViews: full?.viewCount ?? fallbackPosterProfile.totalViews,
+        totalReplies: freshReplyCount || fallbackPosterProfile.totalReplies,
+        totalLikes: freshLikeCount || fallbackPosterProfile.totalLikes,
+      },
+    );
+
+    posterProfileCache.current.set(post.posterId, posterProfile);
+    if (posterProfile.id && posterProfile.id !== post.posterId) {
+      posterProfileCache.current.set(posterProfile.id, posterProfile);
+    }
+
+    const detailInteractions = full?.interactions ?? [];
 
     const detailedPost: DetailedDiscussionPost = {
       ...post,
@@ -697,15 +872,10 @@ export default function Community() {
       replies: freshReplyCount,
       views: full?.viewCount ?? post.views,
       posterDetails: posterProfile,
-      attachments: (full?.attachments ?? []).map((url, idx) => ({
-        id: `attachment-${idx}`,
-        type: /\.(png|jpe?g|gif|webp|svg)$/i.test(url) ? "image" : "file",
-        url,
-        name: url.split("/").pop() ?? `attachment-${idx + 1}`,
-        size: 0,
-      })),
+      attachments: mapDiscussionAttachments(full?.attachments),
       repliesList,
-      mentions: [],
+      lastReply: getLastReply(detailInteractions),
+      mentions: (full?.taggedUsers ?? []).map((taggedUser) => taggedUser.id),
     };
 
     setSelectedPost(detailedPost);
@@ -716,57 +886,18 @@ export default function Community() {
   ) => {
     e.stopPropagation();
 
-    // Show an immediate fallback, then hydrate with authoritative detail payload.
-    const fallbackProfile: UserProfile = {
-      id: post.posterId,
-      name: post.poster,
-      title: "Member",
-      displayPicture: post.posterAvatar || "",
-      bio: "",
-      joinedDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-      totalPosts: 0,
-      totalViews: 0,
-      totalReplies: post.replies,
-      totalLikes: post.likes,
-      isVerified: false,
-      isModerator: false,
-      rating: 4.5,
-    };
+    const fallbackProfile = getFallbackPosterProfile(post);
+    const cachedProfile = posterProfileCache.current.get(post.posterId);
 
-    setSelectedPoster(fallbackProfile);
+    setSelectedPoster(cachedProfile ?? fallbackProfile);
     setShowPosterProfile(true);
-    setPosterProfileHydrating(true);
+    setPosterProfileHydrating(!cachedProfile);
 
-    communityService
-      .getDiscussionById(post.id)
-      .then((full) => {
-        const stats = full.authorStats;
-        const mappedProfile: UserProfile = {
-          id: full.author?.id ?? post.posterId,
-          name:
-            [full.author?.firstName, full.author?.lastName]
-              .filter(Boolean)
-              .join(" ") ||
-            full.author?.username ||
-            post.poster,
-          title: full.author?.role ?? "Member",
-          displayPicture:
-            full.author?.profilePhotoUrl ?? post.posterAvatar ?? "",
-          bio: "",
-          joinedDate: full.author?.createdAt
-            ? new Date(full.author.createdAt)
-            : fallbackProfile.joinedDate,
-          totalPosts: stats?.posts ?? 0,
-          totalViews: stats?.views ?? full.viewCount ?? post.views,
-          totalReplies: stats?.replies ?? post.replies,
-          totalLikes:
-            stats?.likes ??
-            (full.interactions ?? []).filter((i) => i.type === "like").length,
-          isVerified: full.author?.isVerified ?? false,
-          isModerator: full.author?.isModerator ?? false,
-          rating: 4.5,
-        };
-        setSelectedPoster(mappedProfile);
+    if (cachedProfile) return;
+
+    void hydratePosterProfile(post)
+      .then((profile) => {
+        setSelectedPoster(profile);
       })
       .catch((err) => {
         console.error("Failed to hydrate poster profile:", err);
@@ -974,7 +1105,7 @@ export default function Community() {
   // Hover profile card overlay
   const renderHoverCard = () => {
     if (!hoverProfile) return null;
-    const { post, pos, x, y } = hoverProfile;
+    const { pos, x, y, profile, isHydrating } = hoverProfile;
     const style: React.CSSProperties = {
       position: "fixed",
       left: x,
@@ -990,42 +1121,49 @@ export default function Community() {
       <div
         style={style}
         className="w-64 bg-white rounded-lg shadow-lg p-4"
-        onMouseEnter={() => {}}
+        onMouseEnter={clearScheduledHoverClose}
         onMouseLeave={clearProfileHover}
       >
         <div className="flex flex-col items-center text-center">
           <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-2xl mb-2 overflow-hidden">
-            {post.posterAvatar?.startsWith("http") ? (
+            {profile.displayPicture?.startsWith("http") ? (
               <img
-                src={post.posterAvatar}
-                alt={post.poster}
+                src={profile.displayPicture}
+                alt={profile.name}
                 className="h-full w-full object-cover rounded-full"
               />
             ) : (
-              <span>{post.posterAvatar || "👤"}</span>
+              <span>{profile.displayPicture || "👤"}</span>
             )}
           </div>
-          <h3 className="font-semibold text-[#000000]">{post.poster}</h3>
-          <p className="text-xs text-[#737692]">Islamic Finance Professional</p>
+          <h3 className="font-semibold text-[#000000]">{profile.name}</h3>
+          <div className="flex items-center gap-1 text-xs text-[#737692]">
+            <span>{profile.title}</span>
+            {profile.isVerified && <span className="text-blue-600">• Verified</span>}
+          </div>
           <p className="text-xs text-[#737692]">
-            Joined{" "}
-            {formatJoinDate(new Date(Date.now() - 180 * 24 * 60 * 60 * 1000))}
+            Joined {formatJoinDate(profile.joinedDate)}
           </p>
+          {isHydrating && (
+            <p className="mt-2 text-[11px] text-[#737692] animate-pulse">
+              Updating author stats...
+            </p>
+          )}
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#737692]">
             <div className="flex flex-col items-center">
-              <span className="font-semibold">25</span>
+              <span className="font-semibold">{profile.totalPosts}</span>
               <span>Posts</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="font-semibold">85</span>
+              <span className="font-semibold">{profile.totalReplies}</span>
               <span>Replies</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="font-semibold">1.2k</span>
+              <span className="font-semibold">{profile.totalViews.toLocaleString()}</span>
               <span>Views</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="font-semibold">340</span>
+              <span className="font-semibold">{profile.totalLikes}</span>
               <span>Likes</span>
             </div>
           </div>

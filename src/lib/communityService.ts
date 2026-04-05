@@ -41,13 +41,31 @@ export interface DiscussionAuthorStatsAPI {
   likes: number;
 }
 
+export interface DiscussionInteractionUserStatsAPI {
+  posts: number;
+  replies: number;
+  views: number;
+  likes: number;
+}
+
+export interface DiscussionAttachmentAPI {
+  url: string;
+  name?: string | null;
+  size?: number | null;
+  mimeType?: string | null;
+}
+
 export interface DiscussionInteractionAPI {
   id: string;
   user?: DiscussionAuthorAPI;
   type: "like" | "comment";
   content: string | null;
+  children?: DiscussionInteractionAPI[];
+  parent?: DiscussionInteractionAPI | null;
   createdAt: string;
   updatedAt: string;
+  userStats?: DiscussionInteractionUserStatsAPI;
+  replies?: DiscussionInteractionAPI[];
 }
 
 export interface DiscussionGroupAPI {
@@ -67,7 +85,7 @@ export interface DiscussionAPI {
   isLocked: boolean;
   viewCount: number;
   interactions: DiscussionInteractionAPI[];
-  attachments?: string[];
+  attachments?: Array<string | DiscussionAttachmentAPI> | null;
   taggedUsers?: DiscussionAuthorAPI[];
   createdAt: string;
   updatedAt: string;
