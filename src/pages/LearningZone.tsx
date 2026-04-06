@@ -792,7 +792,7 @@ export function LearningZone() {
                 </span>
               </div>
 
-              <motion.div variants={itemVariants}>
+              <div>
                 <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                   <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] via-orange-400 to-amber-300" />
                   <div className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-[#D52B1E]/10 blur-2xl" />
@@ -881,7 +881,7 @@ export function LearningZone() {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {coursesLoading && (
                 <motion.div
