@@ -392,37 +392,48 @@ export function LearningZone() {
                 <GraduationCap className="h-3 w-3" /> IEFA Learning Zone
               </span>
               <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
-                Build your <span className="text-[#D52B1E]">Islamic Finance</span> mastery
+                Build your{" "}
+                <span className="text-[#D52B1E]">Islamic Finance</span> mastery
               </h1>
               <p className="text-gray-400 text-sm md:text-base leading-relaxed max-w-2xl">
-                Track progress, continue lessons, manage subscriptions, and review your certifications from one learning workspace.
+                Track progress, continue lessons, manage subscriptions, and
+                review your certifications from one learning workspace.
               </p>
               <div className="flex flex-wrap items-center gap-5 text-sm text-gray-500">
                 <span className="flex items-center gap-1.5">
-                  <BookOpen className="h-4 w-4 text-gray-600" /> {myCourses.length} Active Enrollments
+                  <BookOpen className="h-4 w-4 text-gray-600" />{" "}
+                  {myCourses.length} Active Enrollments
                 </span>
                 <span className="h-1 w-1 bg-gray-700 rounded-full" />
                 <span className="flex items-center gap-1.5">
-                  <Award className="h-4 w-4 text-gray-600" /> {dashboard?.stats?.certificatesEarned ?? 0} Certificates
+                  <Award className="h-4 w-4 text-gray-600" />{" "}
+                  {dashboard?.stats?.certificatesEarned ?? 0} Certificates
                 </span>
                 <span className="h-1 w-1 bg-gray-700 rounded-full" />
                 <span className="flex items-center gap-1.5">
-                  <BarChart3 className="h-4 w-4 text-gray-600" /> {dashboard?.stats?.weeklyProgress ?? 0}% Weekly Progress
+                  <BarChart3 className="h-4 w-4 text-gray-600" />{" "}
+                  {dashboard?.stats?.weeklyProgress ?? 0}% Weekly Progress
                 </span>
               </div>
             </div>
 
             <div className="flex md:flex-col gap-3 shrink-0">
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-white">{myCourses.length}</p>
+                <p className="text-2xl font-bold text-white">
+                  {myCourses.length}
+                </p>
                 <p className="text-xs text-gray-500">Enrolled</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-[#D52B1E]">{dashboard?.stats?.coursesCompleted ?? 0}</p>
+                <p className="text-2xl font-bold text-[#D52B1E]">
+                  {dashboard?.stats?.coursesCompleted ?? 0}
+                </p>
                 <p className="text-xs text-gray-500">Completed</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-emerald-400">{dashboard?.stats?.weeklyProgress ?? 0}%</p>
+                <p className="text-2xl font-bold text-emerald-400">
+                  {dashboard?.stats?.weeklyProgress ?? 0}%
+                </p>
                 <p className="text-xs text-gray-500">This Week</p>
               </div>
             </div>
@@ -463,11 +474,32 @@ export function LearningZone() {
       </motion.div>
 
       {/* Stat cards */}
-      <motion.div variants={containerVariants} className="grid gap-4 sm:grid-cols-3">
+      <motion.div
+        variants={containerVariants}
+        className="grid gap-4 sm:grid-cols-3"
+      >
         {[
-          { label: "Courses Completed",   value: dashboard?.stats?.coursesCompleted ?? 0,     icon: BookOpen,  color: "#2563eb", bg: "#EFF6FF" },
-          { label: "Certificates Earned", value: dashboard?.stats?.certificatesEarned ?? 0,    icon: Award,     color: "#d97706", bg: "#FFFBEB" },
-          { label: "Weekly Progress",     value: `${dashboard?.stats?.weeklyProgress ?? 0}%`,  icon: BarChart3, color: "#059669", bg: "#ECFDF5" },
+          {
+            label: "Courses Completed",
+            value: dashboard?.stats?.coursesCompleted ?? 0,
+            icon: BookOpen,
+            color: "#2563eb",
+            bg: "#EFF6FF",
+          },
+          {
+            label: "Certificates Earned",
+            value: dashboard?.stats?.certificatesEarned ?? 0,
+            icon: Award,
+            color: "#d97706",
+            bg: "#FFFBEB",
+          },
+          {
+            label: "Weekly Progress",
+            value: `${dashboard?.stats?.weeklyProgress ?? 0}%`,
+            icon: BarChart3,
+            color: "#059669",
+            bg: "#ECFDF5",
+          },
         ].map((s) => (
           <motion.div
             key={s.label}
@@ -485,9 +517,11 @@ export function LearningZone() {
               <div>
                 <p className="text-xs text-gray-500 font-medium">{s.label}</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {dashboardLoading
-                    ? <span className="inline-block h-6 w-12 bg-gray-100 rounded animate-pulse" />
-                    : s.value}
+                  {dashboardLoading ? (
+                    <span className="inline-block h-6 w-12 bg-gray-100 rounded animate-pulse" />
+                  ) : (
+                    s.value
+                  )}
                 </p>
               </div>
             </div>
@@ -507,10 +541,15 @@ export function LearningZone() {
               <PlayCircle className="h-7 w-7 text-[#D52B1E]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-widest mb-0.5">Up Next</p>
-              <h3 className="font-semibold text-gray-900 truncate">{dashboard.continueLearning.courseTitle}</h3>
+              <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-widest mb-0.5">
+                Up Next
+              </p>
+              <h3 className="font-semibold text-gray-900 truncate">
+                {dashboard.continueLearning.courseTitle}
+              </h3>
               <p className="text-xs text-gray-400 truncate mt-0.5">
-                {dashboard.continueLearning.moduleTitle} &mdash; {dashboard.continueLearning.lessonTitle}
+                {dashboard.continueLearning.moduleTitle} &mdash;{" "}
+                {dashboard.continueLearning.lessonTitle}
               </p>
               <div className="mt-3 flex items-center gap-3">
                 <Progress
@@ -556,7 +595,6 @@ export function LearningZone() {
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.22 }}
         >
-
           {/* -- My Learning ------------------------------ */}
           {activeTab === "my-learning" && (
             <div className="space-y-6">
@@ -565,13 +603,21 @@ export function LearningZone() {
                 <div className="lg:col-span-2 space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 text-[#D52B1E]" /> Active Enrollments
+                      <BookOpen className="h-4 w-4 text-[#D52B1E]" /> Active
+                      Enrollments
                     </h2>
-                    <span className="text-xs text-gray-400">{myCourses.length} enrolled</span>
+                    <span className="text-xs text-gray-400">
+                      {myCourses.length} enrolled
+                    </span>
                   </div>
                   {myCoursesLoading && (
                     <div className="space-y-3">
-                      {[1, 2].map((i) => <div key={i} className="h-28 bg-gray-50 rounded-2xl animate-pulse" />)}
+                      {[1, 2].map((i) => (
+                        <div
+                          key={i}
+                          className="h-28 bg-gray-50 rounded-2xl animate-pulse"
+                        />
+                      ))}
                     </div>
                   )}
                   {!myCoursesLoading && myCourses.length > 0 && (
@@ -603,7 +649,12 @@ export function LearningZone() {
                     </h2>
                     {upcomingLoading && (
                       <div className="space-y-2">
-                        {[1, 2].map((i) => <div key={i} className="h-16 bg-gray-50 rounded-xl animate-pulse" />)}
+                        {[1, 2].map((i) => (
+                          <div
+                            key={i}
+                            className="h-16 bg-gray-50 rounded-xl animate-pulse"
+                          />
+                        ))}
                       </div>
                     )}
                     {!upcomingLoading && upcoming.length > 0 && (
@@ -617,7 +668,9 @@ export function LearningZone() {
                               <Calendar className="h-3.5 w-3.5 text-[#D52B1E] group-hover:text-white transition-colors" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-gray-900 line-clamp-1">{activity.title}</p>
+                              <p className="text-sm font-semibold text-gray-900 line-clamp-1">
+                                {activity.title}
+                              </p>
                               <div className="flex flex-wrap gap-1.5 mt-1">
                                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                                   {formatActivityType(activity.type)}
@@ -625,7 +678,9 @@ export function LearningZone() {
                                 {(activity.dueAt ?? activity.scheduledAt) && (
                                   <span className="text-xs bg-red-50 text-[#D52B1E] px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <Clock className="h-2.5 w-2.5" />
-                                    {formatDate(activity.dueAt ?? activity.scheduledAt)}
+                                    {formatDate(
+                                      activity.dueAt ?? activity.scheduledAt,
+                                    )}
                                   </span>
                                 )}
                                 {activity.durationMinutes && (
@@ -650,7 +705,9 @@ export function LearningZone() {
                       </div>
                     )}
                     {!upcomingLoading && upcoming.length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-4">No upcoming activities</p>
+                      <p className="text-xs text-gray-400 text-center py-4">
+                        No upcoming activities
+                      </p>
                     )}
                   </div>
 
@@ -660,7 +717,12 @@ export function LearningZone() {
                     </h2>
                     {announcementsLoading && (
                       <div className="space-y-2">
-                        {[1, 2].map((i) => <div key={i} className="h-20 bg-gray-50 rounded-xl animate-pulse" />)}
+                        {[1, 2].map((i) => (
+                          <div
+                            key={i}
+                            className="h-20 bg-gray-50 rounded-xl animate-pulse"
+                          />
+                        ))}
                       </div>
                     )}
                     {!announcementsLoading && announcements.length > 0 && (
@@ -672,21 +734,29 @@ export function LearningZone() {
                           >
                             <div className="absolute left-0 top-0 h-full w-1 bg-[#D52B1E]" />
                             <div className="flex justify-between items-start mb-1 pl-1">
-                              <p className="text-sm font-semibold text-gray-900 line-clamp-1 pr-2">{a.title}</p>
-                              <span className="text-xs text-gray-400 shrink-0">{formatDate(a.publishedAt)}</span>
+                              <p className="text-sm font-semibold text-gray-900 line-clamp-1 pr-2">
+                                {a.title}
+                              </p>
+                              <span className="text-xs text-gray-400 shrink-0">
+                                {formatDate(a.publishedAt)}
+                              </span>
                             </div>
                             {a.course?.title && (
                               <span className="ml-1 mb-1.5 inline-block text-xs bg-[#D52B1E]/10 text-[#D52B1E] px-2 py-0.5 rounded-full font-medium">
                                 {a.course.title}
                               </span>
                             )}
-                            <p className="text-xs text-gray-500 leading-relaxed pl-1 line-clamp-2">{a.message}</p>
+                            <p className="text-xs text-gray-500 leading-relaxed pl-1 line-clamp-2">
+                              {a.message}
+                            </p>
                           </div>
                         ))}
                       </div>
                     )}
                     {!announcementsLoading && announcements.length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-4">No announcements</p>
+                      <p className="text-xs text-gray-400 text-center py-4">
+                        No announcements
+                      </p>
                     )}
                   </div>
                 </div>
@@ -721,45 +791,6 @@ export function LearningZone() {
                   {courseList?.data?.length ?? 0} courses
                 </span>
               </div>
-
-              {coursesLoading && (
-                <motion.div
-                  className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <motion.div key={i} variants={itemVariants} className="h-80 bg-gray-50 rounded-2xl animate-pulse" />
-                  ))}
-                </motion.div>
-              )}
-              {!coursesLoading && hasCourses && (
-                <motion.div
-                  className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  {courseList?.data.map((course) => (
-                    <CourseCard
-                      key={course.id}
-                      course={course}
-                      isEnrolled={enrolledCourseIds.has(course.id)}
-                      onEnroll={() => enrollMutation.mutate(course.id)}
-                      onUnenroll={() => unenrollMutation.mutate(course.id)}
-                      mutating={enrollMutation.isPending || unenrollMutation.isPending}
-                    />
-                  ))}
-                </motion.div>
-              )}
-              {!coursesLoading && !hasCourses && (
-                <EmptyState
-                  icon={GraduationCap}
-                  title="No courses found"
-                  description="Try a different search keyword."
-                />
-              )}
 
               <motion.div variants={itemVariants}>
                 <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -803,8 +834,12 @@ export function LearningZone() {
                             <div className="h-8 w-8 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center mb-2">
                               <feature.icon className="h-4 w-4 text-[#D52B1E]" />
                             </div>
-                            <p className="text-sm font-semibold text-gray-900 leading-tight">{feature.title}</p>
-                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{feature.desc}</p>
+                            <p className="text-sm font-semibold text-gray-900 leading-tight">
+                              {feature.title}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                              {feature.desc}
+                            </p>
                           </div>
                         ))}
                       </div>
@@ -812,25 +847,86 @@ export function LearningZone() {
 
                     <div className="lg:col-span-2 grid grid-cols-2 gap-3 self-start">
                       <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
-                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Programs</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">{courseList?.data?.length ?? 0}</p>
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">
+                          Programs
+                        </p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">
+                          {courseList?.data?.length ?? 0}
+                        </p>
                       </div>
                       <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
-                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Learners</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">{totalLearners.toLocaleString()}</p>
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">
+                          Learners
+                        </p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">
+                          {totalLearners.toLocaleString()}
+                        </p>
                       </div>
                       <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
-                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Avg. Rating</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">{avgCourseRating.toFixed(1)}</p>
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">
+                          Avg. Rating
+                        </p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">
+                          {avgCourseRating.toFixed(1)}
+                        </p>
                       </div>
                       <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
-                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">Learning Hours</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">{totalLearningHours}</p>
+                        <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">
+                          Learning Hours
+                        </p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">
+                          {totalLearningHours}
+                        </p>
                       </div>
                     </div>
                   </div>
                 </div>
               </motion.div>
+
+              {coursesLoading && (
+                <motion.div
+                  className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <motion.div
+                      key={i}
+                      variants={itemVariants}
+                      className="h-80 bg-gray-50 rounded-2xl animate-pulse"
+                    />
+                  ))}
+                </motion.div>
+              )}
+              {!coursesLoading && hasCourses && (
+                <motion.div
+                  className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {courseList?.data.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      isEnrolled={enrolledCourseIds.has(course.id)}
+                      onEnroll={() => enrollMutation.mutate(course.id)}
+                      onUnenroll={() => unenrollMutation.mutate(course.id)}
+                      mutating={
+                        enrollMutation.isPending || unenrollMutation.isPending
+                      }
+                    />
+                  ))}
+                </motion.div>
+              )}
+              {!coursesLoading && !hasCourses && (
+                <EmptyState
+                  icon={GraduationCap}
+                  title="No courses found"
+                  description="Try a different search keyword."
+                />
+              )}
             </div>
           )}
 
@@ -841,16 +937,25 @@ export function LearningZone() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all overflow-hidden">
                 <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
                 <div className="p-5">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Current Plan</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+                    Current Plan
+                  </p>
                   {paymentsLoading && (
                     <div className="space-y-3">
-                      {[1, 2, 3].map((i) => <div key={i} className="h-8 bg-gray-50 rounded-lg animate-pulse" />)}
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="h-8 bg-gray-50 rounded-lg animate-pulse"
+                        />
+                      ))}
                     </div>
                   )}
                   {!paymentsLoading && payments?.activeSubscription && (
                     <div className="space-y-4">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900">{payments.activeSubscription.planName}</h3>
+                        <h3 className="text-xl font-bold text-gray-900">
+                          {payments.activeSubscription.planName}
+                        </h3>
                         <span
                           className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize mt-1.5 inline-block ${
                             payments.activeSubscription.status === "active"
@@ -865,20 +970,35 @@ export function LearningZone() {
                         <div>
                           <p className="text-xs text-gray-400 mb-0.5">Amount</p>
                           <p className="font-semibold text-gray-900">
-                            {formatMoney(payments.activeSubscription.amountCents, payments.activeSubscription.currency)}
+                            {formatMoney(
+                              payments.activeSubscription.amountCents,
+                              payments.activeSubscription.currency,
+                            )}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-400 mb-0.5">Renews</p>
-                          <p className="font-semibold text-gray-900">{formatDate(payments.activeSubscription.currentPeriodEnd)}</p>
+                          <p className="font-semibold text-gray-900">
+                            {formatDate(
+                              payments.activeSubscription.currentPeriodEnd,
+                            )}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-400 mb-0.5">Started</p>
-                          <p className="font-semibold text-gray-900">{formatDate(payments.activeSubscription.currentPeriodStart)}</p>
+                          <p className="text-xs text-gray-400 mb-0.5">
+                            Started
+                          </p>
+                          <p className="font-semibold text-gray-900">
+                            {formatDate(
+                              payments.activeSubscription.currentPeriodStart,
+                            )}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-400 mb-0.5">Type</p>
-                          <p className="font-semibold text-gray-900 capitalize">{payments.activeSubscription.planType}</p>
+                          <p className="font-semibold text-gray-900 capitalize">
+                            {payments.activeSubscription.planType}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -886,8 +1006,13 @@ export function LearningZone() {
                   {!paymentsLoading && !payments?.activeSubscription && (
                     <div className="py-6 text-center">
                       <CreditCard className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-                      <p className="text-sm text-gray-500 mb-3">No active subscription</p>
-                      <Button size="sm" className="bg-[#D52B1E] hover:bg-[#b82319] text-white rounded-full">
+                      <p className="text-sm text-gray-500 mb-3">
+                        No active subscription
+                      </p>
+                      <Button
+                        size="sm"
+                        className="bg-[#D52B1E] hover:bg-[#b82319] text-white rounded-full"
+                      >
                         View Plans
                       </Button>
                     </div>
@@ -899,66 +1024,88 @@ export function LearningZone() {
               <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
                 <div className="p-5">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Transaction History</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                    Transaction History
+                  </p>
                   {paymentsLoading && (
                     <div className="space-y-3">
-                      {[1, 2, 3].map((i) => <div key={i} className="h-14 bg-gray-50 rounded-xl animate-pulse" />)}
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="h-14 bg-gray-50 rounded-xl animate-pulse"
+                        />
+                      ))}
                     </div>
                   )}
                   {!paymentsLoading && hasPaymentHistory && (
                     <div className="space-y-2">
                       {payments?.paymentHistory.map((payment) => {
                         let paymentStatusClass = "bg-gray-100 text-gray-600";
-                        if (payment.status === "completed" || payment.status === "successful") {
+                        if (
+                          payment.status === "completed" ||
+                          payment.status === "successful"
+                        ) {
                           paymentStatusClass = "bg-emerald-50 text-emerald-700";
-                        } else if (payment.status === "failed" || payment.status === "refunded") {
+                        } else if (
+                          payment.status === "failed" ||
+                          payment.status === "refunded"
+                        ) {
                           paymentStatusClass = "bg-red-50 text-red-700";
                         }
 
                         return (
-                        <div
-                          key={payment.id}
-                          className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center shrink-0">
-                              <CreditCard className="h-4 w-4 text-[#D52B1E]" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">{payment.itemTitle}</p>
-                              <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                                <span>{formatDate(payment.paidAt)}</span>
-                                <span>&middot;</span>
-                                <span className="capitalize">{payment.paymentMethod}</span>
-                                {payment.cardLast4 && (
-                                  <>
-                                    <span>&middot;</span>
-                                    <span>****{payment.cardLast4}</span>
-                                  </>
-                                )}
+                          <div
+                            key={payment.id}
+                            className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center shrink-0">
+                                <CreditCard className="h-4 w-4 text-[#D52B1E]" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {payment.itemTitle}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                                  <span>{formatDate(payment.paidAt)}</span>
+                                  <span>&middot;</span>
+                                  <span className="capitalize">
+                                    {payment.paymentMethod}
+                                  </span>
+                                  {payment.cardLast4 && (
+                                    <>
+                                      <span>&middot;</span>
+                                      <span>****{payment.cardLast4}</span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold text-gray-900">
-                              {formatMoney(payment.amountCents, payment.currency)}
-                            </span>
-                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${paymentStatusClass}`}>
-                              {payment.status}
-                            </span>
-                            {payment.receiptUrl && (
-                              <a
-                                href={payment.receiptUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Download receipt"
-                                className="text-gray-400 hover:text-[#D52B1E] transition-colors"
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-gray-900">
+                                {formatMoney(
+                                  payment.amountCents,
+                                  payment.currency,
+                                )}
+                              </span>
+                              <span
+                                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${paymentStatusClass}`}
                               >
-                                <Download className="h-4 w-4" />
-                              </a>
-                            )}
+                                {payment.status}
+                              </span>
+                              {payment.receiptUrl && (
+                                <a
+                                  href={payment.receiptUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Download receipt"
+                                  className="text-gray-400 hover:text-[#D52B1E] transition-colors"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              )}
+                            </div>
                           </div>
-                        </div>
                         );
                       })}
                     </div>
@@ -980,7 +1127,9 @@ export function LearningZone() {
             <div className="space-y-5">
               {resultsLoading && (
                 <div className="grid sm:grid-cols-3 gap-4 animate-pulse">
-                  {[1, 2, 3].map((i) => <div key={i} className="h-28 bg-gray-50 rounded-2xl" />)}
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-28 bg-gray-50 rounded-2xl" />
+                  ))}
                 </div>
               )}
               {!resultsLoading && results && (
@@ -993,16 +1142,37 @@ export function LearningZone() {
                     animate="visible"
                   >
                     {[
-                      { label: "Avg. Score",        value: `${results.performanceOverview.averageScore}%`,    icon: Star,        color: "#2563eb", bg: "#EFF6FF" },
-                      { label: "Assessments Done",  value: results.performanceOverview.assessmentsCompleted,  icon: CheckCircle2, color: "#059669", bg: "#ECFDF5" },
-                      { label: "Certificates",      value: results.performanceOverview.certificatesEarned,    icon: Award,       color: "#d97706", bg: "#FFFBEB" },
+                      {
+                        label: "Avg. Score",
+                        value: `${results.performanceOverview.averageScore}%`,
+                        icon: Star,
+                        color: "#2563eb",
+                        bg: "#EFF6FF",
+                      },
+                      {
+                        label: "Assessments Done",
+                        value: results.performanceOverview.assessmentsCompleted,
+                        icon: CheckCircle2,
+                        color: "#059669",
+                        bg: "#ECFDF5",
+                      },
+                      {
+                        label: "Certificates",
+                        value: results.performanceOverview.certificatesEarned,
+                        icon: Award,
+                        color: "#d97706",
+                        bg: "#FFFBEB",
+                      },
                     ].map((s) => (
                       <motion.div
                         key={s.label}
                         variants={itemVariants}
                         className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all overflow-hidden"
                       >
-                        <div className="h-1 w-full" style={{ backgroundColor: s.color }} />
+                        <div
+                          className="h-1 w-full"
+                          style={{ backgroundColor: s.color }}
+                        />
                         <div className="p-5 flex items-center gap-4">
                           <div
                             className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
@@ -1011,8 +1181,12 @@ export function LearningZone() {
                             <s.icon className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500 font-medium">{s.label}</p>
-                            <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+                            <p className="text-xs text-gray-500 font-medium">
+                              {s.label}
+                            </p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {s.value}
+                            </p>
                           </div>
                         </div>
                       </motion.div>
@@ -1023,7 +1197,9 @@ export function LearningZone() {
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
                     <div className="p-5">
-                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Earned Certificates</p>
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                        Earned Certificates
+                      </p>
                       {results.earnedCertificates.length > 0 ? (
                         <motion.div
                           className="grid sm:grid-cols-2 gap-3"
@@ -1043,12 +1219,16 @@ export function LearningZone() {
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-1.5">
-                                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">{cert.name}</p>
+                                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">
+                                      {cert.name}
+                                    </p>
                                     {cert.isVerified && (
                                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                                     )}
                                   </div>
-                                  <p className="text-xs text-gray-400 mt-0.5">{cert.type} &middot; {formatDate(cert.date)}</p>
+                                  <p className="text-xs text-gray-400 mt-0.5">
+                                    {cert.type} &middot; {formatDate(cert.date)}
+                                  </p>
                                 </div>
                               </div>
                               <a
@@ -1078,14 +1258,19 @@ export function LearningZone() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                       <div className="h-1 w-full bg-gradient-to-r from-blue-500 to-indigo-500" />
                       <div className="p-5">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Assessment Results</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                          Assessment Results
+                        </p>
                         <div className="space-y-2">
                           {results.assessmentResults.map((r) => {
                             const statusLower = r.status.toLowerCase();
                             let statusClass = "bg-gray-100 text-gray-600";
-                            if (statusLower === "passed") statusClass = "bg-emerald-50 text-emerald-700";
-                            else if (statusLower === "failed") statusClass = "bg-red-50 text-red-700";
-                            else if (statusLower.includes("retake")) statusClass = "bg-amber-50 text-amber-700";
+                            if (statusLower === "passed")
+                              statusClass = "bg-emerald-50 text-emerald-700";
+                            else if (statusLower === "failed")
+                              statusClass = "bg-red-50 text-red-700";
+                            else if (statusLower.includes("retake"))
+                              statusClass = "bg-amber-50 text-amber-700";
                             return (
                               <div
                                 key={r.id}
@@ -1096,13 +1281,21 @@ export function LearningZone() {
                                     <TrendingUp className="h-4 w-4 text-blue-500" />
                                   </div>
                                   <div>
-                                    <p className="text-sm font-semibold text-gray-900">{r.name}</p>
-                                    <p className="text-xs text-gray-400">{formatDate(r.date)}</p>
+                                    <p className="text-sm font-semibold text-gray-900">
+                                      {r.name}
+                                    </p>
+                                    <p className="text-xs text-gray-400">
+                                      {formatDate(r.date)}
+                                    </p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <p className="text-lg font-bold text-gray-900">{r.score}%</p>
-                                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusClass}`}>
+                                  <p className="text-lg font-bold text-gray-900">
+                                    {r.score}%
+                                  </p>
+                                  <span
+                                    className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusClass}`}
+                                  >
                                     {r.status}
                                   </span>
                                 </div>
@@ -1124,7 +1317,6 @@ export function LearningZone() {
               )}
             </div>
           )}
-
         </motion.div>
       </AnimatePresence>
     </motion.div>
