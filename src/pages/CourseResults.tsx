@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { BookOpen, Filter, GraduationCap, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +45,7 @@ export default function CourseResults() {
   const hasNext = coursesResponse?.meta?.hasNextPage ?? false;
   const hasPrev = coursesResponse?.meta?.hasPreviousPage ?? page > 1;
 
-  let coursesContent: JSX.Element;
+  let coursesContent: ReactNode;
   if (isLoading) {
     coursesContent = <Card><CardContent className="p-6 text-sm text-[#737692]">Loading courses...</CardContent></Card>;
   } else if (isError) {

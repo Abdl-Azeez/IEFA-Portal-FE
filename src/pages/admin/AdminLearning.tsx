@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -436,7 +436,7 @@ export default function AdminLearning() { // NOSONAR
 
   const isCoursesTab = activeTab === "courses";
 
-  let courseRows: JSX.Element;
+  let courseRows: ReactNode;
   if (coursesQuery.isLoading) {
     courseRows = <tr><td className="px-4 py-5 text-sm text-slate-500" colSpan={6}>Loading courses...</td></tr>;
   } else if (courseData.length === 0) {
@@ -506,7 +506,7 @@ export default function AdminLearning() { // NOSONAR
     );
   }
 
-  let courseContentBlock: JSX.Element;
+  let courseContentBlock: ReactNode;
   if (courseContentQuery.isLoading) {
     courseContentBlock = <p className="text-sm text-slate-500">Loading course content...</p>;
   } else if ((courseContentQuery.data?.length ?? 0) > 0) {
@@ -524,7 +524,7 @@ export default function AdminLearning() { // NOSONAR
     courseContentBlock = <p className="text-sm text-slate-400">No course content loaded.</p>;
   }
 
-  let sectionContentBlock: JSX.Element;
+  let sectionContentBlock: ReactNode;
   if (sectionContentQuery.isLoading) {
     sectionContentBlock = <p className="text-sm text-slate-500">Loading section content...</p>;
   } else if ((sectionContentQuery.data?.length ?? 0) === 0) {
@@ -542,7 +542,7 @@ export default function AdminLearning() { // NOSONAR
     );
   }
 
-  let lessonBlock: JSX.Element;
+  let lessonBlock: ReactNode;
   if (lessonQuery.isLoading) {
     lessonBlock = <p className="text-sm text-slate-500">Loading lesson...</p>;
   } else if (lessonQuery.data) {
@@ -675,7 +675,7 @@ export default function AdminLearning() { // NOSONAR
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Update Course (PATCH /learning/courses/{id})</CardTitle>
+                  <CardTitle className="text-base">Update Course (PATCH /learning/courses/{`{id}`})</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-2">
                   <Input placeholder="Course ID" value={updateCourseId} onChange={(e) => setUpdateCourseId(e.target.value)} />
