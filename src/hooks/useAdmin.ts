@@ -1641,6 +1641,7 @@ interface ApiProfessional {
   approvalStatus?: ApiVerificationStatus;
   isApproved?: boolean;
   isVerified?: boolean;
+  isFeatured?: boolean;
   rejectedReason?: string;
   createdAt: string;
   updatedAt: string;
@@ -1659,6 +1660,7 @@ export interface IFProfessional {
   scope?: ProfessionalScope;
   verificationStatus?: VerificationStatus;
   isVerified?: boolean;
+  isFeatured?: boolean;
   rejectedReason?: string;
   profileImageUrl?: string;
   createdAt: string;
@@ -1681,6 +1683,7 @@ export interface CreateIFProfessionalDto {
   scope?: ProfessionalScope;
   verificationStatus?: VerificationStatus;
   profileImageUrl?: string;
+  isFeatured?: boolean;
 }
 
 interface ApiCreateProfessionalDto {
@@ -1694,6 +1697,7 @@ interface ApiCreateProfessionalDto {
   locationType?: ProfessionalScope;
   profileImageUrl?: string;
   resumeUrl?: string;
+  isFeatured?: boolean;
 }
 
 interface ApiRejectProfessionalDto {
@@ -1754,6 +1758,7 @@ const toUiProfessional = (profile: ApiProfessional): IFProfessional => ({
   scope: profile.locationType ?? profile.scope,
   verificationStatus: toUiVerificationStatus(profile),
   isVerified: profile.isVerified,
+  isFeatured: profile.isFeatured,
   rejectedReason: profile.rejectedReason,
   profileImageUrl: profile.profileImageUrl,
   createdAt: profile.createdAt,
@@ -1773,6 +1778,7 @@ const toApiCreateDto = (
   locationType: dto.scope,
   profileImageUrl: dto.profileImageUrl,
   resumeUrl: dto.resumeUrl,
+  isFeatured: dto.isFeatured,
 });
 
 // Public (user-facing) — GET /professionals returns array
@@ -1781,6 +1787,17 @@ export const useProfessionals = () =>
     queryKey: ["professionals"],
     queryFn: async () => {
       const { data } = await api.get<ApiProfessional[]>("/professionals");
+      return data.map(toUiProfessional);
+    },
+  });
+
+export const useFeaturedProfessionals = () =>
+  useQuery({
+    queryKey: ["professionals", "featured"],
+    queryFn: async () => {
+      const { data } = await api.get<ApiProfessional[]>(
+        "/professionals/featured",
+      );
       return data.map(toUiProfessional);
     },
   });
@@ -1910,6 +1927,40 @@ export const useAdminDeleteIFProfessional = () => {
       toast({
         title: "Error",
         description: e.response?.data?.message ?? "Delete failed",
+        variant: "destructive",
+      }),
+  });
+};
+
+export const useAdminToggleFeaturedProfessional = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      isFeatured,
+    }: {
+      id: string;
+      isFeatured: boolean;
+    }) => {
+      const { data } = await api.patch<ApiProfessional>(
+        `/professionals/${id}/feature`,
+        { isFeatured },
+      );
+      return toUiProfessional(data);
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["admin", "professionals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "professionals", "pending"] });
+      qc.invalidateQueries({ queryKey: ["professionals", "featured"] });
+      qc.invalidateQueries({ queryKey: ["professionals"] });
+      toast({
+        title: data.isFeatured ? "Marked as featured" : "Removed from featured",
+      });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Toggle featured failed",
         variant: "destructive",
       }),
   });

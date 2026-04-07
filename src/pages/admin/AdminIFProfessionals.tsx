@@ -15,6 +15,7 @@ import {
   Users,
   Loader2,
   X,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ import {
   useAdminDeleteIFProfessional,
   useAdminApproveIFProfessional,
   useAdminRejectIFProfessional,
+  useAdminToggleFeaturedProfessional,
   type IFProfessional,
   type CareerLevel,
   type ProfessionalScope,
@@ -84,6 +86,7 @@ const EMPTY_FORM: CreateIFProfessionalDto = {
   scope: "Local",
   profileImageUrl: "",
   resumeUrl: "",
+  isFeatured: false,
 };
 
 export default function AdminIFProfessionals() {
@@ -122,6 +125,7 @@ export default function AdminIFProfessionals() {
       scope: p.scope ?? "Local",
       profileImageUrl: p.profileImageUrl ?? "",
       resumeUrl: p.resumeUrl ?? "",
+      isFeatured: p.isFeatured ?? false,
     });
     setOpenMenu(null);
     setModalOpen(true);
@@ -194,6 +198,7 @@ export default function AdminIFProfessionals() {
   const deleteMutation = useAdminDeleteIFProfessional();
   const approveMutation = useAdminApproveIFProfessional();
   const rejectMutation = useAdminRejectIFProfessional();
+  const toggleFeaturedMutation = useAdminToggleFeaturedProfessional();
 
   const allProfessionals = [
     ...approvedProfessionals,
@@ -399,6 +404,9 @@ export default function AdminIFProfessionals() {
                     Level
                   </th>
                   <th className="px-4 py-3 text-left hidden sm:table-cell">
+                    Featured
+                  </th>
+                  <th className="px-4 py-3 text-left hidden sm:table-cell">
                     Status
                   </th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -472,6 +480,16 @@ export default function AdminIFProfessionals() {
                         </span>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
+                        {p.isFeatured ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                            <Star className="h-3 w-3 fill-amber-500 text-amber-500" />{" "}
+                            Featured
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
                         <span
                           className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusCls}`}
                         >
@@ -516,6 +534,19 @@ export default function AdminIFProfessionals() {
                               >
                                 <Edit className="h-3.5 w-3.5 text-blue-600" />{" "}
                                 Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  toggleFeaturedMutation.mutate({
+                                    id: p.id,
+                                    isFeatured: !p.isFeatured,
+                                  });
+                                  setOpenMenu(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-amber-50 text-amber-700"
+                              >
+                                <Star className="h-3.5 w-3.5" />{" "}
+                                {p.isFeatured ? "Unfeature" : "Mark Featured"}
                               </button>
                               <hr className="my-1 border-gray-100" />
                               <button
@@ -788,6 +819,25 @@ export default function AdminIFProfessionals() {
               onChange={(url) => setForm((f) => ({ ...f, resumeUrl: url }))}
               previewHeight="h-28"
             />
+          </div>
+
+          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <input
+              id="prof-featured"
+              type="checkbox"
+              checked={form.isFeatured ?? false}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, isFeatured: e.target.checked }))
+              }
+              className="h-4 w-4 rounded border-gray-300 accent-amber-500"
+            />
+            <label
+              htmlFor="prof-featured"
+              className="flex items-center gap-1.5 text-xs font-medium text-amber-800 cursor-pointer select-none"
+            >
+              <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+              Mark as Featured Professional
+            </label>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-1">

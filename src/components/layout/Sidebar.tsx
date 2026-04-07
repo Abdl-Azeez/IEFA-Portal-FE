@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Newspaper, TrendingUp, BookOpen, Settings, HelpCircle, Users, ChevronLeft, ChevronRight, FolderOpen, FileText, Database, Mic, Briefcase, UserCircle, Calculator, Coins, Wrench } from 'lucide-react'
+import { LayoutDashboard, Newspaper, TrendingUp, BookOpen, Settings, HelpCircle, Users, ChevronLeft, ChevronRight, FolderOpen, FileText, Database, Mic, Briefcase, UserCircle, Calculator, Coins, Wrench, Bell } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -22,6 +22,7 @@ const menuNavigation = [
 // Help section items
 const helpNavigation = [
   { name: 'Profile', href: '/profile', icon: UserCircle },
+  { name: 'Notifications', href: '/notifications', icon: Bell },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Support', href: '/support', icon: HelpCircle },
 ]
@@ -37,7 +38,7 @@ interface SidebarProps {
   onToggle: () => void
 }
 
-export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
+export function Sidebar({ isCollapsed, onToggle }: Readonly<SidebarProps>) {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
   const isToolsActive = location.pathname.startsWith('/tools')

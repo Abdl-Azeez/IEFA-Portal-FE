@@ -13,6 +13,7 @@ import Resources from "@/pages/Resources";
 import Data from "@/pages/Data";
 import Podcast from "@/pages/Podcast";
 import IFProfessionals from "@/pages/IFProfessionals";
+import Notifications from "@/pages/Notifications";
 import Settings from "@/pages/Settings";
 import Support from "@/pages/Support";
 import Profile from "@/pages/Profile";
@@ -114,6 +115,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <IFProfessionals />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="notifications"
+              element={
+                <ProtectedRoute>
+                  <Notifications />
                 </ProtectedRoute>
               }
             />

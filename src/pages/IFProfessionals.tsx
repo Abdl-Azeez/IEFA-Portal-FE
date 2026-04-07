@@ -28,6 +28,7 @@ import { Select } from "@/components/ui/select";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
   useCreateProfessionalProfile,
+  useFeaturedProfessionals,
   useProfessionals,
   type CareerLevel,
   type CreateIFProfessionalDto,
@@ -107,10 +108,31 @@ function getVerificationStatus(profile: IFProfessional): VerificationStatus {
 
 // Nigerian cities/states — location containing any of these → Local
 const NIGERIA_KEYWORDS = [
-  "nigeria", "lagos", "abuja", "kano", "ibadan", "port harcourt",
-  "kaduna", "enugu", "ogun", "oyo", "rivers", "delta", "anambra",
-  "abia", "imo", "calabar", "uyo", "owerri", "benin city", "warri",
-  "jos", "maiduguri", "sokoto", "ilorin", "ng",
+  "nigeria",
+  "lagos",
+  "abuja",
+  "kano",
+  "ibadan",
+  "port harcourt",
+  "kaduna",
+  "enugu",
+  "ogun",
+  "oyo",
+  "rivers",
+  "delta",
+  "anambra",
+  "abia",
+  "imo",
+  "calabar",
+  "uyo",
+  "owerri",
+  "benin city",
+  "warri",
+  "jos",
+  "maiduguri",
+  "sokoto",
+  "ilorin",
+  "ng",
 ];
 
 function inferScope(profile: IFProfessional): ProfessionalScope {
@@ -158,15 +180,18 @@ export default function IFProfessionals() {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const { data: professionals = [], isLoading } = useProfessionals();
+  const { data: featuredProfessionals = [] } = useFeaturedProfessionals();
   const createProfile = useCreateProfessionalProfile();
 
   const spotlightPool = useMemo(() => {
+    if (featuredProfessionals.length > 0)
+      return featuredProfessionals.slice(0, 8);
     const richProfiles = professionals.filter(
       (p) => p.profileImageUrl || p.description || p.organization,
     );
     const source = richProfiles.length >= 3 ? richProfiles : professionals;
     return source.slice(0, 8);
-  }, [professionals]);
+  }, [featuredProfessionals, professionals]);
 
   useEffect(() => {
     if (spotlightPool.length <= 1) return;
@@ -203,7 +228,9 @@ export default function IFProfessionals() {
     }
 
     if (verificationFilter !== "All") {
-      list = list.filter((p) => getVerificationStatus(p) === verificationFilter);
+      list = list.filter(
+        (p) => getVerificationStatus(p) === verificationFilter,
+      );
     }
 
     if (search.trim()) {
@@ -229,7 +256,8 @@ export default function IFProfessionals() {
     if (!linkedInUrlIsValid(form.linkedinUrl ?? "")) {
       errors.linkedinUrl = "Enter a valid LinkedIn profile URL";
     }
-    if (!form.profileImageUrl) errors.profileImageUrl = "Profile picture is required";
+    if (!form.profileImageUrl)
+      errors.profileImageUrl = "Profile picture is required";
     if (!form.resumeUrl) errors.resumeUrl = "Resume is required";
 
     setFormErrors(errors);
@@ -318,7 +346,10 @@ export default function IFProfessionals() {
                       />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-[#D52B1E]/30 via-[#9B1F15]/40 to-gray-900 flex items-center justify-center">
-                        <span className="text-white/20 font-bold" style={{ fontSize: "8rem", lineHeight: 1 }}>
+                        <span
+                          className="text-white/20 font-bold"
+                          style={{ fontSize: "8rem", lineHeight: 1 }}
+                        >
                           {spotlightMain.fullName.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -369,7 +400,9 @@ export default function IFProfessionals() {
                       )}
 
                       <div className="mt-4 flex items-center flex-wrap gap-3">
-                        <Badge className={`text-xs border ${SCOPE_COLORS[inferScope(spotlightMain)]}`}>
+                        <Badge
+                          className={`text-xs border ${SCOPE_COLORS[inferScope(spotlightMain)]}`}
+                        >
                           <Globe2 className="h-3 w-3 mr-1" />
                           {inferScope(spotlightMain)}
                         </Badge>
@@ -422,7 +455,10 @@ export default function IFProfessionals() {
                           />
                         ) : (
                           <div className="absolute inset-0 bg-gradient-to-br from-[#D52B1E]/25 via-[#9B1F15]/30 to-gray-800 flex items-center justify-center">
-                            <span className="text-white/20 font-bold" style={{ fontSize: "5rem", lineHeight: 1 }}>
+                            <span
+                              className="text-white/20 font-bold"
+                              style={{ fontSize: "5rem", lineHeight: 1 }}
+                            >
                               {profile.fullName.charAt(0).toUpperCase()}
                             </span>
                           </div>
@@ -455,9 +491,15 @@ export default function IFProfessionals() {
                           {(profile.organization || profile.location) && (
                             <p className="text-xs text-white/55 mt-0.5 flex items-center gap-1 line-clamp-1">
                               {profile.organization ? (
-                                <><Building2 className="h-3 w-3 shrink-0" />{profile.organization}</>
+                                <>
+                                  <Building2 className="h-3 w-3 shrink-0" />
+                                  {profile.organization}
+                                </>
                               ) : (
-                                <><MapPinned className="h-3 w-3 shrink-0" />{profile.location}</>
+                                <>
+                                  <MapPinned className="h-3 w-3 shrink-0" />
+                                  {profile.location}
+                                </>
                               )}
                             </p>
                           )}
@@ -477,11 +519,15 @@ export default function IFProfessionals() {
         </Card>
       </motion.div>
 
-      <motion.div variants={itemVariants} className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <motion.div
+        variants={itemVariants}
+        className="grid gap-6 lg:grid-cols-[1.4fr_1fr]"
+      >
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-[#111111]">
-              <Users className="h-5 w-5 text-[#D52B1E]" /> Professional Directory
+              <Users className="h-5 w-5 text-[#D52B1E]" /> Professional
+              Directory
             </CardTitle>
             <CardDescription>
               Search and filter professionals by career level, verification, and
@@ -500,7 +546,9 @@ export default function IFProfessionals() {
               <div className="min-w-[165px]">
                 <Select
                   value={levelFilter}
-                  onChange={(e) => setLevelFilter(e.target.value as LevelFilter)}
+                  onChange={(e) =>
+                    setLevelFilter(e.target.value as LevelFilter)
+                  }
                 >
                   <option value="All">All career levels</option>
                   {CAREER_OPTIONS.map((level) => (
@@ -520,12 +568,16 @@ export default function IFProfessionals() {
                         ? s === "Local"
                           ? "bg-white text-emerald-700 shadow-sm"
                           : s === "Global"
-                          ? "bg-white text-cyan-700 shadow-sm"
-                          : "bg-white text-[#000000] shadow-sm"
+                            ? "bg-white text-cyan-700 shadow-sm"
+                            : "bg-white text-[#000000] shadow-sm"
                         : "text-[#737692] hover:text-[#000000]"
                     }`}
                   >
-                    {s === "All" ? "All" : s === "Local" ? "🇳🇬 Local" : "🌐 Global"}
+                    {s === "All"
+                      ? "All"
+                      : s === "Local"
+                        ? "🇳🇬 Local"
+                        : "🌐 Global"}
                   </button>
                 ))}
               </div>
@@ -568,7 +620,9 @@ export default function IFProfessionals() {
                 {filtered.map((profile) => {
                   const verification = getVerificationStatus(profile);
                   const scope = inferScope(profile);
-                  const roleOrg = [profile.role, profile.organization].filter(Boolean).join(" · ");
+                  const roleOrg = [profile.role, profile.organization]
+                    .filter(Boolean)
+                    .join(" · ");
 
                   return (
                     <div
@@ -594,7 +648,9 @@ export default function IFProfessionals() {
                           <span className="font-semibold text-[#000000] text-sm">
                             {profile.fullName}
                           </span>
-                          <Badge className={`text-xs border ${VERIFICATION_COLORS[verification]}`}>
+                          <Badge
+                            className={`text-xs border ${VERIFICATION_COLORS[verification]}`}
+                          >
                             {verification === "Verified" ? (
                               <BadgeCheck className="h-3 w-3 mr-1" />
                             ) : verification === "Pending" ? (
@@ -606,7 +662,9 @@ export default function IFProfessionals() {
                           </Badge>
                         </div>
                         {roleOrg && (
-                          <p className="text-xs text-[#737692] mt-0.5 line-clamp-1">{roleOrg}</p>
+                          <p className="text-xs text-[#737692] mt-0.5 line-clamp-1">
+                            {roleOrg}
+                          </p>
                         )}
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-[#737692]">
                           {profile.location && (
@@ -641,11 +699,15 @@ export default function IFProfessionals() {
                       {/* Right-side badges */}
                       <div className="shrink-0 flex flex-col items-end gap-1.5">
                         {profile.seniority && (
-                          <Badge className={`text-xs border ${LEVEL_COLORS[profile.seniority]}`}>
+                          <Badge
+                            className={`text-xs border ${LEVEL_COLORS[profile.seniority]}`}
+                          >
                             {CAREER_LABELS[profile.seniority]}
                           </Badge>
                         )}
-                        <Badge className={`text-xs border ${SCOPE_COLORS[scope]}`}>
+                        <Badge
+                          className={`text-xs border ${SCOPE_COLORS[scope]}`}
+                        >
                           <Globe2 className="h-3 w-3 mr-1" />
                           {scope}
                         </Badge>
@@ -680,7 +742,9 @@ export default function IFProfessionals() {
                 className="h-9 mt-1"
               />
               {formErrors.fullName && (
-                <p className="text-xs text-red-600 mt-1">{formErrors.fullName}</p>
+                <p className="text-xs text-red-600 mt-1">
+                  {formErrors.fullName}
+                </p>
               )}
             </div>
 
@@ -785,17 +849,23 @@ export default function IFProfessionals() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-slate-600">Resume</label>
+              <label className="text-xs font-medium text-slate-600">
+                Resume
+              </label>
               <div className="mt-1">
                 <ImageUpload
                   mode="document"
                   value={form.resumeUrl ?? ""}
-                  onChange={(url) => setForm((prev) => ({ ...prev, resumeUrl: url }))}
+                  onChange={(url) =>
+                    setForm((prev) => ({ ...prev, resumeUrl: url }))
+                  }
                   previewHeight="h-24"
                 />
               </div>
               {formErrors.resumeUrl && (
-                <p className="text-xs text-red-600 mt-1">{formErrors.resumeUrl}</p>
+                <p className="text-xs text-red-600 mt-1">
+                  {formErrors.resumeUrl}
+                </p>
               )}
             </div>
 
