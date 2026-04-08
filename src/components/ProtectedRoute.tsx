@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { GuestOverlay } from './GuestOverlay'
 
@@ -8,7 +8,6 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, isAdmin, isLoading } = useAuth();
-  const location = useLocation();
 
   if (isLoading) {
     return <div>Loading...</div>;

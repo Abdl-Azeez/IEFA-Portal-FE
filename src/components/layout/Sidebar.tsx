@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, Newspaper, TrendingUp, BookOpen, Settings, HelpCircle, Users, ChevronLeft, ChevronRight, FolderOpen, FileText, Database, Mic, Briefcase, UserCircle, Calculator, Coins, Wrench, Bell } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { useAuth } from '@/contexts/AuthContext'
 
 // Menu section items
 const menuNavigation = [
@@ -39,7 +38,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isCollapsed, onToggle }: Readonly<SidebarProps>) {
-  const { isAuthenticated } = useAuth()
   const location = useLocation()
   const isToolsActive = location.pathname.startsWith('/tools')
   const [toolsOpen, setToolsOpen] = useState(isToolsActive)
