@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
   MessageSquare,
@@ -11,6 +11,11 @@ import {
   X,
   Share2,
   Flag,
+  Sparkles,
+  UserCheck,
+  Star,
+  GraduationCap,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -475,6 +480,26 @@ export default function Community() {
         console.error("Failed to load community categories:", err),
       )
       .finally(() => setCategoriesLoading(false));
+  }, []);
+
+  /* -- Eagerly load events on mount so the hero can show them -- */
+  useEffect(() => {
+    if (events.length > 0) return;
+    communityService
+      .getEvents()
+      .then(setEvents)
+      .catch((err) => console.error("Failed to pre-load events for hero:", err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* -- Eagerly load groups on mount so the hero count is visible immediately -- */
+  useEffect(() => {
+    if (groups.length > 0) return;
+    communityService
+      .getGroups()
+      .then((allGroups) => setGroups(allGroups))
+      .catch((err) => console.error("Failed to pre-load groups for hero:", err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* -- Load discussions (re-fetches when filters change) -- */
@@ -1238,15 +1263,298 @@ export default function Community() {
         animate="visible"
         variants={containerVariants}
       >
+        {/* ── DUAL HERO BANNER ─────────────────────────────────────────── */}
         <motion.div variants={itemVariants}>
-          <h1 className="text-3xl font-bold tracking-tight text-[#000000]">
-            Community
-          </h1>
-          <p className="text-[#737692] mt-2">
-            Engage with fellow learners, instructor and professional. Ask
-            questions, share insights, and grow together within IEFA's learning
-            community.
-          </p>
+          <AnimatePresence mode="wait" initial={false}>
+            {selectedTab === "mentorship" ? (
+              /* ── MENTORSHIP HERO ───────────────────────────────────── */
+              <motion.div
+                key="mentorship-hero"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.28 }}
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-[#05091c] to-gray-900 p-8 md:p-12 min-h-[220px] flex items-center"
+              >
+                {/* ambient glows */}
+                <div className="pointer-events-none absolute -top-16 -right-16 h-72 w-72 rounded-full bg-violet-600/20 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-12 -left-12 h-56 w-56 rounded-full bg-[#D52B1E]/10 blur-3xl" />
+                <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-40 w-40 rounded-full bg-violet-500/5 blur-2xl" />
+
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-8 w-full">
+                  <div className="flex-1 space-y-4">
+                    <span className="inline-flex items-center gap-1.5 bg-violet-500/20 text-violet-300 text-xs font-bold px-3 py-1.5 rounded-full border border-violet-500/30 tracking-widest uppercase">
+                      <Sparkles className="h-3 w-3" /> IEFA Mentorship Program
+                    </span>
+                    <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+                      Guided by the{" "}
+                      <span className="text-[#D52B1E]">industry's finest</span>
+                    </h1>
+                    <p className="text-gray-400 text-sm md:text-base leading-relaxed max-w-2xl">
+                      Connect 1-on-1 with senior professionals across Islamic
+                      banking, sukuk structuring, and takaful. Get personalised
+                      guidance to accelerate your career in Islamic finance.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-5 text-sm text-gray-500">
+                      <span className="flex items-center gap-1.5">
+                        <UserCheck className="h-4 w-4 text-gray-600" /> Expert
+                        Mentors
+                      </span>
+                      <span className="h-1 w-1 bg-gray-700 rounded-full" />
+                      <span className="flex items-center gap-1.5">
+                        <Star className="h-4 w-4 text-gray-600" /> 1-on-1
+                        Sessions
+                      </span>
+                      <span className="h-1 w-1 bg-gray-700 rounded-full" />
+                      <span className="flex items-center gap-1.5">
+                        <GraduationCap className="h-4 w-4 text-gray-600" />{" "}
+                        Career Growth Focus
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex md:flex-col gap-3 shrink-0">
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
+                      <p className="text-2xl font-bold text-white">50+</p>
+                      <p className="text-xs text-gray-500">Mentors</p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
+                      <p className="text-2xl font-bold text-[#D52B1E]">1:1</p>
+                      <p className="text-xs text-gray-500">Sessions</p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
+                      <p className="text-2xl font-bold text-violet-300">Free</p>
+                      <p className="text-xs text-gray-500">to Join</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pointer-events-none absolute right-8 bottom-4 opacity-5 text-white select-none hidden md:block">
+                  <Zap className="h-52 w-52" />
+                </div>
+              </motion.div>
+            ) : (
+              /* ── DEFAULT / EVENTS HERO ─────────────────────────────── */
+              <motion.div
+                key="community-hero"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.28 }}
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-[#1c0505] to-gray-900 min-h-[220px]"
+              >
+                {/* ambient glows */}
+                <div className="pointer-events-none absolute -top-20 -right-20 h-80 w-80 rounded-full bg-[#D52B1E]/25 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-orange-600/10 blur-3xl" />
+                <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 h-48 w-[600px] rounded-full bg-[#D52B1E]/5 blur-3xl" />
+                {/* dot-grid texture */}
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-[0.03]"
+                  style={{
+                    backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
+                    backgroundSize: "28px 28px",
+                  }}
+                />
+
+                <div className="relative z-10 flex flex-col lg:flex-row gap-0 h-full">
+                  {/* ── LEFT: headline + CTAs ─────────────────── */}
+                  <div className="flex-1 p-8 md:p-10 flex flex-col justify-center space-y-5">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 bg-[#D52B1E]/20 text-[#D52B1E] text-xs font-bold px-3 py-1.5 rounded-full border border-[#D52B1E]/30 tracking-widest uppercase">
+                        <Calendar className="h-3 w-3" /> IEFA Live Events
+                      </span>
+                      {events.length > 0 && (
+                        <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-500/25">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          {events.length} Upcoming
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+                        Where the industry{" "}
+                        <span className="text-[#D52B1E]">comes together</span>
+                      </h1>
+                      <p className="text-gray-400 text-sm md:text-base leading-relaxed mt-3 max-w-lg">
+                        Webinars, workshops, conferences and networking sessions
+                        curated for Islamic finance professionals across the globe.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 pt-1">
+                      <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-[#D52B1E]" /> Live &amp; Virtual
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
+                        <Users className="h-3.5 w-3.5 text-[#D52B1E]" /> Open Registration
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
+                        <Zap className="h-3.5 w-3.5 text-[#D52B1E]" /> Industry-Led
+                      </span>
+                    </div>
+
+                    {/* community stats row */}
+                    <div className="flex items-center gap-4 pt-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold text-white">
+                          {discussionPosts.length > 0 ? `${discussionPosts.length}+` : "—"}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <MessageSquare className="h-3.5 w-3.5" /> Discussions
+                        </span>
+                      </div>
+                      <span className="h-4 w-px bg-white/10" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold text-white">
+                          {groups.length > 0 ? groups.length : "—"}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Users className="h-3.5 w-3.5" /> Groups
+                        </span>
+                      </div>
+                      <span className="h-4 w-px bg-white/10" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold text-emerald-400">
+                          {events.length > 0 ? events.length : "—"}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Calendar className="h-3.5 w-3.5" /> Events
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* upcoming event pills strip */}
+                    {events.length > 1 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {events.slice(0, 4).map((ev, idx) => (
+                          <span
+                            key={ev.id}
+                            className="text-[11px] font-medium text-gray-400 bg-white/5 border border-white/10 rounded-full px-2.5 py-1 truncate max-w-[160px]"
+                          >
+                            {idx + 1}. {ev.title}
+                          </span>
+                        ))}
+                        {events.length > 4 && (
+                          <span className="text-[11px] font-medium text-[#D52B1E] bg-[#D52B1E]/10 border border-[#D52B1E]/20 rounded-full px-2.5 py-1">
+                            +{events.length - 4} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── RIGHT: featured event card ──────────────── */}
+                  <div className="lg:w-[340px] shrink-0 p-6 lg:p-8 flex items-center justify-center lg:border-l border-white/5">
+                    {events.length > 0 ? (
+                      <div className="w-full">
+                        <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#D52B1E] mb-3 flex items-center gap-1.5">
+                          <span className="h-px flex-1 bg-[#D52B1E]/30" />
+                          Featured Event
+                          <span className="h-px flex-1 bg-[#D52B1E]/30" />
+                        </p>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden">
+                          {/* coloured top bar */}
+                          <div className="h-1.5 w-full bg-gradient-to-r from-[#D52B1E] via-orange-400 to-amber-300" />
+                          <div className="p-5 space-y-4">
+                            {/* type + virtual badge */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {events[0].type && (
+                                <span className="text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full bg-[#D52B1E]/20 text-[#D52B1E] border border-[#D52B1E]/25">
+                                  {events[0].type}
+                                </span>
+                              )}
+                              {events[0].isVirtual && (
+                                <span className="text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25">
+                                  Virtual
+                                </span>
+                              )}
+                              {events[0].isRegistered && (
+                                <span className="text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                                  Registered ✓
+                                </span>
+                              )}
+                            </div>
+
+                            {/* title */}
+                            <h3 className="text-white font-bold text-base leading-snug line-clamp-2">
+                              {events[0].title}
+                            </h3>
+
+                            {/* date / location row */}
+                            <div className="space-y-1.5">
+                              {(events[0].date ?? events[0].startDate) && (
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <Calendar className="h-3.5 w-3.5 text-[#D52B1E] shrink-0" />
+                                  <span>
+                                    {new Date(
+                                      events[0].date ?? events[0].startDate ?? "",
+                                    ).toLocaleDateString(undefined, {
+                                      weekday: "short",
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}
+                                    {(events[0].startTime ?? events[0].time) &&
+                                      ` · ${events[0].startTime ?? events[0].time}`}
+                                  </span>
+                                </div>
+                              )}
+                              {events[0].location && (
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <span className="text-[#D52B1E] shrink-0 text-sm">📍</span>
+                                  <span className="truncate">{events[0].location}</span>
+                                </div>
+                              )}
+                              {((events[0].attendeeCount ?? events[0].attendees) ?? 0) > 0 && (
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <Users className="h-3.5 w-3.5 text-[#D52B1E] shrink-0" />
+                                  <span>
+                                    {(events[0].attendeeCount ?? events[0].attendees ?? 0).toLocaleString()} attending
+                                    {events[0].capacity && ` · ${events[0].capacity} capacity`}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* CTA */}
+                            <button
+                              onClick={() => setSelectedTab("events")}
+                              className="w-full mt-1 flex items-center justify-center gap-2 bg-[#D52B1E] hover:bg-[#b82319] text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                            >
+                              <Calendar className="h-4 w-4" />
+                              {events[0].isRegistered ? "View Details" : "Register Now"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {events.length > 1 && (
+                          <p className="text-center text-xs text-gray-600 mt-3">
+                            +{events.length - 1} more event{events.length - 1 > 1 ? "s" : ""} coming up
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      /* placeholder when events not yet loaded */
+                      <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-6 text-center space-y-3">
+                        <div className="h-12 w-12 rounded-full bg-[#D52B1E]/10 flex items-center justify-center mx-auto">
+                          <Calendar className="h-6 w-6 text-[#D52B1E]" />
+                        </div>
+                        <p className="text-sm font-semibold text-gray-300">Upcoming Events</p>
+                        <p className="text-xs text-gray-500">Browse the Events tab to see what's on.</p>
+                        <button
+                          onClick={() => setSelectedTab("events")}
+                          className="w-full flex items-center justify-center gap-2 bg-[#D52B1E] hover:bg-[#b82319] text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                        >
+                          View Events
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Search and Action Button */}
@@ -1296,7 +1604,7 @@ export default function Community() {
 
         {/* Main Tabs */}
         <Tabs
-          defaultValue="discussions"
+          value={selectedTab}
           className="w-full"
           onValueChange={(value) => {
             if (
