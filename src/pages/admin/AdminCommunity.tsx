@@ -5,15 +5,15 @@ import { MessageSquare, Search, MoreVertical, Trash2, Eye, CheckCircle, XCircle,
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
-import { communityService, getCommunityGroupMemberCount, type CreateEventDto, type DiscussionAPI, type CommunityGroupAPI, type CommunityEventAPI, type CommunityCategoryAPI, type GroupJoinRequestAPI } from '@/lib/communityService'
+import { communityService, getCommunityGroupMemberCount, type CreateEventDto, type DiscussionAPI, type CommunityGroupAPI, type CommunityEventAPI, type CommunityCategoryAPI, type GroupJoinRequestAPI, type CommunityUserAPI } from '@/lib/communityService'
 
 const slugify = (value: string) =>
   value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
+    .replaceAll(/[^a-z0-9\s-]/g, '')
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/-+/g, '-')
 
 const normalizeTime = (value: string) => {
   if (!value) return undefined
@@ -49,6 +49,18 @@ const parseGroupMembers = (group: CommunityGroupAPI): GroupMemberPreview[] => {
   }))
 }
 
+const mapCommunityUserToMemberPreview = (user: CommunityUserAPI): GroupMemberPreview => ({
+  id: user.id,
+  name:
+    [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+    user.username ||
+    user.email ||
+    'Member',
+  email: user.email ?? '—',
+  role: user.role ?? 'member',
+  avatarUrl: user.profilePhotoUrl ?? null,
+})
+
 /* ── Event form modal ─────────────────────────────────────────────────────── */
 function EventFormModal({
   event,
@@ -59,6 +71,7 @@ function EventFormModal({
   onClose: () => void
   onSaved: (e: CommunityEventAPI) => void
 }) {
+  const modalIdPrefix = event ? `event-edit-${event.id}` : 'event-create'
   const [title, setTitle] = useState(event?.title ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
   const [date, setDate] = useState(event?.date ?? event?.startDate ?? '')
@@ -72,8 +85,9 @@ function EventFormModal({
   const [virtualLinkError, setVirtualLinkError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const submitLabel = saving ? 'Saving…' : event ? 'Save Changes' : 'Create Event'
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!title.trim()) { setErr('Title is required'); return }
     if (isVirtual && !virtualLink.trim()) {
@@ -111,7 +125,15 @@ function EventFormModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      role="button"
+      tabIndex={0}
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClose()
+      }}
+    >
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
@@ -120,41 +142,42 @@ function EventFormModal({
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Title *</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className="h-9 text-sm" />
+            <label htmlFor={`${modalIdPrefix}-title`} className="block text-xs font-medium text-slate-600 mb-1">Title *</label>
+            <Input id={`${modalIdPrefix}-title`} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className="h-9 text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+            <label htmlFor={`${modalIdPrefix}-description`} className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+            <textarea id={`${modalIdPrefix}-description`} value={description} onChange={(e) => setDescription(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
               placeholder="Event description" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Date</label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 text-sm" />
+              <label htmlFor={`${modalIdPrefix}-date`} className="block text-xs font-medium text-slate-600 mb-1">Date</label>
+              <Input id={`${modalIdPrefix}-date`} type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
-              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-9 text-sm" />
+              <label htmlFor={`${modalIdPrefix}-start-time`} className="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
+              <Input id={`${modalIdPrefix}-start-time`} type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-9 text-sm" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">End Time</label>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-9 text-sm" />
+              <label htmlFor={`${modalIdPrefix}-end-time`} className="block text-xs font-medium text-slate-600 mb-1">End Time</label>
+              <Input id={`${modalIdPrefix}-end-time`} type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-9 text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
-              <Input type="number" value={capacity} onChange={(e) => setCapacity(Number(e.target.value || 0))} className="h-9 text-sm" min={0} />
+              <label htmlFor={`${modalIdPrefix}-capacity`} className="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
+              <Input id={`${modalIdPrefix}-capacity`} type="number" value={capacity} onChange={(e) => setCapacity(Number(e.target.value || 0))} className="h-9 text-sm" min={0} />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Location</label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Online / City" className="h-9 text-sm" />
+            <label htmlFor={`${modalIdPrefix}-location`} className="block text-xs font-medium text-slate-600 mb-1">Location</label>
+            <Input id={`${modalIdPrefix}-location`} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Online / City" className="h-9 text-sm" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label htmlFor={`${modalIdPrefix}-is-virtual`} className="flex items-center gap-2 text-sm text-slate-700">
             <input
+              id={`${modalIdPrefix}-is-virtual`}
               type="checkbox"
               checked={isVirtual}
               onChange={(e) => {
@@ -164,12 +187,13 @@ function EventFormModal({
               }}
               className="rounded border-slate-300"
             />
-            Virtual event
+            <span>Virtual event</span>
           </label>
           {isVirtual && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Virtual Link</label>
+              <label htmlFor={`${modalIdPrefix}-virtual-link`} className="block text-xs font-medium text-slate-600 mb-1">Virtual Link</label>
               <Input
+                id={`${modalIdPrefix}-virtual-link`}
                 value={virtualLink}
                 onChange={(e) => {
                   const value = e.target.value
@@ -183,14 +207,14 @@ function EventFormModal({
             </div>
           )}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
-            <Input value={type} onChange={(e) => setType(e.target.value)} placeholder="e.g. Webinar, Meetup" className="h-9 text-sm" />
+            <label htmlFor={`${modalIdPrefix}-type`} className="block text-xs font-medium text-slate-600 mb-1">Type</label>
+            <Input id={`${modalIdPrefix}-type`} value={type} onChange={(e) => setType(e.target.value)} placeholder="e.g. Webinar, Meetup" className="h-9 text-sm" />
           </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose} className="rounded-lg">Cancel</Button>
             <Button type="submit" size="sm" disabled={saving} className="rounded-lg bg-[#D52B1E] hover:bg-[#B8241B] text-white gap-1">
-              {saving ? 'Saving…' : event ? 'Save Changes' : 'Create Event'}
+              {submitLabel}
             </Button>
           </div>
         </form>
@@ -210,6 +234,7 @@ function CommCategoryFormModal({
   onClose: () => void
   onSaved: (c: CommunityCategoryAPI) => void
 }) {
+  const modalIdPrefix = cat ? `category-edit-${cat.id}` : 'category-create'
   const [name, setName] = useState(cat?.name ?? '')
   const [slug, setSlug] = useState(cat?.slug ?? '')
   const [description, setDescription] = useState(cat?.description ?? '')
@@ -217,12 +242,13 @@ function CommCategoryFormModal({
   const [sortOrder, setSortOrder] = useState(cat?.sortOrder ?? 0)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const submitLabel = saving ? 'Saving…' : cat ? 'Save Changes' : 'Save'
 
   useEffect(() => {
     if (!cat) setSlug(slugify(name))
   }, [name, cat])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     const cleanName = name.trim()
     const cleanSlug = slug.trim()
@@ -250,7 +276,15 @@ function CommCategoryFormModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      role="button"
+      tabIndex={0}
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClose()
+      }}
+    >
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
         className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
@@ -259,34 +293,34 @@ function CommCategoryFormModal({
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Category Name *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Islamic Finance" className="h-9 text-sm" autoFocus />
+            <label htmlFor={`${modalIdPrefix}-name`} className="block text-xs font-medium text-slate-600 mb-1">Category Name *</label>
+            <Input id={`${modalIdPrefix}-name`} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Islamic Finance" className="h-9 text-sm" autoFocus />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
-            <Input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="e.g. markets-investing" className="h-9 text-sm" />
+            <label htmlFor={`${modalIdPrefix}-slug`} className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
+            <Input id={`${modalIdPrefix}-slug`} value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="e.g. markets-investing" className="h-9 text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+            <label htmlFor={`${modalIdPrefix}-description`} className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+            <textarea id={`${modalIdPrefix}-description`} value={description} onChange={(e) => setDescription(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
               placeholder="Category description" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Icon</label>
-              <Input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="e.g. chart-line" className="h-9 text-sm" />
+              <label htmlFor={`${modalIdPrefix}-icon`} className="block text-xs font-medium text-slate-600 mb-1">Icon</label>
+              <Input id={`${modalIdPrefix}-icon`} value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="e.g. chart-line" className="h-9 text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Sort Order</label>
-              <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value || 0))} className="h-9 text-sm" />
+              <label htmlFor={`${modalIdPrefix}-sort-order`} className="block text-xs font-medium text-slate-600 mb-1">Sort Order</label>
+              <Input id={`${modalIdPrefix}-sort-order`} type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value || 0))} className="h-9 text-sm" />
             </div>
           </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose} className="rounded-lg">Cancel</Button>
             <Button type="submit" size="sm" disabled={saving} className="rounded-lg bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-              {saving ? 'Saving…' : cat ? 'Save Changes' : 'Save'}
+              {submitLabel}
             </Button>
           </div>
         </form>
@@ -306,6 +340,7 @@ function GroupFormModal({
   onClose: () => void
   onSaved: (g: CommunityGroupAPI) => void
 }) {
+  const modalIdPrefix = group ? `group-edit-${group.id}` : 'group-create'
   const [name, setName] = useState(group?.name ?? '')
   const [slug, setSlug] = useState(group?.slug ?? '')
   const [description, setDescription] = useState(group?.description ?? '')
@@ -313,12 +348,13 @@ function GroupFormModal({
   const [isPrivate, setIsPrivate] = useState(Boolean(group?.isPrivate))
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const submitLabel = saving ? 'Saving…' : group ? 'Save Changes' : 'Create Group'
 
   useEffect(() => {
     if (!group) setSlug(slugify(name))
   }, [name, group])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     const cleanName = name.trim()
     const cleanSlug = slug.trim()
@@ -347,7 +383,15 @@ function GroupFormModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      role="button"
+      tabIndex={0}
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClose()
+      }}
+    >
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
@@ -356,37 +400,38 @@ function GroupFormModal({
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Group Name *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. CIFP Study Group" className="h-9 text-sm" autoFocus />
+            <label htmlFor={`${modalIdPrefix}-name`} className="block text-xs font-medium text-slate-600 mb-1">Group Name *</label>
+            <Input id={`${modalIdPrefix}-name`} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. CIFP Study Group" className="h-9 text-sm" autoFocus />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
-            <Input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="e.g. cifp-study-group" className="h-9 text-sm" />
+            <label htmlFor={`${modalIdPrefix}-slug`} className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
+            <Input id={`${modalIdPrefix}-slug`} value={slug} onChange={(e) => setSlug(slugify(e.target.value))} placeholder="e.g. cifp-study-group" className="h-9 text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+            <label htmlFor={`${modalIdPrefix}-description`} className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+            <textarea id={`${modalIdPrefix}-description`} value={description} onChange={(e) => setDescription(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30"
               placeholder="Group description" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Cover Image URL</label>
-            <Input value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="https://..." className="h-9 text-sm" />
+            <label htmlFor={`${modalIdPrefix}-cover-image`} className="block text-xs font-medium text-slate-600 mb-1">Cover Image URL</label>
+            <Input id={`${modalIdPrefix}-cover-image`} value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="https://..." className="h-9 text-sm" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label htmlFor={`${modalIdPrefix}-is-private`} className="flex items-center gap-2 text-sm text-slate-700">
             <input
+              id={`${modalIdPrefix}-is-private`}
               type="checkbox"
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
               className="rounded border-slate-300"
             />
-            Private group
+            <span>Private group</span>
           </label>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose} className="rounded-lg">Cancel</Button>
             <Button type="submit" size="sm" disabled={saving} className="rounded-lg bg-[#D52B1E] hover:bg-[#B8241B] text-white">
-              {saving ? 'Saving…' : group ? 'Save Changes' : 'Create Group'}
+              {submitLabel}
             </Button>
           </div>
         </form>
@@ -451,7 +496,11 @@ export default function AdminCommunity() {
     setLoading(true)
     setApiError(null)
     try {
-      const data = await communityService.getDiscussions()
+      const data = await communityService.getDiscussions({
+        order: 'DESC',
+        page: 1,
+        perPage: 100,
+      })
       setDiscussions(data)
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : 'Failed to load discussions')
@@ -563,19 +612,19 @@ export default function AdminCommunity() {
 
     if (groupMembersById[group.id]) return
 
-    const inlineMembers = parseGroupMembers(group)
-    if (inlineMembers.length > 0) {
-      setGroupMembersById((prev) => ({ ...prev, [group.id]: inlineMembers }))
-      return
-    }
-
     setMembersLoadingGroupId(group.id)
     try {
-      const detailed = await communityService.getGroupById(group.id)
-      const parsed = parseGroupMembers(detailed)
+      const members = await communityService.getGroupMembers(group.id)
+      const parsed = members.map(mapCommunityUserToMemberPreview)
       setGroupMembersById((prev) => ({ ...prev, [group.id]: parsed }))
     } catch {
-      setGroupMembersById((prev) => ({ ...prev, [group.id]: [] }))
+      try {
+        const detailed = await communityService.getGroupById(group.id)
+        const parsed = parseGroupMembers(detailed)
+        setGroupMembersById((prev) => ({ ...prev, [group.id]: parsed }))
+      } catch {
+        setGroupMembersById((prev) => ({ ...prev, [group.id]: [] }))
+      }
     } finally {
       setMembersLoadingGroupId(null)
     }
@@ -1099,9 +1148,10 @@ export default function AdminCommunity() {
           <EventFormModal
             event={eventModal.type === 'edit' ? eventModal.event : undefined}
             onClose={() => setEventModal(null)}
-            onSaved={(saved) => {
+            onSaved={async (saved) => {
               if (eventModal.type === 'edit') {
-                setEvents((prev) => prev.map((e) => (e.id === saved.id ? saved : e)))
+                const refreshed = await communityService.getEventById(saved.id).catch(() => saved)
+                setEvents((prev) => prev.map((e) => (e.id === refreshed.id ? refreshed : e)))
               } else {
                 setEvents((prev) => [saved, ...prev])
               }
@@ -1113,9 +1163,10 @@ export default function AdminCommunity() {
           <CommCategoryFormModal
             cat={catModal.type === 'edit' ? catModal.category : undefined}
             onClose={() => setCatModal(null)}
-            onSaved={(saved) => {
+            onSaved={async (saved) => {
               if (catModal.type === 'edit') {
-                setCategories((prev) => prev.map((c) => (c.id === saved.id ? saved : c)))
+                const refreshed = await communityService.getCategoryById(saved.id).catch(() => saved)
+                setCategories((prev) => prev.map((c) => (c.id === refreshed.id ? refreshed : c)))
               } else {
                 setCategories((prev) => [saved, ...prev])
               }

@@ -190,12 +190,15 @@ export const useEnrollInLearningCourse = () => {
   return useMutation({
     mutationFn: async (courseId: number) => {
       await api.post(`/learning/courses/${courseId}/enroll`);
+      return courseId;
     },
-    onSuccess: async () => {
+    onSuccess: async (courseId) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "my-courses"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "courses"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "course", courseId] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "my-course-progress", courseId] }),
       ]);
     },
   });
@@ -207,12 +210,15 @@ export const useUnenrollFromLearningCourse = () => {
   return useMutation({
     mutationFn: async (courseId: number) => {
       await api.delete(`/learning/courses/${courseId}/unenroll`);
+      return courseId;
     },
-    onSuccess: async () => {
+    onSuccess: async (courseId) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "my-courses"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "courses"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "course", courseId] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "my-course-progress", courseId] }),
       ]);
     },
   });
@@ -229,6 +235,8 @@ export const useEnrollOnboarding = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "my-courses"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "courses"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "upcoming-activities"] }),
       ]);
     },
   });
@@ -266,9 +274,13 @@ export const useUpdateLearningCourse = () => {
   return useMutation({
     mutationFn: async ({ id, payload }: { id: number; payload: UpdateCourseDto }) => {
       await api.patch(`/learning/courses/${id}`, payload);
+      return id;
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["learning", "courses"] });
+    onSuccess: async (id) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["learning", "courses"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "course", id] }),
+      ]);
     },
   });
 };
@@ -279,9 +291,15 @@ export const useDeleteLearningCourse = () => {
   return useMutation({
     mutationFn: async (id: number) => {
       await api.delete(`/learning/courses/${id}`);
+      return id;
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["learning", "courses"] });
+    onSuccess: async (id) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["learning", "courses"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "course", id] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "course-content", id] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "course-students", id] }),
+      ]);
     },
   });
 };
@@ -292,9 +310,13 @@ export const useCreateLearningSection = () => {
   return useMutation({
     mutationFn: async (payload: CreateSectionDto) => {
       await api.post("/learning/sections", payload);
+      return payload.parent_id;
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["learning", "course-content"] });
+    onSuccess: async (courseId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["learning", "course-content"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "course-content", courseId] }),
+      ]);
     },
   });
 };
@@ -305,11 +327,13 @@ export const useUpdateLearningSection = () => {
   return useMutation({
     mutationFn: async ({ id, payload }: { id: number; payload: UpdateSectionDto }) => {
       await api.patch(`/learning/sections/${id}`, payload);
+      return id;
     },
-    onSuccess: async () => {
+    onSuccess: async (id) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "course-content"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "section-content"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "section-content", id] }),
       ]);
     },
   });
@@ -321,11 +345,13 @@ export const useDeleteLearningSection = () => {
   return useMutation({
     mutationFn: async (id: number) => {
       await api.delete(`/learning/sections/${id}`);
+      return id;
     },
-    onSuccess: async () => {
+    onSuccess: async (id) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "course-content"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "section-content"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "section-content", id] }),
       ]);
     },
   });
@@ -337,11 +363,13 @@ export const useCreateLearningLesson = () => {
   return useMutation({
     mutationFn: async (payload: CreateLessonDto) => {
       await api.post("/learning/lessons", payload);
+      return payload.parent_id;
     },
-    onSuccess: async () => {
+    onSuccess: async (sectionId) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "section-content"] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "lesson"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "section-content", sectionId] }),
       ]);
     },
   });
@@ -353,10 +381,12 @@ export const useUpdateLearningLesson = () => {
   return useMutation({
     mutationFn: async ({ id, payload }: { id: number; payload: UpdateLessonDto }) => {
       await api.patch(`/learning/lessons/${id}`, payload);
+      return id;
     },
-    onSuccess: async () => {
+    onSuccess: async (id) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "lesson"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "lesson", id] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "section-content"] }),
       ]);
     },
@@ -369,10 +399,12 @@ export const useDeleteLearningLesson = () => {
   return useMutation({
     mutationFn: async (id: number) => {
       await api.delete(`/learning/lessons/${id}`);
+      return id;
     },
-    onSuccess: async () => {
+    onSuccess: async (id) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["learning", "lesson"] }),
+        queryClient.invalidateQueries({ queryKey: ["learning", "lesson", id] }),
         queryClient.invalidateQueries({ queryKey: ["learning", "section-content"] }),
       ]);
     },

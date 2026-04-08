@@ -35,7 +35,6 @@ import {
 } from "@/lib/communityService";
 import type {
   Attachment,
-  CommunityCategory,
   DiscussionPost,
   DetailedDiscussionPost,
   UserProfile,
@@ -47,6 +46,7 @@ import PosterProfilePopup from "@/components/community/PosterProfilePopup";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Dialog } from "@/components/ui/dialog";
+import { useAuthStore } from "@/stores/auth";
 
 const CATEGORY_PALETTE = [
   "bg-[#D52B1E]",
@@ -58,10 +58,42 @@ const CATEGORY_PALETTE = [
   "bg-indigo-600",
   "bg-teal-600",
 ];
+
+const DISCUSSION_SKELETON_KEYS = ["discussion-1", "discussion-2", "discussion-3", "discussion-4"];
+const BOOKMARK_SKELETON_KEYS = ["bookmark-1", "bookmark-2", "bookmark-3"];
+const FLAGGED_SKELETON_KEYS = ["flagged-1", "flagged-2", "flagged-3"];
+const GROUP_SKELETON_KEYS = ["group-1", "group-2", "group-3", "group-4"];
+const EVENT_SKELETON_KEYS = ["event-1", "event-2", "event-3"];
+
 function getCategoryColor(name: string): string {
   let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + (name.codePointAt(i) ?? 0)) >>> 0;
   return CATEGORY_PALETTE[h % CATEGORY_PALETTE.length];
+}
+
+function getSortByLabel(sortBy: FilterOptions["sortBy"]): string {
+  if (sortBy === "earliest") return "Earliest";
+  if (sortBy === "mostPopular") return "Popular";
+  if (sortBy === "unanswered") return "Unanswered";
+  return "Latest";
+}
+
+function getTimeRangeLabel(timeRange: FilterOptions["timeRange"]): string {
+  if (timeRange === "day") return "Day";
+  if (timeRange === "week") return "Week";
+  if (timeRange === "month") return "Month";
+  return "All Time";
+}
+
+function getFlagTitle(isModerator: boolean, isReported: boolean): string {
+  if (isModerator) return isReported ? "Unflag this post" : "Flag this post";
+  return isReported ? "Already reported" : "Report this post";
+}
+
+function getGroupActionLabel(group: CommunityGroupAPI): string {
+  if (group.isMember) return "Leave Group";
+  if (group.isPrivate) return "Request to Join";
+  return "Join Group";
 }
 
 /* -- API -> UI mapping helpers ---------------------------------------------- */
@@ -84,7 +116,7 @@ function apiDiscussionToPost(
     id: d.id,
     title: d.title,
     description: d.content ?? "",
-    category: catName as CommunityCategory,
+    category: catName,
     poster: authorName,
     posterAvatar: d.author?.profilePhotoUrl ?? undefined,
     posterId: d.author?.id ?? "",
@@ -260,6 +292,8 @@ export default function Community() {
   );
   const [posterProfileHydrating, setPosterProfileHydrating] = useState(false);
   const { isModerator, user, isAuthenticated } = useAuth();
+  const authToken = useAuthStore((state) => state.token);
+  const hasAuthToken = Boolean(authToken || sessionStorage.getItem("authToken"));
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -278,11 +312,11 @@ export default function Community() {
 
   const requireAuth = useCallback(
     (feature: string) => {
-      if (isAuthenticated) return true;
+      if (isAuthenticated && hasAuthToken) return true;
       promptLoginForFeature(feature);
       return false;
     },
-    [isAuthenticated, promptLoginForFeature],
+    [isAuthenticated, hasAuthToken, promptLoginForFeature],
   );
 
   // state to track hover card
@@ -299,14 +333,14 @@ export default function Community() {
 
   const clearScheduledHoverClose = useCallback(() => {
     if (hoverCloseTimeoutRef.current !== null) {
-      window.clearTimeout(hoverCloseTimeoutRef.current);
+      globalThis.clearTimeout(hoverCloseTimeoutRef.current);
       hoverCloseTimeoutRef.current = null;
     }
   }, []);
 
   const scheduleProfileHoverClear = useCallback(() => {
     clearScheduledHoverClose();
-    hoverCloseTimeoutRef.current = window.setTimeout(() => {
+    hoverCloseTimeoutRef.current = globalThis.setTimeout(() => {
       setHoverProfile(null);
     }, 120);
   }, [clearScheduledHoverClose]);
@@ -341,7 +375,7 @@ export default function Community() {
     clearScheduledHoverClose();
     const rect = e.currentTarget.getBoundingClientRect();
     const cardHeight = 200; // approximate height of card
-    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceBelow = globalThis.innerHeight - rect.bottom;
     const pos = spaceBelow < cardHeight ? "top" : "bottom";
     const x = rect.left + rect.width / 2;
     const y = pos === "bottom" ? rect.bottom : rect.top;
@@ -362,14 +396,14 @@ export default function Community() {
     void hydratePosterProfile(post)
       .then((profile) => {
         setHoverProfile((current) => {
-          if (!current || current.discussionId !== post.id) return current;
+          if (current?.discussionId !== post.id) return current;
           return { ...current, profile, isHydrating: false };
         });
       })
       .catch((error) => {
         console.error("Failed to hydrate hover profile:", error);
         setHoverProfile((current) => {
-          if (!current || current.discussionId !== post.id) return current;
+          if (current?.discussionId !== post.id) return current;
           return { ...current, isHydrating: false };
         });
       });
@@ -381,7 +415,7 @@ export default function Community() {
 
   // Scroll to top on page load and when viewing discussion details
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    globalThis.scrollTo({ top: 0, behavior: "smooth" });
   }, [selectedPost]);
 
   useEffect(() => () => clearScheduledHoverClose(), [clearScheduledHoverClose]);
@@ -393,6 +427,7 @@ export default function Community() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [discussionPosts, setDiscussionPosts] = useState<DiscussionPost[]>([]);
   const [groups, setGroups] = useState<CommunityGroupAPI[]>([]);
+  const [joinedGroupIds, setJoinedGroupIds] = useState<string[]>([]);
   const [events, setEvents] = useState<CommunityEventAPI[]>([]);
   const [discussionsLoading, setDiscussionsLoading] = useState(true);
   const [groupsLoading, setGroupsLoading] = useState(false);
@@ -446,27 +481,19 @@ export default function Community() {
   useEffect(() => {
     setDiscussionsLoading(true);
     const apiSort = filters.sortBy
-      ? apiSortToUiSort(
-          filters.sortBy as
-            | "latest"
-            | "earliest"
-            | "mostPopular"
-            | "unanswered",
-        )
+      ? apiSortToUiSort(filters.sortBy)
       : "latest";
     const catId = filters.category
       ? apiCategories.find((c) => c.name === filters.category)?.id
       : undefined;
     communityService
       .getDiscussions({
+        order: filters.sortBy === "earliest" ? "ASC" : "DESC",
+        page: 1,
+        perPage: 100,
         categoryId: catId,
         sortBy: apiSort,
-        timeRange: filters.timeRange as
-          | "day"
-          | "week"
-          | "month"
-          | "all"
-          | undefined,
+        timeRange: filters.timeRange,
         search: searchQuery || undefined,
         showBookmarkedOnly: filters.savedOnly,
       })
@@ -494,48 +521,74 @@ export default function Community() {
   useEffect(() => {
     if (selectedTab !== "study-groups") return;
     setGroupsLoading(true);
-    communityService
-      .getGroups()
-      .then((data) =>
+    Promise.all([
+      communityService.getGroups(),
+      isAuthenticated && hasAuthToken
+        ? communityService.getJoinedGroups().catch(() => [] as CommunityGroupAPI[])
+        : Promise.resolve([] as CommunityGroupAPI[]),
+    ])
+      .then(([allGroups, joinedGroups]) => {
+        const joinedIds = new Set(joinedGroups.map((group) => group.id));
+        setJoinedGroupIds(Array.from(joinedIds));
         setGroups(
-          data.map((g) => ({
-            ...g,
-            memberCount: getCommunityGroupMemberCount(g),
-            isMember: getCommunityGroupIsMember(g, user?.id),
+          allGroups.map((group) => ({
+            ...group,
+            memberCount: getCommunityGroupMemberCount(group),
+            isMember:
+              joinedIds.has(group.id) || getCommunityGroupIsMember(group, user?.id),
           })),
-        ),
-      )
+        );
+      })
       .catch((err) => console.error("Failed to load groups:", err))
       .finally(() => setGroupsLoading(false));
-  }, [selectedTab, user?.id]);
+  }, [selectedTab, user?.id, isAuthenticated, hasAuthToken]);
 
   // Ensure groups are available in discussion modal for optional group selection.
   useEffect(() => {
     if (!showStartDiscussionModal || groups.length > 0) return;
     setGroupsLoading(true);
-    communityService
-      .getGroups()
-      .then((data) =>
+    Promise.all([
+      communityService.getGroups(),
+      isAuthenticated && hasAuthToken
+        ? communityService.getJoinedGroups().catch(() => [] as CommunityGroupAPI[])
+        : Promise.resolve([] as CommunityGroupAPI[]),
+    ])
+      .then(([allGroups, joinedGroups]) => {
+        const joinedIds = new Set(joinedGroups.map((group) => group.id));
+        setJoinedGroupIds(Array.from(joinedIds));
         setGroups(
-          data.map((g) => ({
-            ...g,
-            memberCount: getCommunityGroupMemberCount(g),
-            isMember: getCommunityGroupIsMember(g, user?.id),
+          allGroups.map((group) => ({
+            ...group,
+            memberCount: getCommunityGroupMemberCount(group),
+            isMember:
+              joinedIds.has(group.id) || getCommunityGroupIsMember(group, user?.id),
           })),
-        ),
-      )
+        );
+      })
       .catch((err) =>
         console.error("Failed to load groups for discussion modal:", err),
       )
       .finally(() => setGroupsLoading(false));
-  }, [showStartDiscussionModal, groups.length, user?.id]);
+  }, [showStartDiscussionModal, groups.length, user?.id, isAuthenticated, hasAuthToken]);
 
   /* -- Load bookmarked discussions when tab is selected -- */
   useEffect(() => {
     if (selectedTab !== "bookmarks") return;
     setBookmarksLoading(true);
     communityService
-      .getBookmarkedDiscussions()
+      .getBookmarkedDiscussions({
+        order: filters.sortBy === "earliest" ? "ASC" : "DESC",
+        page: 1,
+        perPage: 100,
+        categoryId: filters.category
+          ? apiCategories.find((category) => category.name === filters.category)?.id
+          : undefined,
+        sortBy: filters.sortBy
+          ? apiSortToUiSort(filters.sortBy)
+          : undefined,
+        timeRange: filters.timeRange,
+        search: searchQuery || undefined,
+      })
       .then((data) =>
         setBookmarkedDiscussions(
           data.map((d) => apiDiscussionToPost(d, apiCategories)),
@@ -544,7 +597,7 @@ export default function Community() {
       .catch((err) => console.error("Failed to load bookmarks:", err))
       .finally(() => setBookmarksLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTab]);
+  }, [selectedTab, filters, searchQuery, apiCategories]);
 
   /* -- Load flagged discussions when moderator opens flagged tab -- */
   useEffect(() => {
@@ -768,7 +821,7 @@ export default function Community() {
   );
 
   const handleShare = async (post: DiscussionPost) => {
-    const url = `${window.location.origin}/community/${post.id}`;
+    const url = `${globalThis.location.origin}/community/${post.id}`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -776,8 +829,10 @@ export default function Community() {
           text: post.description,
           url,
         });
-      } catch (err) {
-        console.log("Share cancelled");
+      } catch (err: unknown) {
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          console.error("Failed to share post:", err);
+        }
       }
     } else {
       navigator.clipboard.writeText(url);
@@ -1115,14 +1170,17 @@ export default function Community() {
     if (pos === "bottom") {
       style.top = y + 8;
     } else {
-      style.bottom = window.innerHeight - y + 8;
+      style.bottom = globalThis.innerHeight - y + 8;
     }
     return (
       <div
         style={style}
         className="w-64 bg-white rounded-lg shadow-lg p-4"
+        role="tooltip"
         onMouseEnter={clearScheduledHoverClose}
         onMouseLeave={clearProfileHover}
+        onFocus={clearScheduledHoverClose}
+        onBlur={clearProfileHover}
       >
         <div className="flex flex-col items-center text-center">
           <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#D52B1E] to-[#6F1610] flex items-center justify-center text-2xl mb-2 overflow-hidden">
@@ -1199,11 +1257,7 @@ export default function Community() {
           <div className="relative flex-1 w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder={
-                selectedTab === "mentorship"
-                  ? "Search discussions, topics or members"
-                  : "Search discussions, topics or members"
-              }
+              placeholder="Search discussions, topics or members"
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -1356,7 +1410,7 @@ export default function Community() {
                             }))
                           }
                           className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
-                            !filters.category
+                            filters.category === undefined
                               ? "bg-gradient-to-r from-[#D52B1E] to-[#B8241B] text-white shadow-lg shadow-red-200"
                               : "bg-gray-100 text-[#000000] hover:bg-gray-200"
                           }`}
@@ -1395,13 +1449,7 @@ export default function Community() {
                           Sort By
                         </h4>
                         <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-full capitalize">
-                          {filters.sortBy === "latest"
-                            ? "Latest"
-                            : filters.sortBy === "earliest"
-                              ? "Earliest"
-                              : filters.sortBy === "mostPopular"
-                                ? "Popular"
-                                : "Unanswered"}
+                          {getSortByLabel(filters.sortBy)}
                         </span>
                       </div>
                       <div className="space-y-2">
@@ -1464,13 +1512,7 @@ export default function Community() {
                           Time Range
                         </h4>
                         <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full capitalize">
-                          {filters.timeRange === "day"
-                            ? "Day"
-                            : filters.timeRange === "week"
-                              ? "Week"
-                              : filters.timeRange === "month"
-                                ? "Month"
-                                : "All Time"}
+                          {getTimeRangeLabel(filters.timeRange)}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1523,6 +1565,7 @@ export default function Community() {
                         </div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
+                        <span className="sr-only">Show saved posts only</span>
                         <input
                           type="checkbox"
                           checked={filters.savedOnly || false}
@@ -1562,6 +1605,7 @@ export default function Community() {
                           </div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
+                          <span className="sr-only">Show flagged posts only</span>
                           <input
                             type="checkbox"
                             checked={showFlaggedOnly}
@@ -1615,9 +1659,9 @@ export default function Community() {
             {/* Discussions List */}
             <div className="space-y-4">
               {discussionsLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
+                DISCUSSION_SKELETON_KEYS.map((key) => (
                   <div
-                    key={i}
+                    key={key}
                     className="bg-white rounded-lg border p-6 animate-pulse space-y-3"
                   >
                     <div className="flex items-center gap-2">
@@ -1751,12 +1795,14 @@ export default function Community() {
                                 <Eye className="h-4 w-4" />
                                 <span>{post.views}</span>
                               </div>
-                              <div
+                              <button
+                                type="button"
                                 className="flex items-center gap-1 text-sm cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleLikePost(post.id);
                                 }}
+                                title={likedPosts.includes(post.id) ? "Unlike" : "Like"}
                               >
                                 <Heart
                                   className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-current text-red-500" : ""}`}
@@ -1765,7 +1811,7 @@ export default function Community() {
                                   {post.likes +
                                     (likedPosts.includes(post.id) ? 1 : 0)}
                                 </span>
-                              </div>
+                              </button>
                               <div className="flex items-center gap-1 text-sm">
                                 <MessageSquare className="h-4 w-4" />
                                 <span>{post.replies}</span>
@@ -1799,13 +1845,7 @@ export default function Community() {
                                 }}
                                 disabled={!isModerator && !!post.isReported}
                                 title={
-                                  isModerator
-                                    ? post.isReported
-                                      ? "Unflag this post"
-                                      : "Flag this post"
-                                    : post.isReported
-                                      ? "Already reported"
-                                      : "Report this post"
+                                  getFlagTitle(isModerator, !!post.isReported)
                                 }
                                 className={`p-1 rounded transition-colors ${
                                   post.isReported
@@ -1872,9 +1912,9 @@ export default function Community() {
               )}
             </div>
             {bookmarksLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
+              BOOKMARK_SKELETON_KEYS.map((key) => (
                 <div
-                  key={i}
+                  key={key}
                   className="bg-white rounded-lg border p-6 animate-pulse space-y-3"
                 >
                   <div className="h-4 bg-gray-200 rounded w-1/2" />
@@ -1992,13 +2032,7 @@ export default function Community() {
                               }}
                               disabled={!isModerator && !!post.isReported}
                               title={
-                                isModerator
-                                  ? post.isReported
-                                    ? "Unflag this post"
-                                    : "Flag this post"
-                                  : post.isReported
-                                    ? "Already reported"
-                                    : "Report this post"
+                                getFlagTitle(isModerator, !!post.isReported)
                               }
                               className={`p-1 rounded transition-colors ${
                                 post.isReported
@@ -2052,9 +2086,9 @@ export default function Community() {
                 )}
               </div>
               {flaggedLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
+                FLAGGED_SKELETON_KEYS.map((key) => (
                   <div
-                    key={i}
+                    key={key}
                     className="bg-white rounded-lg border p-6 animate-pulse space-y-3"
                   >
                     <div className="h-4 bg-gray-200 rounded w-1/2" />
@@ -2173,9 +2207,9 @@ export default function Community() {
           <TabsContent value="study-groups" className="mt-6">
             {groupsLoading ? (
               <div className="grid gap-6 md:grid-cols-2">
-                {Array.from({ length: 4 }).map((_, i) => (
+                {GROUP_SKELETON_KEYS.map((key) => (
                   <div
-                    key={i}
+                    key={key}
                     className="bg-white rounded-lg border p-5 animate-pulse space-y-3"
                   >
                     <div className="h-4 bg-gray-200 rounded w-1/2" />
@@ -2189,7 +2223,7 @@ export default function Community() {
               <div className="grid gap-6 md:grid-cols-2">
                 {groups.map((group, index) => (
                   <motion.div
-                    key={group.id ?? index}
+                    key={group.id || group.name}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -2254,7 +2288,16 @@ export default function Community() {
                               if (!requireAuth("join or leave groups")) return;
                               try {
                                 if (group.isMember) {
-                                  await communityService.leaveGroup(group.id);
+                                  try {
+                                    await communityService.leaveGroup(group.id);
+                                  } catch {
+                                    await communityService.leaveGroupWithDelete(
+                                      group.id,
+                                    );
+                                  }
+                                  setJoinedGroupIds((prev) =>
+                                    prev.filter((id) => id !== group.id),
+                                  );
                                   setGroups((prev) =>
                                     prev.map((g) =>
                                       g.id === group.id
@@ -2279,6 +2322,11 @@ export default function Community() {
                                   );
                                 } else {
                                   await communityService.joinGroup(group.id);
+                                  setJoinedGroupIds((prev) =>
+                                    prev.includes(group.id)
+                                      ? prev
+                                      : [...prev, group.id],
+                                  );
                                   setGroups((prev) =>
                                     prev.map((g) =>
                                       g.id === group.id
@@ -2301,11 +2349,7 @@ export default function Community() {
                               }
                             }}
                           >
-                            {group.isMember
-                              ? "Leave Group"
-                              : group.isPrivate
-                                ? "Request to Join"
-                                : "Join Group"}
+                            {getGroupActionLabel(group)}
                           </Button>
                           {isModerator && group.isPrivate && (
                             <Button
@@ -2520,7 +2564,7 @@ export default function Community() {
               <div className="md:col-span-3 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {mentors.map((mentor, index) => (
                   <motion.div
-                    key={index}
+                    key={mentor.name}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -2567,8 +2611,8 @@ export default function Community() {
           <TabsContent value="events" className="mt-6">
             <div className="space-y-4">
               {eventsLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <Card key={i} className="animate-pulse">
+                EVENT_SKELETON_KEYS.map((key) => (
+                  <Card key={key} className="animate-pulse">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 space-y-3">
@@ -2692,7 +2736,9 @@ export default function Community() {
           isOpen={showStartDiscussionModal}
           onClose={() => setShowStartDiscussionModal(false)}
           categories={apiCategories.map((c) => ({ id: c.id, name: c.name }))}
-          groups={joinedGroupsForModal.map((g) => ({ id: g.id, name: g.name }))}
+          groups={joinedGroupsForModal
+            .filter((group) => joinedGroupIds.includes(group.id))
+            .map((g) => ({ id: g.id, name: g.name }))}
           categoriesLoading={categoriesLoading}
           groupsLoading={groupsLoading}
           onSubmit={handleCreateDiscussion}

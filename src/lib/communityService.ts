@@ -34,6 +34,19 @@ export interface DiscussionAuthorAPI {
   profile?: Record<string, unknown> | null;
 }
 
+export interface CommunityUserAPI {
+  id: string;
+  email?: string | null;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  profilePhotoUrl?: string | null;
+  role?: string;
+  isVerified?: boolean;
+  isActive?: boolean;
+  isModerator?: boolean;
+}
+
 export interface DiscussionAuthorStatsAPI {
   posts: number;
   replies: number;
@@ -121,8 +134,8 @@ export interface CommunityGroupAPI {
     id: string;
     groupId: string;
     userId: string;
-    status: "pending" | "approved" | "rejected" | string;
-    role: "member" | "admin" | "moderator" | string;
+    status: string;
+    role: string;
     createdAt?: string;
     updatedAt?: string;
   }>;
@@ -283,6 +296,11 @@ export const communityService = {
       .post<CommunityCategoryAPI>("/community/categories", data)
       .then((r) => r.data),
 
+  getCategoryById: (id: string) =>
+    api
+      .get<CommunityCategoryAPI>(`/community/categories/${id}`)
+      .then((r) => r.data),
+
   updateCategory: (id: string, data: UpdateCommunityCategoryDto) =>
     api
       .patch<CommunityCategoryAPI>(`/community/categories/${id}`, data)
@@ -290,6 +308,9 @@ export const communityService = {
 
   /* -- Discussions -- */
   getDiscussions: (params?: {
+    order?: "ASC" | "DESC";
+    page?: number;
+    perPage?: number;
     categoryId?: string;
     groupId?: string;
     sortBy?: "latest" | "oldest" | "popular" | "unanswered";
@@ -336,6 +357,9 @@ export const communityService = {
       .then((r) => r.data),
 
   getBookmarkedDiscussions: (params?: {
+    order?: "ASC" | "DESC";
+    page?: number;
+    perPage?: number;
     categoryId?: string;
     groupId?: string;
     sortBy?: 'latest' | 'oldest' | 'popular' | 'unanswered';
@@ -362,7 +386,14 @@ export const communityService = {
 
   /* -- Groups -- */
   getGroups: () =>
-    api.get<CommunityGroupAPI[]>("/community/groups").then((r) => r.data),
+    api
+      .get<ListResponse<CommunityGroupAPI>>("/community/groups")
+      .then((r) => unwrapListResponse(r.data)),
+
+  getJoinedGroups: () =>
+    api
+      .get<ListResponse<CommunityGroupAPI>>("/community/groups/joined")
+      .then((r) => unwrapListResponse(r.data)),
 
   getGroupById: (id: string) =>
     api.get<CommunityGroupAPI>(`/community/groups/${id}`).then((r) => r.data),
@@ -390,9 +421,14 @@ export const communityService = {
       .post<CommunityGroupAPI>(`/community/groups/${id}/leave`)
       .then((r) => r.data),
 
+  leaveGroupWithDelete: (id: string) =>
+    api
+      .delete<CommunityGroupAPI>(`/community/groups/${id}/leave`)
+      .then((r) => r.data),
+
   getGroupMembers: (id: string) =>
     api
-      .get<DiscussionAuthorAPI[]>(`/community/groups/${id}/members`)
+      .get<CommunityUserAPI[]>(`/community/groups/${id}/members`)
       .then((r) => r.data),
 
   requestJoinGroup: (id: string) =>

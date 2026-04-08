@@ -220,9 +220,67 @@ export default function AdminLearning() { // NOSONAR
     const paid = courseData.filter((course) => !course.isFree).length;
     return { total, active, free, paid };
   }, [courseData, pageMeta?.itemCount]);
+  const selectedTabLabel = TABS.find((tab) => tab.id === activeTab)?.label ?? "Selected";
+
+  let courseByIdContent: ReactNode;
+  if (courseByIdQuery.isLoading) {
+    courseByIdContent = <p className="text-sm text-slate-500">Loading course...</p>;
+  } else if (courseByIdQuery.data) {
+    courseByIdContent = (
+      <pre className="text-[11px] bg-slate-50 p-2 rounded overflow-auto max-h-56">
+        {JSON.stringify(courseByIdQuery.data, null, 2)}
+      </pre>
+    );
+  } else {
+    courseByIdContent = <p className="text-sm text-slate-400">Enter a course id to load details.</p>;
+  }
+
+  let myCourseProgressContent: ReactNode;
+  if (myCourseProgressQuery.isLoading) {
+    myCourseProgressContent = <p className="text-sm text-slate-500">Loading progress...</p>;
+  } else if (myCourseProgressQuery.data) {
+    myCourseProgressContent = (
+      <pre className="text-[11px] bg-slate-50 p-2 rounded overflow-auto max-h-56">
+        {JSON.stringify(myCourseProgressQuery.data, null, 2)}
+      </pre>
+    );
+  } else {
+    myCourseProgressContent = (
+      <p className="text-sm text-slate-400">Enter an enrolled course id to load progress.</p>
+    );
+  }
+
+  let courseStudentsSummary: ReactNode;
+  if (courseStudentsQuery.isLoading) {
+    courseStudentsSummary = <p className="text-sm text-slate-500">Loading students...</p>;
+  } else {
+    courseStudentsSummary = (
+      <p className="text-xs text-slate-500">Students returned: {courseStudentsQuery.data?.length ?? 0}</p>
+    );
+  }
+
+  let studentProgressContent: ReactNode;
+  if (studentProgressQuery.data) {
+    studentProgressContent = (
+      <pre className="mt-2 text-[11px] bg-slate-50 p-2 rounded overflow-auto max-h-44">
+        {JSON.stringify(studentProgressQuery.data, null, 2)}
+      </pre>
+    );
+  } else {
+    studentProgressContent = (
+      <p className="text-xs text-slate-400 mt-2">Enter both course id and student id to load progress.</p>
+    );
+  }
 
   function handleSetTab(tab: Tab) {
     navigate(`/admin/learning/${tab}`);
+  }
+
+  function handleEnrollOnboarding() {
+    enrollOnboardingMutation.mutate(undefined, {
+      onSuccess: () => toast.success("Onboarding enrollment created."),
+      onError: () => toast.error("Failed to enroll onboarding."),
+    });
   }
 
   async function handleCreateCourse() {
@@ -806,16 +864,8 @@ export default function AdminLearning() { // NOSONAR
 
                   <div className="rounded-lg border p-3">
                     <p className="text-xs text-slate-500 mb-2">Course students and student progress</p>
-                    {courseStudentsQuery.isLoading ? (
-                      <p className="text-sm text-slate-500">Loading students...</p>
-                    ) : (
-                      <p className="text-xs text-slate-500">Students returned: {courseStudentsQuery.data?.length ?? 0}</p>
-                    )}
-                    {studentProgressQuery.data ? (
-                      <pre className="mt-2 text-[11px] bg-slate-50 p-2 rounded overflow-auto max-h-44">{JSON.stringify(studentProgressQuery.data, null, 2)}</pre>
-                    ) : (
-                      <p className="text-xs text-slate-400 mt-2">Enter both course id and student id to load progress.</p>
-                    )}
+                    {courseStudentsSummary}
+                    {studentProgressContent}
                   </div>
                 </div>
               </CardContent>
@@ -840,10 +890,7 @@ export default function AdminLearning() { // NOSONAR
                   />
                   <Button
                     variant="outline"
-                    onClick={() => enrollOnboardingMutation.mutate(undefined, {
-                      onSuccess: () => toast.success("Onboarding enrollment created."),
-                      onError: () => toast.error("Failed to enroll onboarding."),
-                    })}
+                    onClick={handleEnrollOnboarding}
                     disabled={enrollOnboardingMutation.isPending}
                   >
                     POST /learning/onboarding/enroll
@@ -853,24 +900,12 @@ export default function AdminLearning() { // NOSONAR
                 <div className="grid gap-4 xl:grid-cols-2">
                   <div className="rounded-lg border p-3">
                     <p className="text-xs text-slate-500 mb-2">GET /learning/courses/{`{id}`}</p>
-                    {courseByIdQuery.isLoading ? (
-                      <p className="text-sm text-slate-500">Loading course...</p>
-                    ) : courseByIdQuery.data ? (
-                      <pre className="text-[11px] bg-slate-50 p-2 rounded overflow-auto max-h-56">{JSON.stringify(courseByIdQuery.data, null, 2)}</pre>
-                    ) : (
-                      <p className="text-sm text-slate-400">Enter a course id to load details.</p>
-                    )}
+                    {courseByIdContent}
                   </div>
 
                   <div className="rounded-lg border p-3">
                     <p className="text-xs text-slate-500 mb-2">GET /learning/my-courses/{`{id}`}/progress</p>
-                    {myCourseProgressQuery.isLoading ? (
-                      <p className="text-sm text-slate-500">Loading progress...</p>
-                    ) : myCourseProgressQuery.data ? (
-                      <pre className="text-[11px] bg-slate-50 p-2 rounded overflow-auto max-h-56">{JSON.stringify(myCourseProgressQuery.data, null, 2)}</pre>
-                    ) : (
-                      <p className="text-sm text-slate-400">Enter an enrolled course id to load progress.</p>
-                    )}
+                    {myCourseProgressContent}
                   </div>
                 </div>
               </CardContent>
@@ -878,7 +913,7 @@ export default function AdminLearning() { // NOSONAR
           </div>
         ) : (
           <div className="p-4">
-            <UnsupportedTabNotice label={TABS.find((tab) => tab.id === activeTab)?.label ?? "Selected"} />
+            <UnsupportedTabNotice label={selectedTabLabel} />
           </div>
         )}
       </motion.div>
