@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
+import ISLAMIC_DATA from './islamicData.json'
 import {
   Activity,
   AlertTriangle,
   ArrowUpRight,
   Building,
+  ChevronDown,
   DollarSign,
   FileText,
   Globe2,
@@ -21,7 +23,7 @@ import {
   BookOpen,
   MapPin,
   Layers,
-} from 'lucide-react'
+} from "lucide-react";
 import { BarItem, ResponsiveBar } from "@nivo/bar";
 import { ResponsiveFunnel } from "@nivo/funnel";
 import { ResponsiveSunburst } from "@nivo/sunburst";
@@ -35,6 +37,8 @@ import {
   ComposedChart,
   Line,
   LineChart,
+  Pie,
+  PieChart as RechartsPieChart,
   PolarAngleAxis,
   PolarGrid,
   PolarRadiusAxis,
@@ -117,561 +121,6 @@ const RECHARTS_TOOLTIP_STYLE = {
   },
   labelStyle: { color: "#0F9D8A", fontWeight: 600 as const },
   itemStyle: { color: "#101828" },
-};
-
-// ─── All Data ─────────────────────────────────────────────────────────────────
-const ISLAMIC_DATA = {
-  globalGlance: {
-    headline: {
-      totalAssets: "US$6tn",
-      totalAssetsRaw: 5985,
-      yoyGrowth: "21%",
-      totalInstitutions: 2255,
-      countriesCovered: 140,
-    },
-    assetsBySector: [
-      {
-        id: "Islamic Banking",
-        label: "Islamic Banking",
-        value: 4318,
-        share: 72,
-        color: "#A31612",
-      },
-      { id: "Sukuk", label: "Sukuk", value: 1031, share: 17, color: "#16A34A" },
-      {
-        id: "Islamic Funds",
-        label: "Islamic Funds",
-        value: 308,
-        share: 5,
-        color: "#7C3AED",
-      },
-      {
-        id: "Other IFIs",
-        label: "Other IFIs",
-        value: 193,
-        share: 3,
-        color: "#E3261C",
-      },
-      {
-        id: "Takaful",
-        label: "Takaful",
-        value: 136,
-        share: 2,
-        color: "#D4A017",
-      },
-    ],
-    assetsGrowth: [
-      { year: "2018", value: 2505, projected: false },
-      { year: "2019", value: 2909, projected: false },
-      { year: "2020", value: 3329, projected: false },
-      { year: "2021", value: 3989, projected: false },
-      { year: "2022", value: 4304, projected: false },
-      { year: "2023", value: 4963, projected: false },
-      { year: "2024", value: 5985, projected: false },
-      { year: "2029", value: 9719, projected: true },
-    ],
-    topCountriesByAssets: [
-      { country: "Iran", value: 2249, flag: "🇮🇷" },
-      { country: "Saudi Arabia", value: 1316, flag: "🇸🇦" },
-      { country: "Malaysia", value: 761, flag: "🇲🇾" },
-      { country: "UAE", value: 460, flag: "🇦🇪" },
-      { country: "Kuwait", value: 198, flag: "🇰🇼" },
-      { country: "Qatar", value: 192, flag: "🇶🇦" },
-      { country: "Indonesia", value: 179, flag: "🇮🇩" },
-      { country: "Bahrain", value: 139, flag: "🇧🇭" },
-      { country: "Türkiye", value: 127, flag: "🇹🇷" },
-      { country: "Pakistan", value: 77, flag: "🇵🇰" },
-    ],
-    topIFDIMarkets: [
-      { rank: 1, country: "Malaysia", flag: "🇲🇾", medal: "🥇" },
-      { rank: 2, country: "Saudi Arabia", flag: "🇸🇦", medal: "🥈" },
-      { rank: 3, country: "UAE", flag: "🇦🇪", medal: "🥉" },
-      { rank: 4, country: "Indonesia", flag: "🇮🇩", medal: "4️⃣" },
-      { rank: 5, country: "Pakistan", flag: "🇵🇰", medal: "5️⃣" },
-    ],
-    highlights: {
-      leadingCountry: "Iran",
-      leadingCountryValue: 2249,
-      topThreeSharePercent: 72,
-      topTenGrowthNote: "All top 10 saw double-digit growth",
-      chartAnnotation: "21% YoY Growth",
-      milestoneLabel: "US$6tn Milestone",
-      sourceNote: "Data covers 140 countries",
-    },
-    ecosystem: {
-      governance: [
-        { label: "Countries with IF Regulation", value: 57, suffix: "" },
-        { label: "Countries with FinTech Sandbox", value: 72, suffix: "" },
-        { label: "Central Shariah Committees", value: 23, suffix: "" },
-        { label: "Avg Disclosure Index", value: 76, suffix: "%" },
-        { label: "Shariah Scholars", value: 1617, suffix: "" },
-      ],
-      sustainability: [
-        { label: "ESG Sukuk Outstanding", value: "US$61.5bn", raw: 61.5 },
-        { label: "ESG Islamic Funds Outstanding", value: "US$9.7bn", raw: 9.7 },
-        { label: "Countries with S. Guidelines", value: "50", raw: 50 },
-        { label: "Avg Sustainability Reporting", value: "49%", raw: 49 },
-        { label: "Total CSR Funds Disbursed", value: "US$1.7bn", raw: 1.7 },
-      ],
-      awareness: [
-        { label: "In-Person Events", value: 1031 },
-        { label: "Virtual Events", value: 379 },
-        { label: "IF News Articles", value: 9480 },
-      ],
-      knowledge: [
-        { label: "Education Providers", value: 1186 },
-        { label: "Research Papers", value: 5291 },
-        { label: "Journals", value: 379 },
-      ],
-      knowledgeLeader: {
-        country: "Indonesia",
-        providers: 536,
-      },
-    },
-  },
-
-  globalOverview: {
-    headline: {
-      totalAssets: "US$6tn",
-      totalAssetsExact: "US$5.986tn",
-      yoyGrowth: "21%",
-      countriesWithPresence: 98,
-      majorSectors: 5,
-      totalInstitutions: 2255,
-      regionsCount: 8,
-      gccMenaShare: 78,
-      oicCountriesAssetShare: 98,
-    },
-    sectorBreakdown: [
-      {
-        sector: "Islamic Banking",
-        totalAssets: "US$4.3tn",
-        sharePercent: 72,
-        institutionsLabel: "681 Banks",
-        color: "#A31612",
-      },
-      {
-        sector: "Sukuk",
-        totalAssets: "US$1.0tn",
-        sharePercent: 17,
-        institutionsLabel: "4,712 Outstanding",
-        color: "#16A34A",
-      },
-      {
-        sector: "Islamic Funds",
-        totalAssets: "US$308bn",
-        sharePercent: 5,
-        institutionsLabel: "2,610 Outstanding",
-        color: "#7C3AED",
-      },
-      {
-        sector: "Other IFIs",
-        totalAssets: "US$193bn",
-        sharePercent: 3,
-        institutionsLabel: "1,179 Institutions",
-        color: "#E3261C",
-      },
-      {
-        sector: "Takaful",
-        totalAssets: "US$136bn",
-        sharePercent: 2,
-        institutionsLabel: "395 Operators",
-        color: "#D4A017",
-      },
-    ],
-    institutionBreakdown: {
-      fullyFledged: { count: 1376, shareOfAssets: 86, label: "Fully-Fledged" },
-      windows: { count: 877, shareOfAssets: 14, label: "Windows" },
-    },
-    regionalDistribution: [
-      { id: "GCC", label: "GCC", value: 39, color: "#0F9D8A" },
-      { id: "Other MENA", label: "Other MENA", value: 39, color: "#16A34A" },
-      {
-        id: "Southeast Asia",
-        label: "Southeast Asia",
-        value: 16,
-        color: "#7C3AED",
-      },
-      { id: "Europe", label: "Europe", value: 3, color: "#D4A017" },
-      { id: "South Asia", label: "South Asia", value: 2, color: "#E3261C" },
-      {
-        id: "Sub-Saharan Afr.",
-        label: "Sub-Saharan Afr.",
-        value: 0.25,
-        color: "#0891B2",
-      },
-      { id: "Americas", label: "Americas", value: 0.22, color: "#8B5CF6" },
-      { id: "Other Asia", label: "Other Asia", value: 0.05, color: "#98A2B3" },
-    ],
-  },
-
-  islamicBanking: {
-    headline: {
-      totalAssets: "US$4.32tn",
-      growth: "21%",
-      totalBanks: 681,
-      shareOfIfAssets: "72%",
-      marketsCount: 84,
-      globalBankingShare: "2.3%",
-      windowsBankShare: "48%",
-      windowsAssetShare: "14%",
-      subSaharanAfricaBanks: 104,
-      subSaharanAfricaCountries: 28,
-      menaDominanceValue: 3755,
-      menaDominanceShare: "87%",
-      southeastAsiaValue: 380,
-    },
-    assetsGrowth: [
-      { year: "2018", value: 1685, projected: false },
-      { year: "2019", value: 1970, projected: false },
-      { year: "2020", value: 2264, projected: false },
-      { year: "2021", value: 2680, projected: false },
-      { year: "2022", value: 3024, projected: false },
-      { year: "2023", value: 3557, projected: false },
-      { year: "2024", value: 4318, projected: false },
-      { year: "2029", value: 6897, projected: true },
-    ],
-    topCountries: [
-      { country: "Iran", value: 2012, flag: "🇮🇷" },
-      { country: "Saudi Arabia", value: 913, flag: "🇸🇦" },
-      { country: "Malaysia", value: 312, flag: "🇲🇾" },
-      { country: "UAE", value: 306, flag: "🇦🇪" },
-      { country: "Kuwait", value: 180, flag: "🇰🇼" },
-      { country: "Qatar", value: 153, flag: "🇶🇦" },
-      { country: "Bahrain", value: 88, flag: "🇧🇭" },
-      { country: "Türkiye", value: 75, flag: "🇹🇷" },
-      { country: "Indonesia", value: 59, flag: "🇮🇩" },
-      { country: "Bangladesh", value: 50, flag: "🇧🇩" },
-    ],
-    regionalAssets: [
-      { id: "Other MENA", label: "Other MENA", value: 2095, color: "#16A34A" },
-      { id: "GCC", label: "GCC", value: 1660, color: "#0F9D8A" },
-      {
-        id: "Southeast Asia",
-        label: "Southeast Asia",
-        value: 380,
-        color: "#7C3AED",
-      },
-      { id: "South Asia", label: "South Asia", value: 92, color: "#E3261C" },
-      { id: "Europe", label: "Europe", value: 85, color: "#D4A017" },
-      { id: "Other", label: "Other", value: 6, color: "#98A2B3" },
-    ],
-  },
-
-  takaful: {
-    headline: {
-      totalAssets: "US$136bn",
-      growth: "26%",
-      totalOperators: 395,
-      shareOfIfAssets: "2%",
-      activeCountries: 53,
-      projectedAssets2029: "US$237bn",
-      iranGlobalShare: "54%",
-      topThreeShare: "90%",
-      growthSince2018Multiple: "3×",
-    },
-    assetsGrowth: [
-      { year: "2018", value: 45, projected: false },
-      { year: "2019", value: 54, projected: false },
-      { year: "2020", value: 63, projected: false },
-      { year: "2021", value: 76, projected: false },
-      { year: "2022", value: 83, projected: false },
-      { year: "2023", value: 108, projected: false },
-      { year: "2024", value: 136, projected: false },
-      { year: "2029", value: 237, projected: true },
-    ],
-    topCountries: [
-      { country: "Iran", value: 73, flag: "🇮🇷" },
-      { country: "Malaysia", value: 28, flag: "🇲🇾" },
-      { country: "Saudi Arabia", value: 22, flag: "🇸🇦" },
-      { country: "UAE", value: 4, flag: "🇦🇪" },
-      { country: "Indonesia", value: 2, flag: "🇮🇩" },
-      { country: "Türkiye", value: 2, flag: "🇹🇷" },
-      { country: "Qatar", value: 1, flag: "🇶🇦" },
-      { country: "Pakistan", value: 0.9, flag: "🇵🇰" },
-      { country: "Oman", value: 0.5, flag: "🇴🇲" },
-      { country: "Brunei Darussalam", value: 0.5, flag: "🇧🇳" },
-    ],
-    regionalAssets: [
-      { id: "Other MENA", label: "Other MENA", value: 73, color: "#16A34A" },
-      {
-        id: "Southeast Asia",
-        label: "Southeast Asia",
-        value: 31,
-        color: "#7C3AED",
-      },
-      { id: "GCC", label: "GCC", value: 28, color: "#0F9D8A" },
-      { id: "Other", label: "Other", value: 3, color: "#98A2B3" },
-    ],
-    emergingMarkets: [
-      {
-        country: "Uganda",
-        flag: "🇺🇬",
-        description:
-          "Insurance regulator issued Takaful guidelines in 2024. First Islamic bank also established same year.",
-        status: "🟡 Guidelines Issued",
-        statusClassName: "border-amber-200 bg-amber-50 text-amber-700",
-      },
-      {
-        country: "Philippines",
-        flag: "🇵🇭",
-        description:
-          "First Takaful operator launched by Pru Life UK, Nov 2024. First Takaful product launched Jan 2025.",
-        status: "🟢 Operational",
-        statusClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      },
-      {
-        country: "Kyrgyzstan",
-        flag: "🇰🇬",
-        description: "Draft Takaful legislation under parliamentary review.",
-        status: "🔵 Draft Legislation",
-        statusClassName: "border-sky-200 bg-sky-50 text-sky-700",
-      },
-      {
-        country: "Australia",
-        flag: "🇦🇺",
-        description:
-          "Orient Insurance (UAE) in discussions with APRA for Takaful launch approval.",
-        status: "⚪ Exploratory",
-        statusClassName: "border-gray-200 bg-gray-50 text-gray-600",
-      },
-      {
-        country: "Saudi Arabia",
-        flag: "🇸🇦",
-        description:
-          "Multiple merger discussions ongoing: Saudi Enaya/Salama, MedGulf/Buruj, Liva/Malath. New 30% reinsurance cede rule.",
-        status: "🔴 Consolidation",
-        statusClassName: "border-red-200 bg-red-50 text-red-700",
-      },
-    ],
-  },
-
-  otherIFIs: {
-    headline: {
-      totalAssets: "US$193bn",
-      growth: "6%",
-      totalOIFIs: 1179,
-      shareOfIfAssets: "3%",
-      stabilityWindowStart: "US$176bn",
-      stabilityWindowEnd: "US$193bn",
-      switzerlandValue: "US$6bn",
-      gccValue: 94,
-      gccShare: "49%",
-      southeastAsiaValue: 51,
-      southeastAsiaShare: "26%",
-    },
-    assetsGrowth: [
-      { year: "2018", value: 176, projected: false },
-      { year: "2019", value: 182, projected: false },
-      { year: "2020", value: 176, projected: false },
-      { year: "2021", value: 166, projected: false },
-      { year: "2022", value: 166, projected: false },
-      { year: "2023", value: 181, projected: false },
-      { year: "2024", value: 193, projected: false },
-      { year: "2029", value: 246, projected: true },
-    ],
-    topCountries: [
-      { country: "Malaysia", value: 46, flag: "🇲🇾" },
-      { country: "Saudi Arabia", value: 38, flag: "🇸🇦" },
-      { country: "Iran", value: 37, flag: "🇮🇷" },
-      { country: "Bahrain", value: 34, flag: "🇧🇭" },
-      { country: "Qatar", value: 12, flag: "🇶🇦" },
-      { country: "UAE", value: 6, flag: "🇦🇪" },
-      { country: "Switzerland", value: 6, flag: "🇨🇭" },
-      { country: "Kuwait", value: 4, flag: "🇰🇼" },
-      { country: "Indonesia", value: 4, flag: "🇮🇩" },
-      { country: "Pakistan", value: 2, flag: "🇵🇰" },
-    ],
-    regionalAssets: [
-      { id: "GCC", label: "GCC", value: 94, color: "#0F9D8A" },
-      {
-        id: "Southeast Asia",
-        label: "Southeast Asia",
-        value: 51,
-        color: "#7C3AED",
-      },
-      { id: "Other MENA", label: "Other MENA", value: 37, color: "#16A34A" },
-      { id: "Europe", label: "Europe", value: 7, color: "#D4A017" },
-      { id: "Other", label: "Other", value: 3, color: "#98A2B3" },
-    ],
-    composition: [
-      {
-        title: "Mudaraba Companies",
-        icon: "TrendingUp",
-        accent: "#7C3AED",
-        description:
-          "Profit-sharing investment vehicles primarily operating in Pakistan. Serve SME financing needs through Shariah-compliant equity participation.",
-        countries: "🇵🇰 Pakistan leads this sub-sector",
-      },
-      {
-        title: "Islamic Development Finance",
-        icon: "Globe2",
-        accent: "#0F9D8A",
-        description:
-          "Multilateral and bilateral development institutions including IsDB Group entities, ICD, and regional development banks operating on Shariah principles.",
-        countries: "🌍 GCC-based institutions dominate",
-      },
-      {
-        title: "Islamic Leasing & Microfinance",
-        icon: "Layers",
-        accent: "#16A34A",
-        description:
-          "Ijarah-based leasing companies and Shariah-compliant microfinance institutions serving underbanked populations across Southeast Asia and Sub-Saharan Africa.",
-        countries: "🇲🇾 🇧🇩 🇮🇩 Growing rapidly",
-      },
-    ],
-  },
-
-  sukuk: {
-    headline: {
-      totalOutstanding: "US$1tn",
-      growth: "20%",
-      numberOutstanding: 4712,
-      globalIssuance2024: 254.3,
-      globalIssuanceGrowth: "11%",
-      govtShareOfIssuance: "58%",
-      saudiIssuance2024: 75.3,
-      saudiIssuanceGrowth: "53%",
-      globalMaturityBy2030: "55%",
-      maturingIn2025: 105,
-      malaysiaGlobalShare: "~33%",
-    },
-    valueGrowth: [
-      { year: "2018", value: 470, projected: false },
-      { year: "2019", value: 538, projected: false },
-      { year: "2020", value: 626, projected: false },
-      { year: "2021", value: 713, projected: false },
-      { year: "2022", value: 788, projected: false },
-      { year: "2023", value: 863, projected: false },
-      { year: "2024", value: 1031, projected: false },
-      { year: "2029", value: 1802, projected: true },
-    ],
-    topCountries: [
-      { country: "Malaysia", value: 340, flag: "🇲🇾" },
-      { country: "Saudi Arabia", value: 313, flag: "🇸🇦" },
-      { country: "Indonesia", value: 111, flag: "🇮🇩" },
-      { country: "UAE", value: 100, flag: "🇦🇪" },
-      { country: "Türkiye", value: 31, flag: "🇹🇷" },
-      { country: "Pakistan", value: 27, flag: "🇵🇰" },
-      { country: "Qatar", value: 26, flag: "🇶🇦" },
-      { country: "Iran", value: 24, flag: "🇮🇷" },
-      { country: "Bahrain", value: 16, flag: "🇧🇭" },
-      { country: "Kuwait", value: 11, flag: "🇰🇼" },
-    ],
-    regionalOutstanding: [
-      { id: "GCC", label: "GCC", value: 477, color: "#0F9D8A" },
-      {
-        id: "Southeast Asia",
-        label: "Southeast Asia",
-        value: 452,
-        color: "#7C3AED",
-      },
-      { id: "Europe", label: "Europe", value: 35, color: "#D4A017" },
-      { id: "South Asia", label: "South Asia", value: 30, color: "#E3261C" },
-      { id: "Other MENA", label: "Other MENA", value: 28, color: "#16A34A" },
-      { id: "Other", label: "Other", value: 8, color: "#98A2B3" },
-    ],
-  },
-
-  islamicFunds: {
-    headline: {
-      totalAuM: "US$308bn",
-      growth: "21%",
-      fundsOutstanding: 2610,
-      shareOfIfAssets: "5%",
-      ukValue: 42,
-      usValue: 11,
-      dipFrom2021: 20,
-      recoveryFrom2022: 65,
-      projected2029: 538,
-      esgFundsValue: "US$9.7bn",
-      sukukFundsValue: 15.3,
-      sukukFundsShare: "9%",
-      sukukFundsGrowth: "37%",
-    },
-    aumGrowth: [
-      { year: "2018", value: 128, projected: false },
-      { year: "2019", value: 165, projected: false },
-      { year: "2020", value: 200, projected: false },
-      { year: "2021", value: 263, projected: false },
-      { year: "2022", value: 243, projected: false },
-      { year: "2023", value: 254, projected: false },
-      { year: "2024", value: 308, projected: false },
-      { year: "2029", value: 538, projected: true },
-    ],
-    topCountries: [
-      { country: "Iran", value: 103, flag: "🇮🇷" },
-      { country: "UAE", value: 44, flag: "🇦🇪" },
-      { country: "United Kingdom", value: 42, flag: "🇬🇧" },
-      { country: "Malaysia", value: 36, flag: "🇲🇾" },
-      { country: "Saudi Arabia", value: 31, flag: "🇸🇦" },
-      { country: "Türkiye", value: 19, flag: "🇹🇷" },
-      { country: "United States", value: 11, flag: "🇺🇸" },
-      { country: "Pakistan", value: 7, flag: "🇵🇰" },
-      { country: "South Africa", value: 4, flag: "🇿🇦" },
-      { country: "Indonesia", value: 3, flag: "🇮🇩" },
-    ],
-    regionalAuM: [
-      { id: "Other MENA", label: "Other MENA", value: 103, color: "#16A34A" },
-      { id: "GCC", label: "GCC", value: 77, color: "#0F9D8A" },
-      { id: "Europe", label: "Europe", value: 64, color: "#D4A017" },
-      {
-        id: "Southeast Asia",
-        label: "Southeast Asia",
-        value: 40,
-        color: "#7C3AED",
-      },
-      { id: "Americas", label: "Americas", value: 11, color: "#E3261C" },
-      { id: "Other", label: "Other", value: 13, color: "#98A2B3" },
-    ],
-    innovation: [
-      {
-        market: "South Africa",
-        flag: "🇿🇦",
-        title: "First Islamic ETF — Oct 2024",
-        description:
-          "South Africa launched its first Shariah-compliant ETF, expanding Islamic investing in Sub-Saharan Africa.",
-        badge: "🟢 Launched",
-        badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      },
-      {
-        market: "Kazakhstan",
-        flag: "🇰🇿",
-        title: "Central Asia's First Islamic ETF — Jan 2025",
-        description:
-          "Listed on Astana International Exchange. First Islamic ETF in the entire Central Asia region.",
-        badge: "🟢 Launched",
-        badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      },
-      {
-        market: "Hong Kong",
-        flag: "🇭🇰",
-        title: "Saudi Sukuk ETF — May 2025",
-        description:
-          "ETF tracking Saudi government and agency sukuk as part of Hong Kong's strategy to deepen Middle East ties.",
-        badge: "🟢 Launched",
-        badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      },
-      {
-        market: "Saudi Arabia",
-        flag: "🇸🇦",
-        title: "Hong Kong Stocks Islamic ETF — Oct 2024",
-        description:
-          "Saudi launch of Islamic ETF tracking Hong Kong stocks, bridging GCC and Asian capital markets.",
-        badge: "🟢 Launched",
-        badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      },
-      {
-        market: "ESG Islamic Funds",
-        flag: "🌱",
-        title: "ESG Islamic Funds — US$9.7bn AuM",
-        description:
-          "Growing class of funds combining Shariah compliance with ESG criteria. US leads at US$7.942bn, followed by Malaysia at US$1.234bn.",
-        badge: "📊 Growing",
-        badgeClassName: "border-amber-200 bg-amber-50 text-amber-700",
-      },
-    ],
-  },
 };
 
 // ─── Shared Components ────────────────────────────────────────────────────────
@@ -1718,6 +1167,289 @@ function GimChordChart({
   );
 }
 
+// ─── Pie Chart ───────────────────────────────────────────────────────────────
+function GimPieChart({
+  items,
+  formatter,
+  height = 260,
+}: Readonly<{
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+  height?: number;
+}>) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const total = items.reduce((sum, i) => sum + i.value, 0);
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="rounded-xl border border-gray-200 bg-white"
+        style={{ height }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <RechartsPieChart>
+            <Pie
+              data={items}
+              dataKey="value"
+              nameKey="label"
+              cx="50%"
+              cy="50%"
+              outerRadius="72%"
+              innerRadius="36%"
+              paddingAngle={2}
+              isAnimationActive
+              animationDuration={700}
+              label={(props: any) => {
+                const { cx, cy, midAngle, innerRadius, outerRadius, value } =
+                  props;
+                const RADIAN = Math.PI / 180;
+                const radius =
+                  innerRadius + (outerRadius - innerRadius) * 1.38;
+                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                const pct = (value / total) * 100;
+                return pct >= 5 ? (
+                  <text
+                    x={x}
+                    y={y}
+                    fill={COLORS.textSecond}
+                    textAnchor={x > cx ? "start" : "end"}
+                    dominantBaseline="central"
+                    fontSize={9}
+                    fontFamily="inherit"
+                  >
+                    {pct.toFixed(1)}%
+                  </text>
+                ) : null;
+              }}
+              labelLine={{ stroke: COLORS.cardBorder, strokeWidth: 1 }}
+            >
+              {items.map((item) => (
+                <Cell
+                  key={item.id}
+                  fill={item.color}
+                  opacity={activeId && activeId !== item.id ? 0.25 : 1}
+                  stroke="#fff"
+                  strokeWidth={activeId === item.id ? 2 : 1}
+                  style={{ cursor: "pointer" }}
+                  onClick={() =>
+                    setActiveId((cur) => (cur === item.id ? null : item.id))
+                  }
+                />
+              ))}
+            </Pie>
+            <RechartsTooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0].payload as {
+                  label: string;
+                  value: number;
+                  color: string;
+                };
+                return (
+                  <div
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #E9E5E5",
+                      borderRadius: 10,
+                      padding: "10px 14px",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          backgroundColor: d.color,
+                          display: "inline-block",
+                        }}
+                      />
+                      <strong>{d.label}</strong>
+                    </div>
+                    <div style={{ marginTop: 4, color: "#667085" }}>
+                      {formatter(d.value)} (
+                      {((d.value / total) * 100).toFixed(1)}%)
+                    </div>
+                  </div>
+                );
+              }}
+            />
+          </RechartsPieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() =>
+              setActiveId((cur) => (cur === item.id ? null : item.id))
+            }
+            className="flex items-center gap-2 rounded-lg border bg-gray-50/70 px-3 py-2 text-xs transition-all"
+            style={{
+              borderColor:
+                activeId === item.id ? item.color : COLORS.cardBorder,
+              opacity: activeId && activeId !== item.id ? 0.45 : 1,
+            }}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-gray-600">
+              {item.label}
+            </span>
+            <span className="shrink-0 font-semibold text-gray-900">
+              {formatter(item.value)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Regional Multi-Chart ─────────────────────────────────────────────────────
+type RegionalChartType =
+  | "funnel"
+  | "sunburst"
+  | "radar"
+  | "bar-h"
+  | "treemap"
+  | "bubble"
+  | "pie"
+  | "lollipop";
+
+const REGIONAL_CHART_OPTIONS: Array<{
+  value: RegionalChartType;
+  label: string;
+}> = [
+  { value: "funnel", label: "Funnel" },
+  { value: "sunburst", label: "Sunburst" },
+  { value: "radar", label: "Radar" },
+  { value: "bar-h", label: "Bar (Horizontal)" },
+  { value: "treemap", label: "Treemap" },
+  { value: "bubble", label: "Bubble" },
+  { value: "pie", label: "Pie" },
+  { value: "lollipop", label: "Lollipop" },
+];
+
+function RegionalMultiChart({
+  title,
+  items,
+  formatter,
+  height = 260,
+  defaultChartType,
+  className = "",
+  children,
+}: Readonly<{
+  title: string;
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+  height?: number;
+  defaultChartType: RegionalChartType;
+  className?: string;
+  children?: React.ReactNode;
+}>) {
+  const [activeType, setActiveType] =
+    useState<RegionalChartType>(defaultChartType);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const currentOption = REGIONAL_CHART_OPTIONS.find(
+    (o) => o.value === activeType,
+  )!;
+
+  return (
+    <div
+      className={`border rounded-xl bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`}
+      style={{ borderColor: "#E9E5E5" }}
+      role="region"
+      aria-label={title}
+    >
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold" style={{ color: "#667085" }}>
+          {title}
+        </p>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100"
+          >
+            <span>{currentOption.label}</span>
+            <ChevronDown className="h-3 w-3" />
+          </button>
+          {dropdownOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setDropdownOpen(false)}
+              />
+              <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                {REGIONAL_CHART_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setActiveType(option.value);
+                      setDropdownOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-gray-50"
+                    style={{
+                      color:
+                        option.value === activeType
+                          ? COLORS.teal
+                          : COLORS.textSecond,
+                      fontWeight: option.value === activeType ? 600 : 400,
+                    }}
+                  >
+                    {option.label}
+                    {option.value === activeType && (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: COLORS.teal }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      {activeType === "funnel" && (
+        <GimFunnelChart items={items} formatter={formatter} height={height} />
+      )}
+      {activeType === "sunburst" && (
+        <WaffleDistributionChart items={items} formatter={formatter} />
+      )}
+      {activeType === "radar" && (
+        <GimChordChart items={items} formatter={formatter} height={height} />
+      )}
+      {activeType === "bar-h" && (
+        <RadialDistributionChart items={items} formatter={formatter} />
+      )}
+      {activeType === "treemap" && (
+        <GimTreemap items={items} formatter={formatter} height={height} />
+      )}
+      {activeType === "bubble" && (
+        <AreaCircleDistributionChart items={items} formatter={formatter} />
+      )}
+      {activeType === "pie" && (
+        <GimPieChart items={items} formatter={formatter} height={height} />
+      )}
+      {activeType === "lollipop" && (
+        <LollipopDistributionChart items={items} formatter={formatter} />
+      )}
+      {children}
+    </div>
+  );
+}
+
 function useAnimatedNumber(target: number, delay = 0) {
   const [count, setCount] = useState(0);
 
@@ -2700,21 +2432,19 @@ function TabGlobalGlance() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <RegionalMultiChart
           title="Assets by Sector (2024)"
           className="relative lg:col-span-2"
-        >
-          <GimFunnelChart
-            items={globalGlance.assetsBySector.map((item) => ({
-              id: String(item.id),
-              label: String(item.id),
-              value: item.share,
-              color: item.color,
-            }))}
-            formatter={(v) => `${v}%`}
-            height={260}
-          />
-        </SectionCard>
+          items={globalGlance.assetsBySector.map((item) => ({
+            id: String(item.id),
+            label: String(item.id),
+            value: item.share,
+            color: item.color,
+          }))}
+          formatter={(v) => `${v}%`}
+          height={260}
+          defaultChartType="funnel"
+        />
       </div>
 
       <SectionCard title="Top 10 Countries by Total Islamic Finance Assets (US$bn, 2024)">
@@ -3211,17 +2941,17 @@ function TabGlobalOverview() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Regional Distribution of IF Assets (%, 2024)">
-          <WaffleDistributionChart
-            items={globalOverview.regionalDistribution.map((r) => ({
-              id: r.id,
-              label: r.label,
-              value: r.value,
-              color: r.color,
-            }))}
-            formatter={(v) => `${v >= 1 ? v : v.toFixed(2)}%`}
-          />
-        </SectionCard>
+        <RegionalMultiChart
+          title="Regional Distribution of IF Assets (%, 2024)"
+          items={globalOverview.regionalDistribution.map((r) => ({
+            id: r.id,
+            label: r.label,
+            value: r.value,
+            color: r.color,
+          }))}
+          formatter={(v) => `${v >= 1 ? v : v.toFixed(2)}%`}
+          defaultChartType="sunburst"
+        />
       </div>
 
       <SectionCard title="Regional Islamic Finance Asset Share">
@@ -3425,20 +3155,19 @@ function TabIslamicBanking() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <RegionalMultiChart
           title="Islamic Banking Assets by Region (US$bn, 2024)"
           className="lg:col-span-2"
+          items={islamicBanking.regionalAssets.map((item) => ({
+            id: String(item.id),
+            label: item.label,
+            value: item.value,
+            color: item.color,
+          }))}
+          formatter={(v) => formatUsdValue(v)}
+          height={260}
+          defaultChartType="radar"
         >
-          <GimChordChart
-            items={islamicBanking.regionalAssets.map((item) => ({
-              id: String(item.id),
-              label: item.label,
-              value: item.value,
-              color: item.color,
-            }))}
-            formatter={(v) => formatUsdValue(v)}
-            height={260}
-          />
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div
               className="rounded-xl border p-3 text-xs"
@@ -3464,7 +3193,7 @@ function TabIslamicBanking() {
               {formatUsdValue(islamicBanking.headline.southeastAsiaValue)}
             </div>
           </div>
-        </SectionCard>
+        </RegionalMultiChart>
       </div>
 
       <SectionCard title="Top 10 Countries by Islamic Banking Assets (US$bn, 2024)">
@@ -3793,19 +3522,18 @@ function TabTakaful() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <RegionalMultiChart
           title="Regional Takaful Distribution (2024)"
           className="lg:col-span-2"
+          items={takaful.regionalAssets.map((item) => ({
+            id: String(item.id),
+            label: item.label,
+            value: item.value,
+            color: item.color,
+          }))}
+          formatter={(v) => formatUsdValue(v)}
+          defaultChartType="bar-h"
         >
-          <RadialDistributionChart
-            items={takaful.regionalAssets.map((item) => ({
-              id: String(item.id),
-              label: item.label,
-              value: item.value,
-              color: item.color,
-            }))}
-            formatter={(v) => formatUsdValue(v)}
-          />
           <div
             className="mt-3 rounded-lg border p-2 text-center text-xs"
             style={{
@@ -3817,7 +3545,7 @@ function TabTakaful() {
             🇮🇷 Iran alone accounts for {takaful.headline.iranGlobalShare} of all
             Takaful assets globally
           </div>
-        </SectionCard>
+        </RegionalMultiChart>
       </div>
 
       <SectionCard title="Top 10 Countries by Takaful Assets (US$bn, 2024)">
@@ -4061,20 +3789,19 @@ function TabOtherIFIs() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <RegionalMultiChart
           title="Regional Distribution (2024)"
           className="lg:col-span-2"
+          items={otherIFIs.regionalAssets.map((item) => ({
+            id: String(item.id),
+            label: item.label,
+            value: item.value,
+            color: item.color,
+          }))}
+          formatter={(v) => formatUsdValue(v)}
+          height={240}
+          defaultChartType="treemap"
         >
-          <GimTreemap
-            items={otherIFIs.regionalAssets.map((item) => ({
-              id: String(item.id),
-              label: item.label,
-              value: item.value,
-              color: item.color,
-            }))}
-            formatter={(v) => formatUsdValue(v)}
-            height={240}
-          />
           <div
             className="mt-3 rounded-lg border p-2 text-center text-xs"
             style={{
@@ -4088,7 +3815,7 @@ function TabOtherIFIs() {
             {otherIFIs.headline.southeastAsiaValue}bn (
             {otherIFIs.headline.southeastAsiaShare})
           </div>
-        </SectionCard>
+        </RegionalMultiChart>
       </div>
 
       <SectionCard title="Top 10 Countries by Other IFI Assets (US$bn, 2024)">
@@ -4491,25 +4218,24 @@ function TabSukuk() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <RegionalMultiChart
           title="Sukuk Outstanding by Region (US$bn, 2024)"
           className="lg:col-span-2"
+          items={sukuk.regionalOutstanding.map((item) => ({
+            id: String(item.id),
+            label: item.label,
+            value: item.value,
+            color: item.color,
+          }))}
+          formatter={(v) => formatUsdValue(v)}
+          defaultChartType="bubble"
         >
-          <AreaCircleDistributionChart
-            items={sukuk.regionalOutstanding.map((item) => ({
-              id: String(item.id),
-              label: item.label,
-              value: item.value,
-              color: item.color,
-            }))}
-            formatter={(v) => formatUsdValue(v)}
-          />
           <div className="mt-3 rounded-xl border border-cyan-200 bg-gray-100 p-3 text-center text-xs text-gray-600">
             ⚖️ GCC (US$477bn) vs Southeast Asia (US$452bn) — the two dominant
             sukuk regions are virtually neck-and-neck, together representing 90%
             of global outstanding sukuk
           </div>
-        </SectionCard>
+        </RegionalMultiChart>
       </div>
 
       <SectionCard title="Top 10 Countries by Sukuk Outstanding (US$bn, 2024)">
@@ -4969,20 +4695,19 @@ function TabIslamicFunds() {
           </div>
         </SectionCard>
 
-        <SectionCard
+        <RegionalMultiChart
           title="Islamic Funds AuM by Region (US$bn, 2024)"
           className="lg:col-span-2"
+          items={funds.regionalAuM.map((item) => ({
+            id: String(item.id),
+            label: item.label,
+            value: item.value,
+            color: item.color,
+          }))}
+          formatter={(v) => formatUsdValue(v)}
+          height={240}
+          defaultChartType="treemap"
         >
-          <GimTreemap
-            items={funds.regionalAuM.map((item) => ({
-              id: String(item.id),
-              label: item.label,
-              value: item.value,
-              color: item.color,
-            }))}
-            formatter={(v) => formatUsdValue(v)}
-            height={240}
-          />
           <div
             className="mt-3 rounded-lg border p-3 text-center text-xs"
             style={{
@@ -4994,7 +4719,7 @@ function TabIslamicFunds() {
             🌍 Europe (US$64bn) outranks Southeast Asia (US$40bn) in Islamic
             funds — driven by Luxembourg and UK domiciliation
           </div>
-        </SectionCard>
+        </RegionalMultiChart>
       </div>
 
       <SectionCard title="Top 10 Countries by Islamic Funds AuM (US$bn, 2024)">
