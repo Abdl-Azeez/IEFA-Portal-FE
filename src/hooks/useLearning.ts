@@ -33,6 +33,17 @@ function getLearningApiErrorMessage(
   error: unknown,
   fallbackMessage: string,
 ): string {
+  const axiosMessage = extractAxiosErrorMessage(error);
+  if (axiosMessage) return axiosMessage;
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
+
+function extractAxiosErrorMessage(error: unknown): string | null {
   if (axios.isAxiosError(error)) {
     const responseData = error.response?.data as
       | { message?: unknown }
@@ -55,16 +66,32 @@ function getLearningApiErrorMessage(
     }
   }
 
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-
-  return fallbackMessage;
+  return null;
 }
 
-function showLearningApiErrorToast(error: unknown, fallbackMessage: string) {
+function toSentenceCase(value: string): string {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getLearningSectionTitle(fallbackMessage: string): string {
+  const cleaned = fallbackMessage
+    .replace(/^Failed to\s+/i, "")
+    .replace(/^Sorry,\s*/i, "")
+    .replace(/\.$/, "")
+    .replace(/^(load|create|update|delete|enroll|unenroll)\s+/i, "")
+    .trim();
+
+  return cleaned ? toSentenceCase(cleaned) : "Learning";
+}
+
+function showLearningApiErrorToast(
+  error: unknown,
+  fallbackMessage: string,
+  sectionTitle?: string,
+) {
   toast({
-    title: "Learning API error",
+    title: sectionTitle ?? getLearningSectionTitle(fallbackMessage),
     description: getLearningApiErrorMessage(error, fallbackMessage),
     variant: "destructive",
   });
