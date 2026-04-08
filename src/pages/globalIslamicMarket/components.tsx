@@ -1203,8 +1203,7 @@ function GimPieChart({
                 const { cx, cy, midAngle, innerRadius, outerRadius, value } =
                   props;
                 const RADIAN = Math.PI / 180;
-                const radius =
-                  innerRadius + (outerRadius - innerRadius) * 1.38;
+                const radius = innerRadius + (outerRadius - innerRadius) * 1.38;
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
                 const pct = (value / total) * 100;
