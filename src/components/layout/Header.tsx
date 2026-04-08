@@ -528,22 +528,22 @@ export function Header() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="absolute right-0 top-full mt-3 w-[380px] overflow-hidden rounded-[28px] border border-[#F3D6CF] bg-[linear-gradient(180deg,_rgba(255,255,255,0.98)_0%,_rgba(255,247,244,0.98)_100%)] shadow-[0_24px_80px_rgba(17,24,39,0.18)] backdrop-blur-xl"
+              className="absolute right-0 top-full mt-3 w-[380px] overflow-hidden rounded-[28px] border border-[#D52B1E]/20 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98)_0%,_rgba(255,246,245,0.98)_100%)] shadow-[0_24px_80px_rgba(213,43,30,0.16)] backdrop-blur-xl"
             >
-              <div className="border-b border-[#F4E2DD] px-5 py-4">
+              <div className="border-b border-[#D52B1E]/15 px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#111827] text-white">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#D52B1E] text-white shadow-sm">
                         <BellRing className="h-4 w-4" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-[#111827]">Notifications</h3>
+                        <h3 className="text-sm font-semibold text-[#000000]">Notifications</h3>
                         <p className="text-xs text-[#7A8094]">Latest mentions, replies and alerts</p>
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#B84B35] shadow-sm">
+                  <div className="rounded-full bg-[#FFF0ED] border border-[#D52B1E]/20 px-2.5 py-1 text-xs font-semibold text-[#D52B1E] shadow-sm">
                     {notifications} unread
                   </div>
                 </div>
@@ -588,16 +588,16 @@ export function Header() {
                         className={[
                           "w-full rounded-[22px] border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
                           notification.isRead
-                            ? "border-white/80 bg-white/80"
-                            : "border-[#FFD8CF] bg-white shadow-[0_10px_24px_rgba(213,43,30,0.08)]",
+                            ? "border-[#F1E4E1] bg-white"
+                            : "border-[#D52B1E]/25 bg-[#FFF9F8] shadow-[0_10px_24px_rgba(213,43,30,0.10)]",
                         ].join(" ")}
                       >
                         <div className="flex gap-3">
                           <div className={[
                             "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl",
                             notification.isRead
-                              ? "bg-[#F3F4F6] text-[#6B7280]"
-                              : "bg-[#111827] text-white",
+                              ? "bg-[#FFF0ED] text-[#B8241B]"
+                              : "bg-[#D52B1E] text-white",
                           ].join(" ")}>
                             {notification.isRead ? (
                               <CheckCheck className="h-4 w-4" />
@@ -623,7 +623,7 @@ export function Header() {
                                 <Clock3 className="h-3.5 w-3.5" />
                                 {formatNotificationTime(notification.createdAt)}
                               </span>
-                              <span className="inline-flex items-center gap-1 font-medium text-[#B84B35]">
+                              <span className="inline-flex items-center gap-1 font-medium text-[#D52B1E]">
                                 Open <ExternalLink className="h-3.5 w-3.5" />
                               </span>
                             </div>
@@ -635,7 +635,7 @@ export function Header() {
                 )}
               </div>
 
-              <div className="border-t border-[#F4E2DD] bg-white/70 px-4 py-3">
+              <div className="border-t border-[#D52B1E]/15 bg-white/80 px-4 py-3">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -643,7 +643,7 @@ export function Header() {
                     setShowNotifications(false);
                     navigate("/notifications");
                   }}
-                  className="w-full rounded-full bg-[#111827] text-white hover:bg-[#1F2937] hover:text-white"
+                  className="w-full rounded-full bg-[#D52B1E] text-white hover:bg-[#B8241B] hover:text-white"
                 >
                   View all notifications
                 </Button>

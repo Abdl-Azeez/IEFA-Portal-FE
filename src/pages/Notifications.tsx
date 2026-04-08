@@ -66,26 +66,30 @@ function getNotificationTheme(type: string) {
   if (type.includes("tag") || type.includes("mention")) {
     return {
       icon: AtSign,
-      chip: "bg-rose-100 text-rose-700 border-rose-200",
-      iconWrap: "bg-rose-500/15 text-rose-600",
-      accent: "from-rose-500 to-orange-400",
+      chip: "bg-[#FFF0ED] text-[#B8241B] border-[#F3C6BC]",
+      iconWrap: "bg-[#D52B1E]/12 text-[#B8241B]",
+      accent: "from-[#D52B1E] to-[#F4A261]",
       label: "Mention",
     };
   }
-  if (type.includes("comment") || type.includes("reply") || type.includes("community")) {
+  if (
+    type.includes("comment") ||
+    type.includes("reply") ||
+    type.includes("community")
+  ) {
     return {
       icon: Tag,
-      chip: "bg-sky-100 text-sky-700 border-sky-200",
-      iconWrap: "bg-sky-500/15 text-sky-600",
-      accent: "from-sky-500 to-cyan-400",
+      chip: "bg-[#FFF6F5] text-[#D52B1E] border-[#F3C6BC]",
+      iconWrap: "bg-[#D52B1E]/12 text-[#D52B1E]",
+      accent: "from-[#D52B1E] to-[#6F1610]",
       label: "Conversation",
     };
   }
   return {
     icon: BellRing,
-    chip: "bg-amber-100 text-amber-700 border-amber-200",
-    iconWrap: "bg-amber-500/15 text-amber-600",
-    accent: "from-amber-500 to-yellow-400",
+    chip: "bg-[#FFF6F5] text-[#B84B35] border-[#F3C6BC]",
+    iconWrap: "bg-[#D52B1E]/10 text-[#B84B35]",
+    accent: "from-[#B84B35] to-[#F4A261]",
     label: "Update",
   };
 }
@@ -108,10 +112,10 @@ function NotificationCard({
     <motion.article
       variants={item}
       className={[
-        "group relative overflow-hidden rounded-[28px] border p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-all duration-300",
+        "group relative overflow-hidden rounded-[28px] border p-5 shadow-[0_18px_60px_rgba(213,43,30,0.10)] backdrop-blur-sm transition-all duration-300",
         notification.isRead
-          ? "border-white/70 bg-white/80"
-          : "border-[#FFD8CF] bg-white",
+          ? "border-[#F1E4E1] bg-white"
+          : "border-[#F3C6BC] bg-[#FFF9F8]",
       ].join(" ")}
     >
       {!notification.isRead && (
@@ -129,11 +133,16 @@ function NotificationCard({
           </div>
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={["inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]", theme.chip].join(" ")}>
+              <span
+                className={[
+                  "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
+                  theme.chip,
+                ].join(" ")}
+              >
                 {theme.label}
               </span>
               {!notification.isRead && (
-                <span className="inline-flex items-center rounded-full bg-[#111827] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                <span className="inline-flex items-center rounded-full bg-[#D52B1E] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
                   Unread
                 </span>
               )}
@@ -153,7 +162,9 @@ function NotificationCard({
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-[#8A8FA3]">
               <span>{formatDate(notification.createdAt)}</span>
-              {notification.readAt && <span>Read {formatDate(notification.readAt)}</span>}
+              {notification.readAt && (
+                <span>Read {formatDate(notification.readAt)}</span>
+              )}
             </div>
           </div>
         </div>
@@ -173,7 +184,7 @@ function NotificationCard({
             <Button
               size="sm"
               onClick={() => onOpen(notification)}
-              className="rounded-full bg-[#111827] px-4 text-white hover:bg-[#1F2937]"
+              className="rounded-full bg-[#D52B1E] px-4 text-white hover:bg-[#B8241B]"
             >
               Open
               <ExternalLink className="h-4 w-4" />
@@ -181,14 +192,19 @@ function NotificationCard({
           )}
         </div>
       </div>
-      <div className={["pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-gradient-to-br opacity-10 blur-2xl", theme.accent].join(" ")} />
+      <div
+        className={[
+          "pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-gradient-to-br opacity-10 blur-2xl",
+          theme.accent,
+        ].join(" ")}
+      />
     </motion.article>
   );
 }
 
 function NotificationCardSkeleton() {
   return (
-    <div className="rounded-[28px] border border-white/70 bg-white/80 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] animate-pulse">
+    <div className="rounded-[28px] border border-[#F1E4E1] bg-white p-5 shadow-[0_18px_60px_rgba(213,43,30,0.08)] animate-pulse">
       <div className="flex gap-4">
         <div className="h-12 w-12 rounded-2xl bg-gray-200" />
         <div className="flex-1 space-y-3">
@@ -232,12 +248,16 @@ export default function Notifications() {
   const meta = data?.meta;
 
   const visibleNotifications = useMemo(() => {
-    if (viewFilter === "unread") return notifications.filter((item) => !item.isRead);
-    if (viewFilter === "read") return notifications.filter((item) => item.isRead);
+    if (viewFilter === "unread")
+      return notifications.filter((item) => !item.isRead);
+    if (viewFilter === "read")
+      return notifications.filter((item) => item.isRead);
     return notifications;
   }, [notifications, viewFilter]);
 
-  const readCountOnPage = notifications.length - notifications.filter((entry) => !entry.isRead).length;
+  const readCountOnPage =
+    notifications.length -
+    notifications.filter((entry) => !entry.isRead).length;
 
   function openNotification(notification: NotificationItem) {
     if (!notification.isRead) {
@@ -265,7 +285,7 @@ export default function Notifications() {
       >
         <div className="absolute -left-10 top-0 h-40 w-40 rounded-full bg-[#FFD2C7] blur-3xl" />
         <div className="absolute right-0 top-4 h-48 w-48 rounded-full bg-[#FFE7A8] blur-3xl" />
-        <div className="absolute bottom-0 right-16 h-28 w-28 rounded-full bg-[#F8C7FF] blur-3xl opacity-50" />
+        <div className="absolute bottom-0 right-16 h-28 w-28 rounded-full bg-[#FFD8CF] blur-3xl opacity-60" />
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl space-y-4">
@@ -277,29 +297,44 @@ export default function Notifications() {
                 Notifications that actually keep pace with your work
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[#5C6178] md:text-base">
-                Track mentions, replies, and account activity in one focused stream. New updates surface first, and anything actionable can take you straight back into the conversation.
+                Track mentions, replies, and account activity in one focused
+                stream. New updates surface first, and anything actionable can
+                take you straight back into the conversation.
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-3xl bg-[#111827] px-4 py-4 text-white shadow-lg">
-              <p className="text-xs uppercase tracking-[0.18em] text-white/60">Unread</p>
+            <div className="rounded-3xl bg-gradient-to-br from-[#D52B1E] to-[#B8241B] px-4 py-4 text-white shadow-lg shadow-[#D52B1E]/30">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/70">
+                Unread
+              </p>
               <p className="mt-2 text-3xl font-bold">{unreadCount}</p>
             </div>
             <div className="rounded-3xl bg-white/90 px-4 py-4 shadow-lg shadow-[#D52B1E]/10">
-              <p className="text-xs uppercase tracking-[0.18em] text-[#8A8FA3]">This page</p>
-              <p className="mt-2 text-3xl font-bold text-[#111827]">{notifications.length}</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#8A8FA3]">
+                This page
+              </p>
+              <p className="mt-2 text-3xl font-bold text-[#111827]">
+                {notifications.length}
+              </p>
             </div>
             <div className="rounded-3xl bg-white/90 px-4 py-4 shadow-lg shadow-[#D52B1E]/10 sm:col-span-1 col-span-2">
-              <p className="text-xs uppercase tracking-[0.18em] text-[#8A8FA3]">Read now</p>
-              <p className="mt-2 text-3xl font-bold text-[#111827]">{readCountOnPage}</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#8A8FA3]">
+                Read now
+              </p>
+              <p className="mt-2 text-3xl font-bold text-[#111827]">
+                {readCountOnPage}
+              </p>
             </div>
           </div>
         </div>
       </motion.section>
 
-      <motion.section variants={item} className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+      <motion.section
+        variants={item}
+        className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]"
+      >
         <div className="rounded-[28px] border border-white/70 bg-white/80 p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="relative flex-1">
@@ -315,7 +350,8 @@ export default function Notifications() {
               <div className="inline-flex items-center rounded-full border border-[#F0D7D0] bg-[#FFFDFC] p-1">
                 {["all", "unread", "read"].map((filter) => {
                   const active = viewFilter === filter;
-                  const label = filter.charAt(0).toUpperCase() + filter.slice(1);
+                  const label =
+                    filter.charAt(0).toUpperCase() + filter.slice(1);
                   return (
                     <button
                       key={filter}
@@ -323,7 +359,9 @@ export default function Notifications() {
                       onClick={() => setViewFilter(filter as ViewFilter)}
                       className={[
                         "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                        active ? "bg-[#111827] text-white" : "text-[#6B7280] hover:text-[#111827]",
+                        active
+                          ? "bg-[#D52B1E] text-white"
+                          : "text-[#6B7280] hover:text-[#D52B1E]",
                       ].join(" ")}
                     >
                       {label}
@@ -347,7 +385,9 @@ export default function Notifications() {
                       }}
                       className={[
                         "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                        active ? "bg-[#D52B1E] text-white" : "text-[#6B7280] hover:text-[#111827]",
+                        active
+                          ? "bg-[#D52B1E] text-white"
+                          : "text-[#6B7280] hover:text-[#111827]",
                       ].join(" ")}
                     >
                       {option.label}
@@ -359,22 +399,27 @@ export default function Notifications() {
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/70 bg-[#111827] p-4 text-white shadow-[0_18px_60px_rgba(15,23,42,0.14)]">
+        <div className="rounded-[28px] border border-[#F3C6BC] bg-gradient-to-br from-[#D52B1E] to-[#B8241B] p-4 text-white shadow-[0_18px_60px_rgba(213,43,30,0.24)]">
           <div className="flex h-full flex-col justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-white/75">
+              <div className="flex items-center gap-2 text-white/80">
                 <Filter className="h-4 w-4" />
-                <span className="text-xs uppercase tracking-[0.2em]">Quick actions</span>
+                <span className="text-xs uppercase tracking-[0.2em]">
+                  Quick actions
+                </span>
               </div>
-              <p className="mt-3 text-xl font-semibold">Clear the backlog without losing context.</p>
-              <p className="mt-2 text-sm leading-6 text-white/70">
-                Mark every item as read once you have caught up, or drill into specific notifications when you need full context.
+              <p className="mt-3 text-xl font-semibold">
+                Clear the backlog without losing context.
+              </p>
+              <p className="mt-2 text-sm leading-6 text-white/80">
+                Mark every item as read once you have caught up, or drill into
+                specific notifications when you need full context.
               </p>
             </div>
             <Button
               onClick={() => markAllAsRead.mutate()}
               disabled={markAllAsRead.isPending || unreadCount === 0}
-              className="h-11 rounded-full bg-white text-[#111827] hover:bg-white/90"
+              className="h-11 rounded-full bg-white text-[#B8241B] hover:bg-[#FFF5F2]"
             >
               <CheckCheck className="h-4 w-4" /> Mark all as read
             </Button>
@@ -385,9 +430,13 @@ export default function Notifications() {
       <motion.section variants={item} className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-[#111827]">Your activity feed</h2>
+            <h2 className="text-xl font-semibold text-[#111827]">
+              Your activity feed
+            </h2>
             <p className="text-sm text-[#737692]">
-              {isFetching && !isLoading ? "Refreshing notifications..." : "Mentions, replies, and updates appear here as they happen."}
+              {isFetching && !isLoading
+                ? "Refreshing notifications..."
+                : "Mentions, replies, and updates appear here as they happen."}
             </p>
           </div>
           {meta && (
@@ -400,7 +449,9 @@ export default function Notifications() {
         {isLoading ? (
           <div className="space-y-4">
             {Array.from({ length: 4 }, (_, index) => (
-              <NotificationCardSkeleton key={`notification-skeleton-${index}`} />
+              <NotificationCardSkeleton
+                key={`notification-skeleton-${index}`}
+              />
             ))}
           </div>
         ) : visibleNotifications.length === 0 ? (
@@ -408,9 +459,12 @@ export default function Notifications() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#FFF2EE] text-[#D52B1E]">
               <Bell className="h-7 w-7" />
             </div>
-            <h3 className="mt-5 text-xl font-semibold text-[#111827]">Nothing to show right now</h3>
+            <h3 className="mt-5 text-xl font-semibold text-[#111827]">
+              Nothing to show right now
+            </h3>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6B7280]">
-              When someone tags you, replies to you, or the platform needs your attention, the updates will land here.
+              When someone tags you, replies to you, or the platform needs your
+              attention, the updates will land here.
             </p>
           </div>
         ) : (
@@ -429,7 +483,10 @@ export default function Notifications() {
       </motion.section>
 
       {meta && meta.pageCount > 1 && (
-        <motion.section variants={item} className="flex items-center justify-between rounded-[24px] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <motion.section
+          variants={item}
+          className="flex items-center justify-between rounded-[24px] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_18px_60px_rgba(15,23,42,0.08)]"
+        >
           <p className="text-sm text-[#6B7280]">
             Showing page {meta.page} with {meta.perPage} notifications per page.
           </p>
