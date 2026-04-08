@@ -44,11 +44,7 @@ export function Sidebar({ isCollapsed, onToggle }: Readonly<SidebarProps>) {
   const isToolsActive = location.pathname.startsWith('/tools')
   const [toolsOpen, setToolsOpen] = useState(isToolsActive)
 
-  const visibleMenuNavigation = isAuthenticated
-    ? menuNavigation
-    : menuNavigation.filter((item) =>
-        ['Dashboard', 'News', 'Market Insights', 'Community'].includes(item.name),
-      )
+  const visibleMenuNavigation = menuNavigation;
 
   return (
     <motion.aside 
@@ -167,9 +163,8 @@ export function Sidebar({ isCollapsed, onToggle }: Readonly<SidebarProps>) {
           </nav>
 
           {/* Tools sub-menu */}
-          {isAuthenticated && (
-            <div className="mt-1">
-              <button
+          <div className="mt-1">
+            <button
                 onClick={() => setToolsOpen((o) => !o)}
                 title={isCollapsed ? 'Tools' : undefined}
                 className={`group flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200 w-full relative overflow-hidden hover:bg-[#FFEFEF] ${
@@ -263,14 +258,12 @@ export function Sidebar({ isCollapsed, onToggle }: Readonly<SidebarProps>) {
                 </div>
               )}
             </div>
-          )}
         </div>
 
         {/* Spacer to push Help section to bottom */}
         {/* <div className="flex-1" /> */}
 
         {/* Help Section - Positioned towards the bottom */}
-        {isAuthenticated && (
           <div className="px-4 pb-8 mt-24">
             {!isCollapsed && (
               <motion.p 
@@ -341,7 +334,6 @@ export function Sidebar({ isCollapsed, onToggle }: Readonly<SidebarProps>) {
               ))}
             </nav>
           </div>
-        )}
       </div>
     </motion.aside>
   )

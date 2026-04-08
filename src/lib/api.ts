@@ -73,6 +73,8 @@ api.interceptors.response.use(
         useAuthStore.getState().logout();
         isRefreshing = false;
         processQueue(error, null);
+        // Make it identifiable so error handlers can suppress 401 toasts for guests
+        (error as any).isGuestOverlayError = true;
         throw error;
       }
 

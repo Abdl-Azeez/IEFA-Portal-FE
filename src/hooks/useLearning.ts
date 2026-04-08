@@ -90,6 +90,11 @@ function showLearningApiErrorToast(
   fallbackMessage: string,
   sectionTitle?: string,
 ) {
+  // Suppress toasts for background API calls from guest overlays
+  if (error && typeof error === "object" && "isGuestOverlayError" in error) {
+    return;
+  }
+  
   toast({
     title: sectionTitle ?? getLearningSectionTitle(fallbackMessage),
     description: getLearningApiErrorMessage(error, fallbackMessage),
