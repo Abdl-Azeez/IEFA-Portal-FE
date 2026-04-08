@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,8 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
   const loginMutation = useLogin();
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -29,7 +31,11 @@ const Login = () => {
       const result = await loginMutation.mutateAsync({ email, password });
       // Role comes directly from the API response
       const role = result?.user?.role;
-      navigate(role === "admin" || role === "staff" ? "/admin" : "/");
+      if (role === "admin" || role === "staff") {
+        navigate("/admin");
+      } else {
+        navigate(from ?? "/");
+      }
     } catch {
       // Error handled by toast in hook
     }
