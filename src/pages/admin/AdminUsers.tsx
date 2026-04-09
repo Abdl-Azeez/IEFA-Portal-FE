@@ -105,26 +105,6 @@ export default function AdminUsers() {
     setShowCreatePassword(false);
   }
 
-  // Create modal
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    firstName: "",
-    lastName: "",
-    username: "",
-    email: "",
-    phone: "",
-    country: "",
-    password: "",
-    role: "student" as AdminUser["role"],
-  });
-  const [showCreatePassword, setShowCreatePassword] = useState(false);
-
-  function closeCreateModal() {
-    setCreateModalOpen(false);
-    setCreateForm({ firstName: "", lastName: "", username: "", email: "", phone: "", country: "", password: "", role: "student" });
-    setShowCreatePassword(false);
-  }
-
   // Edit modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
@@ -173,7 +153,6 @@ export default function AdminUsers() {
     page,
     perPage: 15,
   });
-  const createMutation = useAdminCreateUser();
   const createMutation = useAdminCreateUser();
   const verifyMutation = useAdminVerifyUser();
   const deactivateMutation = useAdminDeactivateUser();
