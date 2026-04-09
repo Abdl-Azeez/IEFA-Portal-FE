@@ -12,11 +12,16 @@ interface LoginData {
 interface RegisterData {
   email: string;
   password: string;
-  firstName?: string;
-  lastName?: string;
-  role?: "student" | "instructor" | "admin" | "staff";
-  phone?: string;
-  country?: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  role: "student";
+  phone: string;
+  country: string;
+}
+
+interface CheckUsernameResult {
+  available: boolean;
 }
 
 interface UpdateUserData {
@@ -156,6 +161,27 @@ export const useLogin = () => {
         description: error.response?.data?.message || "Login failed",
         variant: "destructive",
       });
+    },
+  });
+};
+
+export const useCheckUsername = () => {
+  return useMutation({
+    mutationFn: async (username: string): Promise<CheckUsernameResult> => {
+      try {
+        const response = await api.get("/auth/check-username", {
+          params: { username },
+        });
+        // API may return { available: true } or simply 200 OK
+        const data = response.data as { available?: boolean };
+        return { available: data.available !== false };
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 409) {
+          return { available: false };
+        }
+        // Unexpected error – let the caller treat as unavailable
+        throw err;
+      }
     },
   });
 };

@@ -61,6 +61,37 @@ export interface UsersListParams extends ListParams {
   name?: string;
 }
 
+export interface AdminCreateUserDto {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  phone: string;
+  country: string;
+  role: AdminUser["role"];
+}
+
+export const useAdminCreateUser = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: AdminCreateUserDto) => {
+      const { data } = await api.post<AdminUser>("/auth/register", dto);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast({ title: "User created successfully" });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Error",
+        description: e.response?.data?.message ?? "Failed to create user",
+        variant: "destructive",
+      }),
+  });
+};
+
 export const useAdminUsers = (params: UsersListParams = {}) =>
   useQuery({
     queryKey: ["admin", "users", params],

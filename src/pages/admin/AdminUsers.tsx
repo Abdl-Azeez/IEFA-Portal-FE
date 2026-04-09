@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +34,7 @@ import {
   useAdminUpdateUser,
   useAdminUpdateUserRole,
   useAdminToggleModerator,
+  useAdminCreateUser,
   type AdminUser,
 } from "@/hooks/useAdmin";
 
@@ -82,6 +85,46 @@ export default function AdminUsers() {
   const [page, setPage] = useState(1);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
+  // Create modal
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    firstName: "",
+    lastName: "",
+    username: "",
+    email: "",
+    phone: "",
+    country: "",
+    password: "",
+    role: "student" as AdminUser["role"],
+  });
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+
+  function closeCreateModal() {
+    setCreateModalOpen(false);
+    setCreateForm({ firstName: "", lastName: "", username: "", email: "", phone: "", country: "", password: "", role: "student" });
+    setShowCreatePassword(false);
+  }
+
+  // Create modal
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    firstName: "",
+    lastName: "",
+    username: "",
+    email: "",
+    phone: "",
+    country: "",
+    password: "",
+    role: "student" as AdminUser["role"],
+  });
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+
+  function closeCreateModal() {
+    setCreateModalOpen(false);
+    setCreateForm({ firstName: "", lastName: "", username: "", email: "", phone: "", country: "", password: "", role: "student" });
+    setShowCreatePassword(false);
+  }
+
   // Edit modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
@@ -130,6 +173,8 @@ export default function AdminUsers() {
     page,
     perPage: 15,
   });
+  const createMutation = useAdminCreateUser();
+  const createMutation = useAdminCreateUser();
   const verifyMutation = useAdminVerifyUser();
   const deactivateMutation = useAdminDeactivateUser();
   const activateMutation = useAdminActivateUser();
@@ -202,8 +247,9 @@ export default function AdminUsers() {
           <Button
             size="sm"
             className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg gap-1.5"
+            onClick={() => setCreateModalOpen(true)}
           >
-            <Mail className="h-3.5 w-3.5" /> Invite User
+            <Mail className="h-3.5 w-3.5" /> Create User
           </Button>
         </div>
       </motion.div>
@@ -519,6 +565,272 @@ export default function AdminUsers() {
           </div>
         )}
       </motion.div>
+
+      {/* Create User Modal */}
+      <Dialog open={createModalOpen} onClose={closeCreateModal} title="Create New User">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="create-fname" className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
+              <input
+                id="create-fname"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Jane"
+                value={createForm.firstName}
+                onChange={(e) => setCreateForm((f) => ({ ...f, firstName: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="create-lname" className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
+              <input
+                id="create-lname"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Doe"
+                value={createForm.lastName}
+                onChange={(e) => setCreateForm((f) => ({ ...f, lastName: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="create-username" className="block text-xs font-medium text-slate-600 mb-1">Username</label>
+              <input
+                id="create-username"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="janedoe123"
+                value={createForm.username}
+                onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="create-role" className="block text-xs font-medium text-slate-600 mb-1">Role</label>
+              <Select
+                id="create-role"
+                value={createForm.role}
+                onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as AdminUser["role"] }))}
+              >
+                <option value="student">Student</option>
+                <option value="instructor">Educator</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="create-email" className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+            <input
+              id="create-email"
+              type="email"
+              className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+              placeholder="jane@example.com"
+              value={createForm.email}
+              onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="create-phone" className="block text-xs font-medium text-slate-600 mb-1">Phone</label>
+              <input
+                id="create-phone"
+                type="tel"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="+2348012345678"
+                value={createForm.phone}
+                onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="create-country" className="block text-xs font-medium text-slate-600 mb-1">Country</label>
+              <input
+                id="create-country"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Nigeria"
+                value={createForm.country}
+                onChange={(e) => setCreateForm((f) => ({ ...f, country: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="create-password" className="block text-xs font-medium text-slate-600 mb-1">Password</label>
+            <div className="relative">
+              <input
+                id="create-password"
+                type={showCreatePassword ? "text" : "password"}
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 pr-9 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Minimum 8 characters"
+                value={createForm.password}
+                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCreatePassword((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
+              >
+                {showCreatePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={closeCreateModal}>Cancel</Button>
+            <Button
+              size="sm"
+              className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
+              disabled={createMutation.isPending}
+              onClick={() => {
+                createMutation.mutate(
+                  {
+                    firstName: createForm.firstName.trim(),
+                    lastName: createForm.lastName.trim(),
+                    username: createForm.username.trim(),
+                    email: createForm.email.trim(),
+                    phone: createForm.phone.trim(),
+                    country: createForm.country.trim(),
+                    password: createForm.password,
+                    role: createForm.role,
+                  },
+                  { onSuccess: closeCreateModal },
+                );
+              }}
+            >
+              {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Create User"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Create User Modal */}
+      <Dialog open={createModalOpen} onClose={closeCreateModal} title="Create New User">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="create-fname" className="block text-xs font-medium text-slate-600 mb-1">First Name</label>
+              <input
+                id="create-fname"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Jane"
+                value={createForm.firstName}
+                onChange={(e) => setCreateForm((f) => ({ ...f, firstName: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="create-lname" className="block text-xs font-medium text-slate-600 mb-1">Last Name</label>
+              <input
+                id="create-lname"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Doe"
+                value={createForm.lastName}
+                onChange={(e) => setCreateForm((f) => ({ ...f, lastName: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="create-username" className="block text-xs font-medium text-slate-600 mb-1">Username</label>
+              <input
+                id="create-username"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="janedoe123"
+                value={createForm.username}
+                onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="create-role" className="block text-xs font-medium text-slate-600 mb-1">Role</label>
+              <Select
+                id="create-role"
+                value={createForm.role}
+                onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as AdminUser["role"] }))}
+              >
+                <option value="student">Student</option>
+                <option value="instructor">Educator</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="create-email" className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+            <input
+              id="create-email"
+              type="email"
+              className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+              placeholder="jane@example.com"
+              value={createForm.email}
+              onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="create-phone" className="block text-xs font-medium text-slate-600 mb-1">Phone</label>
+              <input
+                id="create-phone"
+                type="tel"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="+2348012345678"
+                value={createForm.phone}
+                onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="create-country" className="block text-xs font-medium text-slate-600 mb-1">Country</label>
+              <input
+                id="create-country"
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Nigeria"
+                value={createForm.country}
+                onChange={(e) => setCreateForm((f) => ({ ...f, country: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="create-password" className="block text-xs font-medium text-slate-600 mb-1">Password</label>
+            <div className="relative">
+              <input
+                id="create-password"
+                type={showCreatePassword ? "text" : "password"}
+                className="w-full h-9 text-sm border border-gray-200 rounded-lg px-3 pr-9 focus:outline-none focus:ring-2 focus:ring-[#D52B1E]/30 focus:border-[#D52B1E]"
+                placeholder="Minimum 8 characters"
+                value={createForm.password}
+                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCreatePassword((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
+              >
+                {showCreatePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={closeCreateModal}>Cancel</Button>
+            <Button
+              size="sm"
+              className="bg-[#D52B1E] hover:bg-[#B8241B] rounded-lg"
+              disabled={createMutation.isPending}
+              onClick={() => {
+                createMutation.mutate(
+                  {
+                    firstName: createForm.firstName.trim(),
+                    lastName: createForm.lastName.trim(),
+                    username: createForm.username.trim(),
+                    email: createForm.email.trim(),
+                    phone: createForm.phone.trim(),
+                    country: createForm.country.trim(),
+                    password: createForm.password,
+                    role: createForm.role,
+                  },
+                  { onSuccess: closeCreateModal },
+                );
+              }}
+            >
+              {createMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Create User"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* Edit User Modal */}
       <Dialog open={editModalOpen} onClose={closeEditModal} title="Edit User">
