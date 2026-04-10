@@ -486,22 +486,17 @@ function PayloadAtlas({ course }: Readonly<{ course: StudentCourseDto | null }>)
   const courseFieldCards = useMemo(() => buildCourseFieldCards(course), [course]);
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2">
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
         <Sparkles className="h-4 w-4 text-[#D52B1E]" />
         <h3 className="font-semibold text-gray-900">Course Details</h3>
       </div>
-      <p className="mt-1 text-sm text-gray-500">
-        Key information about this course at a glance.
-      </p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="divide-y divide-gray-50">
         {courseFieldCards.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3">
-            <div className="flex items-center gap-2 text-gray-900">
-              <Icon className="h-4 w-4 text-[#D52B1E]" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-            </div>
-            <p className="mt-2 break-words text-sm text-gray-700">{value}</p>
+          <div key={label} className="flex items-center gap-3 px-4 py-2.5">
+            <Icon className="h-4 w-4 shrink-0 text-[#D52B1E]" />
+            <span className="w-28 shrink-0 text-xs font-medium text-gray-500">{label}</span>
+            <span className="truncate text-sm text-gray-900">{value}</span>
           </div>
         ))}
       </div>
@@ -729,98 +724,87 @@ function LessonPanel({
         )}
 
         {lesson && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-            <div className="space-y-4">
-              {embedUrl ? (
-                <div className="overflow-hidden rounded-2xl border border-gray-100 bg-black shadow-sm">
-                  <div className="aspect-video">
-                    <iframe
-                      className="h-full w-full"
-                      src={embedUrl}
-                      title={lesson.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
-                  No video is available for this lesson.
-                </div>
-              )}
-
-              <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
-                <div className="mb-2 flex items-center gap-2 text-gray-900">
-                  <Sparkles className="h-4 w-4 text-[#D52B1E]" />
-                  <h4 className="font-semibold">Lesson Summary</h4>
-                </div>
-                <p className="text-sm leading-6 text-gray-700">
-                  {content.summary || "No description is available for this lesson."}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-gray-100 p-4">
-                <h4 className="font-semibold text-gray-900">Content Highlights</h4>
-                <div className="mt-3 space-y-3">
-                  {content.paragraphs.length > 0 ? (
-                    content.paragraphs.slice(0, 8).map((paragraph) => (
-                      <div
-                        key={paragraph}
-                        className="flex items-start gap-3 rounded-xl bg-gray-50 px-3 py-2.5"
-                      >
-                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#D52B1E]" />
-                        <p className="text-sm leading-6 text-gray-700">{paragraph}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-400">No additional content is available for this lesson.</p>
-                  )}
+          <div className="space-y-4">
+            {embedUrl ? (
+              <div className="overflow-hidden rounded-2xl border border-gray-100 bg-black shadow-md">
+                <div className="aspect-video">
+                  <iframe
+                    className="h-full w-full"
+                    src={embedUrl}
+                    title={lesson.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
                 </div>
               </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-gray-100 bg-white p-4">
-                <h4 className="font-semibold text-gray-900">Quick Actions</h4>
-                <div className="mt-3 space-y-2">
-                  {lesson.videoUrl && (
-                    <Button asChild className="w-full justify-between bg-[#D52B1E] hover:bg-[#B8241B]">
-                      <a href={lesson.videoUrl} target="_blank" rel="noreferrer">
-                        Open lesson video <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </Button>
-                  )}
-                  {content.quizUrl && (
-                    <Button asChild variant="outline" className="w-full justify-between">
-                      <a href={content.quizUrl} target="_blank" rel="noreferrer">
-                        Open quiz <ChevronRight className="h-4 w-4" />
-                      </a>
-                    </Button>
-                  )}
-                  {!lesson.videoUrl && !content.quizUrl && (
-                    <p className="text-sm text-gray-400">No video or quiz is available for this lesson.</p>
-                  )}
-                </div>
+            ) : (
+              <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
+                No video is available for this lesson.
               </div>
+            )}
 
-              <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-[#D52B1E]/5 to-white p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <BookOpen className="h-4 w-4 text-[#D52B1E]" />
-                  <h4 className="font-semibold text-gray-900">Lesson Info</h4>
-                </div>
-                <div className="space-y-2 text-sm text-gray-600">
-                  {lesson?.course?.title && (
-                    <p><span className="font-semibold text-gray-900">Course:</span> {lesson.course.title}</p>
-                  )}
-                  <p><span className="font-semibold text-gray-900">Duration:</span> {formatLessonDuration(lesson?.durationSeconds)}</p>
-                  <p><span className="font-semibold text-gray-900">Access:</span> {lesson?.isFree ? "Free preview" : "Available after enrollment"}</p>
-                  {lesson?.quizId && (
-                    <p><span className="font-semibold text-gray-900">Assessment:</span> Quiz included</p>
-                  )}
-                </div>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-2.5">
+              <div className="flex items-center gap-4 text-sm text-gray-600 mr-auto">
+                <span className="flex items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5 text-[#D52B1E]" />
+                  {formatLessonDuration(lesson.durationSeconds)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-[#D52B1E]" />
+                  {lesson.isFree ? "Free preview" : "Enrolled access"}
+                </span>
+                {lesson.quizId && (
+                  <span className="flex items-center gap-1.5">
+                    <NotepadText className="h-3.5 w-3.5 text-[#D52B1E]" />
+                    Quiz included
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {lesson.videoUrl && (
+                  <Button asChild size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B]">
+                    <a href={lesson.videoUrl} target="_blank" rel="noreferrer">
+                      Open video <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                )}
+                {content.quizUrl && (
+                  <Button asChild size="sm" variant="outline">
+                    <a href={content.quizUrl} target="_blank" rel="noreferrer">
+                      Take quiz <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                )}
               </div>
             </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50/80 to-white p-5">
+              <div className="mb-3 flex items-center gap-2 text-gray-900">
+                <Sparkles className="h-4 w-4 text-[#D52B1E]" />
+                <h4 className="font-semibold">Lesson Summary</h4>
+              </div>
+              <p className="text-sm leading-7 text-gray-700">
+                {content.summary || "No description is available for this lesson."}
+              </p>
+            </div>
+
+            {content.paragraphs.length > 1 && (
+              <div className="rounded-2xl border border-gray-100 p-5">
+                <h4 className="font-semibold text-gray-900 mb-4">Content Highlights</h4>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  {content.paragraphs.slice(0, 8).map((paragraph) => (
+                    <div
+                      key={paragraph}
+                      className="flex items-start gap-3 rounded-xl bg-gray-50 px-3.5 py-3"
+                    >
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#D52B1E]" />
+                      <p className="text-sm leading-6 text-gray-700">{paragraph}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -908,7 +892,7 @@ export function CourseExplorerDialog({
       <div className="space-y-5">
         <CourseHero course={course} sectionCount={sections.length} lessonCount={lessons.length} />
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
           <CourseStoryPanel
             course={course}
             previewEmbedUrl={previewEmbedUrl}
@@ -917,23 +901,25 @@ export function CourseExplorerDialog({
           <PayloadAtlas course={course} />
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[280px_320px_minmax(0,1fr)]">
-          <OutlineColumn
-            sections={sections}
-            sectionsLoading={sectionsLoading}
-            selectedSectionId={selectedSectionId}
-            onSelectSection={(sectionId) => {
-              setSelectedSectionId(sectionId);
-              setSelectedLessonId(null);
-            }}
-          />
-          <LessonsColumn
-            selectedSectionId={selectedSectionId}
-            lessons={lessons}
-            lessonsLoading={lessonsLoading}
-            selectedLessonId={selectedLessonId}
-            onSelectLesson={setSelectedLessonId}
-          />
+        <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="space-y-4 xl:max-h-[700px] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
+            <OutlineColumn
+              sections={sections}
+              sectionsLoading={sectionsLoading}
+              selectedSectionId={selectedSectionId}
+              onSelectSection={(sectionId) => {
+                setSelectedSectionId(sectionId);
+                setSelectedLessonId(null);
+              }}
+            />
+            <LessonsColumn
+              selectedSectionId={selectedSectionId}
+              lessons={lessons}
+              lessonsLoading={lessonsLoading}
+              selectedLessonId={selectedLessonId}
+              onSelectLesson={setSelectedLessonId}
+            />
+          </div>
           <LessonPanel
             lesson={lesson}
             selectedLessonId={selectedLessonId}
