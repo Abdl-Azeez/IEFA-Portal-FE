@@ -353,7 +353,11 @@ function CourseStoryPanel({
         <div className="space-y-3">
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
             {artworkSrc ? (
-              <img src={artworkSrc} alt={artworkAlt} className="h-44 w-full object-cover" />
+              <img
+                src={artworkSrc}
+                alt={artworkAlt}
+                className="h-44 w-full object-cover"
+              />
             ) : (
               <div className="flex h-44 items-center justify-center text-sm text-gray-400">
                 No course image available
@@ -362,8 +366,23 @@ function CourseStoryPanel({
           </div>
 
           {courseDescriptionData.imageCaption && (
-            <p className="text-xs text-gray-500">Image caption: {courseDescriptionData.imageCaption}</p>
+            <p className="text-xs text-gray-500">
+              Image caption: {courseDescriptionData.imageCaption}
+            </p>
           )}
+
+          <div className="grid gap-3">
+            <InfoListCard
+              title="Instructors"
+              items={instructors}
+              itemClassName="bg-gray-50 text-gray-700"
+            />
+            <InfoListCard
+              title="Access Plans"
+              items={accessPlans}
+              itemClassName="bg-orange-50 text-orange-700"
+            />
+          </div>
 
           {previewEmbedUrl ? (
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-black shadow-sm">
@@ -385,13 +404,10 @@ function CourseStoryPanel({
           <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
             <h4 className="font-semibold text-gray-900">Course Summary</h4>
             <p className="mt-2 text-sm leading-6 text-gray-700">
-              {courseDescriptionData.summary || stripHtml(course?.description || "") || "No course description available."}
+              {courseDescriptionData.summary ||
+                stripHtml(course?.description || "") ||
+                "No course description available."}
             </p>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <InfoListCard title="Instructors" items={instructors} itemClassName="bg-gray-50 text-gray-700" />
-            <InfoListCard title="Access Plans" items={accessPlans} itemClassName="bg-orange-50 text-orange-700" />
           </div>
 
           <div className="rounded-2xl border border-gray-100 p-4">
@@ -416,16 +432,6 @@ function CourseStoryPanel({
               </p>
             )}
           </div>
-
-          {courseDescriptionData.renderedHtml && (
-            <div className="rounded-2xl border border-gray-100 p-4">
-              <h4 className="font-semibold text-gray-900">Full Description</h4>
-              <div
-                className="prose prose-sm mt-3 max-w-none overflow-hidden text-gray-700 prose-img:rounded-xl prose-figure:my-4 prose-a:text-[#D52B1E]"
-                dangerouslySetInnerHTML={{ __html: courseDescriptionData.renderedHtml }}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -442,7 +448,10 @@ function InfoListCard({
       <h4 className="font-semibold text-gray-900">{title}</h4>
       <div className="mt-2 space-y-2">
         {items.map((item) => (
-          <div key={item} className={`rounded-xl px-3 py-2 text-sm ${itemClassName}`}>
+          <div
+            key={item}
+            className={`rounded-xl px-3 py-2 text-sm ${itemClassName}`}
+          >
             {item}
           </div>
         ))}
@@ -466,11 +475,17 @@ function BadgeCluster({
 }>) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+        {title}
+      </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {items.length > 0 ? (
           items.map((item, index) => (
-            <Badge key={`${item}-${index}`} variant={variant} className={className}>
+            <Badge
+              key={`${item}-${index}`}
+              variant={variant}
+              className={className}
+            >
               {item}
             </Badge>
           ))
@@ -482,8 +497,13 @@ function BadgeCluster({
   );
 }
 
-function PayloadAtlas({ course }: Readonly<{ course: StudentCourseDto | null }>) {
-  const courseFieldCards = useMemo(() => buildCourseFieldCards(course), [course]);
+function PayloadAtlas({
+  course,
+}: Readonly<{ course: StudentCourseDto | null }>) {
+  const courseFieldCards = useMemo(
+    () => buildCourseFieldCards(course),
+    [course],
+  );
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -493,10 +513,14 @@ function PayloadAtlas({ course }: Readonly<{ course: StudentCourseDto | null }>)
       </div>
       <div className="divide-y divide-gray-50">
         {courseFieldCards.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="flex items-center gap-3 px-4 py-2.5">
+          <div key={label} className="flex items-start gap-3 px-4 py-2.5">
             <Icon className="h-4 w-4 shrink-0 text-[#D52B1E]" />
-            <span className="w-28 shrink-0 text-xs font-medium text-gray-500">{label}</span>
-            <span className="truncate text-sm text-gray-900">{value}</span>
+            <span className="w-32 shrink-0 pt-0.5 text-xs font-medium text-gray-500">
+              {label}
+            </span>
+            <span className="min-w-0 whitespace-normal break-words text-sm text-gray-900">
+              {value}
+            </span>
           </div>
         ))}
       </div>
@@ -523,14 +547,20 @@ function OutlineColumn({
         </div>
         <div>
           <p className="text-sm font-semibold text-gray-900">Course Sections</p>
-          <p className="text-xs text-gray-500">Select a section to browse its lessons</p>
+          <p className="text-xs text-gray-500">
+            Select a section to browse its lessons
+          </p>
         </div>
       </div>
 
       <div className="space-y-2">
-        {sectionsLoading && <p className="text-sm text-gray-500">Loading sections...</p>}
+        {sectionsLoading && (
+          <p className="text-sm text-gray-500">Loading sections...</p>
+        )}
         {!sectionsLoading && sections.length === 0 && (
-          <p className="text-sm text-gray-400">No sections are available for this course yet.</p>
+          <p className="text-sm text-gray-400">
+            No sections are available for this course yet.
+          </p>
         )}
         {sections.map((section) => {
           const active = section.id === selectedSectionId;
@@ -548,7 +578,9 @@ function OutlineColumn({
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 line-clamp-2">{section.title}</p>
+                  <p className="text-sm font-semibold text-gray-900 line-clamp-2">
+                    {section.title}
+                  </p>
                 </div>
                 <Badge variant="outline">#{section.order}</Badge>
               </div>
@@ -582,21 +614,29 @@ function LessonsColumn({
         <div>
           <p className="text-sm font-semibold text-gray-900">Section Lessons</p>
           <p className="text-xs text-gray-500">
-            {selectedSectionId ? "Select a lesson to view its content" : "Choose a section first"}
+            {selectedSectionId
+              ? "Select a lesson to view its content"
+              : "Choose a section first"}
           </p>
         </div>
       </div>
 
       <div className="space-y-2">
         {selectedSectionId === null && (
-          <p className="text-sm text-gray-400">Select a section to see its lessons.</p>
+          <p className="text-sm text-gray-400">
+            Select a section to see its lessons.
+          </p>
         )}
         {selectedSectionId !== null && lessonsLoading && (
           <p className="text-sm text-gray-500">Loading lessons...</p>
         )}
-        {selectedSectionId !== null && !lessonsLoading && lessons.length === 0 && (
-          <p className="text-sm text-gray-400">No lessons are available in this section yet.</p>
-        )}
+        {selectedSectionId !== null &&
+          !lessonsLoading &&
+          lessons.length === 0 && (
+            <p className="text-sm text-gray-400">
+              No lessons are available in this section yet.
+            </p>
+          )}
         {lessons.map((lessonItem) => {
           const active = lessonItem.id === selectedLessonId;
 
@@ -616,7 +656,9 @@ function LessonsColumn({
                   {lessonItem.order}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 line-clamp-2">{lessonItem.title}</p>
+                  <p className="text-sm font-semibold text-gray-900 line-clamp-2">
+                    {lessonItem.title}
+                  </p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
                     <span className="rounded-full bg-gray-100 px-2 py-0.5 capitalize tracking-wide">
                       {lessonItem.type}
@@ -675,9 +717,12 @@ function LessonPanel({
         {lesson && (
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-transparent">
-              <Clock3 className="mr-1 h-3 w-3" /> {formatLessonDuration(lesson.durationSeconds)}
+              <Clock3 className="mr-1 h-3 w-3" />{" "}
+              {formatLessonDuration(lesson.durationSeconds)}
             </Badge>
-            <Badge variant="outline">{lesson.isFree ? "Free Preview" : "Enrolled Access"}</Badge>
+            <Badge variant="outline">
+              {lesson.isFree ? "Free Preview" : "Enrolled Access"}
+            </Badge>
             {lesson.quizId && <Badge variant="outline">Includes Quiz</Badge>}
           </div>
         )}
@@ -694,9 +739,13 @@ function LessonPanel({
             <ArrowLeft className="h-4 w-4" /> Previous lesson
           </Button>
           <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Lesson navigation</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Lesson navigation
+            </p>
             <p className="text-sm font-medium text-gray-900">
-              {lessonIndex >= 0 ? `${lessonIndex + 1} of ${lessonCount}` : "No lesson selected"}
+              {lessonIndex >= 0
+                ? `${lessonIndex + 1} of ${lessonCount}`
+                : "No lesson selected"}
             </p>
           </div>
           <Button
@@ -714,13 +763,17 @@ function LessonPanel({
 
       <div className="p-4 space-y-4">
         {selectedLessonId === null && (
-          <p className="text-sm text-gray-400">Choose a lesson from the section list to begin.</p>
+          <p className="text-sm text-gray-400">
+            Choose a lesson from the section list to begin.
+          </p>
         )}
         {selectedLessonId !== null && lessonLoading && (
           <p className="text-sm text-gray-500">Loading lesson content...</p>
         )}
         {selectedLessonId !== null && !lessonLoading && !lesson && (
-          <p className="text-sm text-gray-400">This lesson's details could not be loaded.</p>
+          <p className="text-sm text-gray-400">
+            This lesson's details could not be loaded.
+          </p>
         )}
 
         {lesson && (
@@ -763,7 +816,11 @@ function LessonPanel({
               </div>
               <div className="flex items-center gap-2">
                 {lesson.videoUrl && (
-                  <Button asChild size="sm" className="bg-[#D52B1E] hover:bg-[#B8241B]">
+                  <Button
+                    asChild
+                    size="sm"
+                    className="bg-[#D52B1E] hover:bg-[#B8241B]"
+                  >
                     <a href={lesson.videoUrl} target="_blank" rel="noreferrer">
                       Open video <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                     </a>
@@ -785,13 +842,16 @@ function LessonPanel({
                 <h4 className="font-semibold">Lesson Summary</h4>
               </div>
               <p className="text-sm leading-7 text-gray-700">
-                {content.summary || "No description is available for this lesson."}
+                {content.summary ||
+                  "No description is available for this lesson."}
               </p>
             </div>
 
             {content.paragraphs.length > 1 && (
               <div className="rounded-2xl border border-gray-100 p-5">
-                <h4 className="font-semibold text-gray-900 mb-4">Content Highlights</h4>
+                <h4 className="font-semibold text-gray-900 mb-4">
+                  Content Highlights
+                </h4>
                 <div className="grid gap-2.5 sm:grid-cols-2">
                   {content.paragraphs.slice(0, 8).map((paragraph) => (
                     <div
@@ -799,7 +859,9 @@ function LessonPanel({
                       className="flex items-start gap-3 rounded-xl bg-gray-50 px-3.5 py-3"
                     >
                       <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#D52B1E]" />
-                      <p className="text-sm leading-6 text-gray-700">{paragraph}</p>
+                      <p className="text-sm leading-6 text-gray-700">
+                        {paragraph}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -824,17 +886,19 @@ export function CourseExplorerDialog({
   onClose,
 }: CourseExplorerDialogProps) {
   const courseId = course?.id;
-  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(
+    null,
+  );
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
 
-  const { data: sections = [], isLoading: sectionsLoading } = useLearningCourseContent(
-    open ? courseId : undefined,
-  );
-  const { data: lessons = [], isLoading: lessonsLoading } = useLearningSectionContent(
-    open ? selectedSectionId ?? undefined : undefined,
-  );
+  const { data: sections = [], isLoading: sectionsLoading } =
+    useLearningCourseContent(open ? courseId : undefined);
+  const { data: lessons = [], isLoading: lessonsLoading } =
+    useLearningSectionContent(
+      open ? (selectedSectionId ?? undefined) : undefined,
+    );
   const { data: lesson, isLoading: lessonLoading } = useLearningLessonById(
-    open ? selectedLessonId ?? undefined : undefined,
+    open ? (selectedLessonId ?? undefined) : undefined,
   );
 
   useEffect(() => {
@@ -853,7 +917,10 @@ export function CourseExplorerDialog({
     setSelectedLessonId(lessons[0].id);
   }, [lessons, selectedLessonId]);
 
-  const content = useMemo(() => extractLessonContent(lesson?.description), [lesson?.description]);
+  const content = useMemo(
+    () => extractLessonContent(lesson?.description),
+    [lesson?.description],
+  );
   const courseDescriptionData = useMemo(
     () => extractCourseDescriptionData(course?.description),
     [course?.description],
@@ -862,13 +929,17 @@ export function CourseExplorerDialog({
     () => getEmbeddableVideoUrl(course?.previewVideoUrl),
     [course?.previewVideoUrl],
   );
-  const lessonEmbedUrl = useMemo(() => getEmbeddableVideoUrl(lesson?.videoUrl), [lesson?.videoUrl]);
+  const lessonEmbedUrl = useMemo(
+    () => getEmbeddableVideoUrl(lesson?.videoUrl),
+    [lesson?.videoUrl],
+  );
   const selectedLessonIndex = useMemo(
     () => lessons.findIndex((lessonItem) => lessonItem.id === selectedLessonId),
     [lessons, selectedLessonId],
   );
   const hasPreviousLesson = selectedLessonIndex > 0;
-  const hasNextLesson = selectedLessonIndex >= 0 && selectedLessonIndex < lessons.length - 1;
+  const hasNextLesson =
+    selectedLessonIndex >= 0 && selectedLessonIndex < lessons.length - 1;
 
   const handlePreviousLesson = () => {
     if (!hasPreviousLesson) return;
@@ -890,9 +961,13 @@ export function CourseExplorerDialog({
       maxWidth="max-w-7xl"
     >
       <div className="space-y-5">
-        <CourseHero course={course} sectionCount={sections.length} lessonCount={lessons.length} />
+        <CourseHero
+          course={course}
+          sectionCount={sections.length}
+          lessonCount={lessons.length}
+        />
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <CourseStoryPanel
             course={course}
             previewEmbedUrl={previewEmbedUrl}
