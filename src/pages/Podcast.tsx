@@ -1,6 +1,7 @@
 ﻿import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from "react-router-dom";
 import {
   Play,
   Pause,
@@ -306,16 +307,34 @@ function Pager({
 
 /* --- Main Podcast Component ----------------------------------------------- */
 export default function Podcast() {
+  const [searchParams, setSearchParams] = useSearchParams();
   /* Data */
   const { data: showsResponse, isLoading: showsLoading } = usePodcastShows()
   const shows: PodcastShow[] = (showsResponse as any)?.data ?? []
 
   const [activeShowId, setActiveShowId] = useState<string | null>(null)
-  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('All')
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>(() => searchParams.get("category") || "All")
 
   // Derive unique categories from shows for the filter tabs
   const showCategories = ['All', ...Array.from(new Set(shows.map(s => s.category).filter(Boolean) as string[]))]
   const filteredShows = activeCategoryFilter === 'All' ? shows : shows.filter(s => s.category === activeCategoryFilter)
+
+  useEffect(() => {
+    const categoryFromQuery = searchParams.get("category") || "All";
+    if (showCategories.includes(categoryFromQuery) && categoryFromQuery !== activeCategoryFilter) {
+      setActiveCategoryFilter(categoryFromQuery);
+    }
+  }, [activeCategoryFilter, searchParams, showCategories]);
+
+  useEffect(() => {
+    if (!shows.length) return;
+    const showFromQuery = searchParams.get("show");
+    if (!showFromQuery) return;
+    const exists = shows.some((show) => show.id === showFromQuery);
+    if (exists && showFromQuery !== activeShowId) {
+      setActiveShowId(showFromQuery);
+    }
+  }, [activeShowId, searchParams, shows]);
 
   const { data: episodesData, isLoading: epsLoading } = usePodcastEpisodes(
     activeShowId ?? undefined,
@@ -529,6 +548,16 @@ export default function Podcast() {
                 key={cat}
                 onClick={() => {
                   setActiveCategoryFilter(cat)
+                  const next = new URLSearchParams(searchParams)
+                  next.set("category", cat)
+                  if (cat !== 'All' && activeShowId) {
+                    const activeShow = shows.find((s) => s.id === activeShowId)
+                    if (activeShow && activeShow.category !== cat) {
+                      setActiveShowId(null)
+                      next.delete("show")
+                    }
+                  }
+                  setSearchParams(next, { replace: true })
                   // Only deselect the active show if it won't appear in the new filter
                   if (cat !== 'All' && activeShowId) {
                     const activeShow = shows.find((s) => s.id === activeShowId)
@@ -575,9 +604,17 @@ export default function Podcast() {
                 key={show.id}
                 show={show}
                 active={activeShowId === show.id}
-                onClick={() =>
-                  setActiveShowId(activeShowId === show.id ? null : show.id)
-                }
+                onClick={() => {
+                  const nextShowId = activeShowId === show.id ? null : show.id;
+                  setActiveShowId(nextShowId);
+                  const next = new URLSearchParams(searchParams);
+                  if (nextShowId) {
+                    next.set("show", nextShowId);
+                  } else {
+                    next.delete("show");
+                  }
+                  setSearchParams(next, { replace: true });
+                }}
               />
             ))}
           </div>
@@ -706,7 +743,12 @@ export default function Podcast() {
                         </span>
                       )}
                     <button
-                      onClick={() => setActiveShowId(null)}
+                      onClick={() => {
+                        setActiveShowId(null);
+                        const next = new URLSearchParams(searchParams);
+                        next.delete("show");
+                        setSearchParams(next, { replace: true });
+                      }}
                       className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors ml-auto"
                     >
                       <X className="h-3 w-3" />

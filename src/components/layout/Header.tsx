@@ -11,10 +11,15 @@ import {
   Newspaper,
   TrendingUp,
   GraduationCap,
+  Headphones,
   MessageSquare,
   Building2,
+  Briefcase,
   BookOpen,
+  CalendarDays,
   BarChart2,
+  CreditCard,
+  Globe,
   Mic2,
   Users,
   Settings,
@@ -48,6 +53,7 @@ type SearchItem = {
   description: string;
   path: string;
   parent?: string;
+  keywords?: string[];
 };
 
 const SEARCH_ITEMS: SearchItem[] = [
@@ -69,54 +75,63 @@ const SEARCH_ITEMS: SearchItem[] = [
     label: "Market Insights",
     description: "Market data, trends and analysis",
     path: "/market-insights",
+    keywords: ["markets", "indices", "sukuk", "stocks"],
   },
   {
     icon: GraduationCap,
     label: "Learning Zone",
     description: "Courses and learning content",
     path: "/learning-zone",
+    keywords: ["courses", "lessons", "training"],
   },
   {
     icon: MessageSquare,
     label: "Community",
     description: "Discussions, forums and networking",
     path: "/community",
+    keywords: ["groups", "events", "mentorship"],
   },
   {
     icon: Building2,
     label: "Directory",
     description: "Islamic finance institutions & providers",
     path: "/directory",
+    keywords: ["institutions", "service providers", "organizations"],
   },
   {
     icon: BookOpen,
     label: "Resources",
     description: "Guides, publications and practical resources",
     path: "/resources",
+    keywords: ["guides", "publications", "standards"],
   },
   {
     icon: BarChart2,
     label: "Data",
     description: "Islamic finance datasets and statistics",
     path: "/data",
+    keywords: ["datasets", "metrics", "analytics"],
   },
   {
     icon: Mic2,
     label: "Podcast",
     description: "Islamic finance podcast episodes",
     path: "/podcast",
+    keywords: ["shows", "episodes", "playlists"],
   },
   {
     icon: Users,
     label: "IF Professionals",
     description: "Connect with Islamic finance professionals",
     path: "/if-professionals",
+    keywords: ["experts", "directory", "linkedin"],
   },
   {
     icon: Bell,
     label: "Notifications",
     description: "Mentions, replies and account activity",
     path: "/notifications",
+    keywords: ["alerts", "activity"],
   },
   {
     icon: Settings,
@@ -129,48 +144,315 @@ const SEARCH_ITEMS: SearchItem[] = [
     label: "Support",
     description: "Help and support centre",
     path: "/support",
+    keywords: ["help", "contact"],
   },
   {
     icon: User,
     label: "Profile",
     description: "Your personal profile and activity",
     path: "/profile",
+    keywords: ["account", "bio"],
+  },
+  {
+    icon: BookOpen,
+    label: "Course Results",
+    description: "Browse and enroll in available courses",
+    path: "/course-results",
+    parent: "Learning Zone",
+    keywords: ["catalog", "course explorer", "enrollment"],
+  },
+  {
+    icon: FileText,
+    label: "Questionnaire",
+    description: "Complete onboarding and preference questionnaires",
+    path: "/questionnaire",
+    keywords: ["onboarding", "survey"],
+  },
+  {
+    icon: Wrench,
+    label: "Zakat Calculator",
+    description: "Calculate zakat obligations",
+    path: "/tools/zakat",
+    parent: "Tools",
+    keywords: ["zakat", "calculator", "charity"],
+  },
+  {
+    icon: TrendingUp,
+    label: "Halal Stock Screening",
+    description: "Check stocks against halal screening criteria",
+    path: "/tools/halal-stocks",
+    parent: "Tools",
+    keywords: ["stocks", "screening", "halal"],
+  },
+  {
+    icon: TrendingUp,
+    label: "Halal Crypto Screening",
+    description: "Evaluate digital assets using halal screening criteria",
+    path: "/tools/halal-crypto",
+    parent: "Tools",
+    keywords: ["crypto", "screening", "halal"],
+  },
+  // ── Market Insights tabs ──
+  {
+    icon: TrendingUp,
+    label: "Global Islamic Market",
+    description: "Shariah market overview with macro indicators",
+    path: "/market-insights?tab=global-islamic",
+    parent: "Market Insights",
+    keywords: ["global islamic", "overview", "market pulse"],
+  },
+  {
+    icon: TrendingUp,
+    label: "Global Market",
+    description: "Global market cards, indices and top performers",
+    path: "/market-insights?tab=global",
+    parent: "Market Insights",
+    keywords: ["indices", "gainers", "losers"],
+  },
+  {
+    icon: TrendingUp,
+    label: "NGX Market",
+    description: "Nigerian Exchange market insights",
+    path: "/market-insights?tab=ngx",
+    parent: "Market Insights",
+  },
+  {
+    icon: TrendingUp,
+    label: "NGX Islamic",
+    description: "Islamic-focused Nigerian Exchange market view",
+    path: "/market-insights?tab=ngx-islamic",
+    parent: "Market Insights",
+  },
+  {
+    icon: TrendingUp,
+    label: "Crypto Market",
+    description: "Digital asset market metrics",
+    path: "/market-insights?tab=crypto",
+    parent: "Market Insights",
+  },
+  {
+    icon: TrendingUp,
+    label: "Halal Crypto",
+    description: "Halal-screened crypto market view",
+    path: "/market-insights?tab=halal-crypto",
+    parent: "Market Insights",
+  },
+  // ── Learning Zone tabs ──
+  {
+    icon: BookOpen,
+    label: "My Learning",
+    description: "Track enrollments, progress and upcoming activities",
+    path: "/learning-zone?tab=my-learning",
+    parent: "Learning Zone",
+  },
+  {
+    icon: GraduationCap,
+    label: "Browse Courses",
+    description: "Explore courses and open course explorer",
+    path: "/learning-zone?tab=courses",
+    parent: "Learning Zone",
+  },
+  {
+    icon: CreditCard,
+    label: "Learning Payments",
+    description: "View payment history and invoices",
+    path: "/learning-zone?tab=payments",
+    parent: "Learning Zone",
+  },
+  {
+    icon: BookA,
+    label: "Learning Results & Certificates",
+    description: "Review course results and certificates",
+    path: "/learning-zone?tab=results",
+    parent: "Learning Zone",
+  },
+  // ── Community tabs ──
+  {
+    icon: MessageSquare,
+    label: "Community Discussions",
+    description: "Explore latest discussions from members",
+    path: "/community?tab=discussions",
+    parent: "Community",
+  },
+  {
+    icon: Users,
+    label: "Community Groups",
+    description: "Join and participate in study groups",
+    path: "/community?tab=study-groups",
+    parent: "Community",
+  },
+  {
+    icon: Users,
+    label: "Community Mentorship",
+    description: "Mentorship opportunities and guidance",
+    path: "/community?tab=mentorship",
+    parent: "Community",
+  },
+  {
+    icon: CalendarDays,
+    label: "Community Events",
+    description: "Upcoming events, workshops and sessions",
+    path: "/community?tab=events",
+    parent: "Community",
+  },
+  {
+    icon: BookOpen,
+    label: "Saved Community Posts",
+    description: "Your bookmarked community content",
+    path: "/community?tab=bookmarks",
+    parent: "Community",
+  },
+  // ── Directory sectors ──
+  {
+    icon: Building2,
+    label: "Directory Financial Sector",
+    description: "Browse financial institutions and providers",
+    path: "/directory?sector=financial",
+    parent: "Directory",
+  },
+  {
+    icon: Users,
+    label: "Directory Non-Financial Sector",
+    description: "Browse legal, research, education and advisory bodies",
+    path: "/directory?sector=non-financial",
+    parent: "Directory",
   },
   // ── Resources sections ──
+  {
+    icon: Shield,
+    label: "Regulatory Resources",
+    description: "Browse regulatory bodies and circulars",
+    path: "/resources?category=regulatory",
+    parent: "Resources",
+  },
   {
     icon: BookOpen,
     label: "Educational Guides",
     description: "Introductory guides on Islamic finance fundamentals",
-    path: "/resources?tab=educational-guides",
+    path: "/resources?category=general&sub=educational-guides",
     parent: "Resources",
   },
   {
     icon: FileText,
     label: "Research & Publications",
     description: "Academic journals, white papers and industry reports",
-    path: "/resources?tab=research-publications",
+    path: "/resources?category=general&sub=research-publications",
     parent: "Resources",
   },
   {
     icon: Shield,
     label: "Standards & Governance",
     description: "AAOIFI, IFSB and regulatory standards",
-    path: "/resources?tab=standards-governance",
+    path: "/resources?category=general&sub=standards-governance",
     parent: "Resources",
   },
   {
     icon: Wrench,
     label: "Tools & Practical Resources",
     description: "Templates, calculators and planning worksheets",
-    path: "/resources?tab=tools-practical",
+    path: "/resources?category=general&sub=tools-practical",
     parent: "Resources",
   },
   {
     icon: BookA,
     label: "Glossary",
     description: "Islamic finance terms and definitions",
-    path: "/resources?tab=glossary",
+    path: "/resources?category=general&sub=glossary",
     parent: "Resources",
+  },
+  // ── Data sections ──
+  {
+    icon: Globe,
+    label: "Data Market Overview",
+    description: "High-level Islamic finance market snapshot",
+    path: "/data?tab=market-overview",
+    parent: "Data",
+  },
+  {
+    icon: BarChart2,
+    label: "Data Islamic Banking",
+    description: "Islamic banking metrics and benchmarks",
+    path: "/data?tab=islamic-banking",
+    parent: "Data",
+  },
+  {
+    icon: TrendingUp,
+    label: "Data Sukuk Market",
+    description: "Sukuk issuance and performance indicators",
+    path: "/data?tab=sukuk-market",
+    parent: "Data",
+  },
+  {
+    icon: Shield,
+    label: "Data Takaful",
+    description: "Islamic insurance market indicators",
+    path: "/data?tab=takaful",
+    parent: "Data",
+  },
+  {
+    icon: BarChart2,
+    label: "Data Islamic Capital Market",
+    description: "Shariah-compliant equity and capital-market data",
+    path: "/data?tab=islamic-capital-market",
+    parent: "Data",
+  },
+  {
+    icon: BookA,
+    label: "Data Research & Insights",
+    description: "Research-driven rankings and policy indicators",
+    path: "/data?tab=research-insights",
+    parent: "Data",
+  },
+  // ── Podcast shortcuts ──
+  {
+    icon: Mic2,
+    label: "Podcast All Shows",
+    description: "Browse all podcast shows",
+    path: "/podcast?category=All",
+    parent: "Podcast",
+  },
+  {
+    icon: Headphones,
+    label: "Podcast Interviews",
+    description: "Jump to interview-focused podcast category",
+    path: "/podcast?category=Interviews",
+    parent: "Podcast",
+  },
+  {
+    icon: Headphones,
+    label: "Podcast Market Debriefs",
+    description: "Jump to market-debrief podcast category",
+    path: "/podcast?category=Market Debriefs",
+    parent: "Podcast",
+  },
+  // ── IF Professionals shortcuts ──
+  {
+    icon: Users,
+    label: "IF Professionals Local",
+    description: "View local Nigerian professionals",
+    path: "/if-professionals?scope=Local",
+    parent: "IF Professionals",
+  },
+  {
+    icon: Globe,
+    label: "IF Professionals Global",
+    description: "View globally-focused professionals",
+    path: "/if-professionals?scope=Global",
+    parent: "IF Professionals",
+  },
+  {
+    icon: Shield,
+    label: "IF Professionals Verified",
+    description: "Filter to verified professionals",
+    path: "/if-professionals?verification=Verified",
+    parent: "IF Professionals",
+  },
+  {
+    icon: Briefcase,
+    label: "IF Professionals Senior",
+    description: "Filter to senior-level experts",
+    path: "/if-professionals?level=Senior",
+    parent: "IF Professionals",
   },
   // ── Directory — Financial ──
   {
@@ -343,10 +625,17 @@ export function Header() {
   const searchResults =
     searchQuery.trim().length > 0
       ? SEARCH_ITEMS.filter(
-          (item) =>
-            item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.description.toLowerCase().includes(searchQuery.toLowerCase()),
-        ).slice(0, 8)
+          (item) => {
+            const query = searchQuery.toLowerCase();
+            return (
+              item.label.toLowerCase().includes(query) ||
+              item.description.toLowerCase().includes(query) ||
+              item.path.toLowerCase().includes(query) ||
+              item.parent?.toLowerCase().includes(query) ||
+              item.keywords?.some((keyword) => keyword.toLowerCase().includes(query))
+            );
+          },
+        ).slice(0, 12)
       : [];
 
   const isProtectedSearchPath = (path: string) => {

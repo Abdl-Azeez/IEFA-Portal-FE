@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Award,
@@ -316,13 +317,32 @@ function CourseCard({
 
 /* -------------------- Main Component ---------------------------------------- */
 export function LearningZone() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const allowedTabs = useMemo(
+    () => new Set(["my-learning", "courses", "payments", "results"]),
+    [],
+  );
   const [courseSearch, setCourseSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("my-learning");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get("tab");
+    return tab && allowedTabs.has(tab) ? tab : "my-learning";
+  });
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && allowedTabs.has(tab)) {
+      if (tab !== activeTab) setActiveTab(tab);
+      return;
+    }
+    if (activeTab !== "my-learning") {
+      setActiveTab("my-learning");
+    }
+  }, [activeTab, allowedTabs, searchParams]);
 
   const { data: me } = useMe();
   const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } = useLearningDashboard();
@@ -594,7 +614,12 @@ export function LearningZone() {
               label={t.label}
               icon={t.icon}
               active={activeTab === t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => {
+                setActiveTab(t.id);
+                const next = new URLSearchParams(searchParams);
+                next.set("tab", t.id);
+                setSearchParams(next, { replace: true });
+              }}
             />
           ))}
         </div>

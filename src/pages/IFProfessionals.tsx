@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BadgeCheck,
@@ -170,11 +171,27 @@ function ProfileRowSkeleton() {
 }
 
 export default function IFProfessionals() {
-  const [search, setSearch] = useState("");
-  const [levelFilter, setLevelFilter] = useState<LevelFilter>("All");
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("All");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>(() => {
+    const value = searchParams.get("level");
+    return value && (["All", ...CAREER_OPTIONS] as string[]).includes(value)
+      ? (value as LevelFilter)
+      : "All";
+  });
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>(() => {
+    const value = searchParams.get("scope");
+    return value === "Local" || value === "Global" || value === "All"
+      ? (value as ScopeFilter)
+      : "All";
+  });
   const [verificationFilter, setVerificationFilter] =
-    useState<VerificationFilter>("All");
+    useState<VerificationFilter>(() => {
+      const value = searchParams.get("verification");
+      return value === "Verified" || value === "Pending" || value === "Unverified" || value === "All"
+        ? (value as VerificationFilter)
+        : "All";
+    });
   const [spotlightIndex, setSpotlightIndex] = useState(0);
   const [form, setForm] = useState<CreateIFProfessionalDto>(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -246,6 +263,43 @@ export default function IFProfessionals() {
 
     return list;
   }, [professionals, levelFilter, scopeFilter, verificationFilter, search]);
+
+  useEffect(() => {
+    const q = searchParams.get("q") ?? "";
+    const level = searchParams.get("level") ?? "All";
+    const scope = searchParams.get("scope") ?? "All";
+    const verification = searchParams.get("verification") ?? "All";
+
+    if (q !== search) setSearch(q);
+    if ((["All", ...CAREER_OPTIONS] as string[]).includes(level) && level !== levelFilter) {
+      setLevelFilter(level as LevelFilter);
+    }
+    if ((["All", "Local", "Global"] as string[]).includes(scope) && scope !== scopeFilter) {
+      setScopeFilter(scope as ScopeFilter);
+    }
+    if ((["All", "Verified", "Pending", "Unverified"] as string[]).includes(verification) && verification !== verificationFilter) {
+      setVerificationFilter(verification as VerificationFilter);
+    }
+  }, [levelFilter, scopeFilter, search, searchParams, verificationFilter]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (search.trim()) next.set("q", search.trim());
+    else next.delete("q");
+
+    if (levelFilter !== "All") next.set("level", levelFilter);
+    else next.delete("level");
+
+    if (scopeFilter !== "All") next.set("scope", scopeFilter);
+    else next.delete("scope");
+
+    if (verificationFilter !== "All") next.set("verification", verificationFilter);
+    else next.delete("verification");
+
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [search, levelFilter, scopeFilter, verificationFilter, searchParams, setSearchParams]);
 
   function validateForm(): boolean {
     const errors: FormErrors = {};

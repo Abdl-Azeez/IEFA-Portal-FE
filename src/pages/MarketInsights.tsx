@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion'
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   TrendingUp,
   TrendingDown,
@@ -270,6 +272,27 @@ function MarketComingSoon({
 }
 
 export function MarketInsights() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabOptions = useMemo(
+    () => new Set(["global-islamic", "global", "ngx", "ngx-islamic", "crypto", "halal-crypto"]),
+    [],
+  );
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get("tab");
+    return tab && tabOptions.has(tab) ? tab : "global-islamic";
+  });
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && tabOptions.has(tab)) {
+      if (tab !== activeTab) setActiveTab(tab);
+      return;
+    }
+    if (activeTab !== "global-islamic") {
+      setActiveTab("global-islamic");
+    }
+  }, [activeTab, searchParams, tabOptions]);
+
   const {
     data: dashboard,
     isLoading: dashLoading,
@@ -558,7 +581,17 @@ export function MarketInsights() {
       </motion.div>
 
       {/* Market Tabs */}
-      <Tabs defaultValue="global-islamic" className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          if (!tabOptions.has(value)) return;
+          setActiveTab(value);
+          const next = new URLSearchParams(searchParams);
+          next.set("tab", value);
+          setSearchParams(next, { replace: true });
+        }}
+        className="space-y-6"
+      >
         <TabsList className="bg-white border border-gray-100 rounded-xl p-1.5 h-auto shadow-sm flex flex-wrap gap-1">
           <TabsTrigger
             value="global-islamic"

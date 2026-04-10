@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Globe,
@@ -691,6 +692,7 @@ function mapDatasetToMetric(dataset: Dataset): MetricRow {
 }
 
 export default function Data() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [geoFilter, setGeoFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -698,7 +700,7 @@ export default function Data() {
   const [premiumFilter, setPremiumFilter] = useState<"all" | "free" | "premium">("all");
 
   const { data: categoriesData } = useDatasetCategories();
-  const [activeTab, setActiveTab] = useState("");
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") ?? "");
 
   const activeCategoryId = useMemo(() => {
     const categories = categoriesData ?? [];
@@ -738,9 +740,23 @@ export default function Data() {
   useEffect(() => {
     if (!sections.length) return;
     if (!sections.some((section) => section.id === activeTab)) {
-      setActiveTab(sections[0].id);
+      const fallback = sections[0].id;
+      setActiveTab(fallback);
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", fallback);
+      setSearchParams(next, { replace: true });
     }
-  }, [sections, activeTab]);
+  }, [sections, activeTab, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!sections.length) return;
+    const tab = searchParams.get("tab");
+    if (!tab) return;
+    if (!sections.some((section) => section.id === tab)) return;
+    if (tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [activeTab, sections, searchParams]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1009,7 +1025,15 @@ export default function Data() {
       ) : (
         /* ── Tab Navigation (default, no search) ────────────────────── */
         <motion.div variants={itemVariants}>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              setActiveTab(value);
+              const next = new URLSearchParams(searchParams);
+              next.set("tab", value);
+              setSearchParams(next, { replace: true });
+            }}
+          >
             {/* Arrow-shaped tabs */}
             <TabsList className="flex flex-nowrap overflow-x-auto scrollbar-hide w-full justify-start bg-transparent border-0 rounded-none p-0 h-auto shadow-none">
               {sections.map((section, idx) => {

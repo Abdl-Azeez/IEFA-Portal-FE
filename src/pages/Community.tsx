@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   communityService,
   apiSortToUiSort,
@@ -273,7 +273,19 @@ const itemVariants = {
 };
 
 export default function Community() {
-  const [selectedTab, setSelectedTab] = useState("discussions");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedTab, setSelectedTab] = useState(() => {
+    const tab = searchParams.get("tab");
+    const allowedTabs = new Set([
+      "discussions",
+      "study-groups",
+      "mentorship",
+      "events",
+      "bookmarks",
+      "flagged",
+    ]);
+    return tab && allowedTabs.has(tab) ? tab : "discussions";
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
@@ -335,6 +347,25 @@ export default function Community() {
   } | null>(null);
   const posterProfileCache = useRef<Map<string, UserProfile>>(new Map());
   const hoverCloseTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (!tab) return;
+
+    const allowedTabs = new Set([
+      "discussions",
+      "study-groups",
+      "mentorship",
+      "events",
+      "bookmarks",
+      "flagged",
+    ]);
+
+    if (!allowedTabs.has(tab)) return;
+    if (tab === "flagged" && !isModerator) return;
+    if ((tab === "bookmarks" || tab === "flagged") && !isAuthenticated) return;
+    if (tab !== selectedTab) setSelectedTab(tab);
+  }, [isAuthenticated, isModerator, searchParams, selectedTab]);
 
   const clearScheduledHoverClose = useCallback(() => {
     if (hoverCloseTimeoutRef.current !== null) {
@@ -1614,7 +1645,13 @@ export default function Community() {
               promptLoginForFeature("view saved or moderated content");
               return;
             }
+            if (value === "flagged" && !isModerator) {
+              return;
+            }
             setSelectedTab(value);
+            const next = new URLSearchParams(searchParams);
+            next.set("tab", value);
+            setSearchParams(next, { replace: true });
           }}
         >
           <TabsList className="bg-transparent h-auto p-0 mb-6 gap-2 border-b-0 w-full justify-start overflow-x-auto scrollbar-hide -mx-2 px-2 flex-nowrap md:flex-wrap md:overflow-visible md:px-0">
