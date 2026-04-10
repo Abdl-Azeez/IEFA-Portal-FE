@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from '@/hooks/use-toast'
 import type { Attachment } from '@/types/community'
 import api from '@/lib/api'
-import { useUserSearch, type UserSearchResult } from '@/hooks/useAuth'
+import { useUserSearch, useMe, type UserSearchResult } from '@/hooks/useAuth'
 
 interface UploadingAttachment extends Attachment {
   uploadStatus: 'uploading' | 'uploaded' | 'error'
@@ -66,6 +67,7 @@ export default function StartDiscussionModal({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { data: mentionResults = [], isLoading: mentionLoading } = useUserSearch(debouncedMentionQuery)
+  const { data: currentUser } = useMe()
 
   // Debounce: update the query that triggers the API call 300 ms after typing stops
   useEffect(() => {
@@ -108,6 +110,17 @@ export default function StartDiscussionModal({
 
   const insertMention = (user: UserSearchResult) => {
     if (!user.username) return
+    
+    // Prevent tagging oneself
+    if (currentUser && user.id === currentUser.id) {
+      toast({
+        title: "Cannot tag yourself",
+        description: "You cannot mention your own username in a discussion.",
+        variant: "destructive",
+      })
+      return
+    }
+    
     const before = content.slice(0, mentionStart)
     const after = content.slice(mentionStart + 1 + (mentionQuery?.length ?? 0))
     const tag = `@${user.username} `
@@ -205,23 +218,39 @@ export default function StartDiscussionModal({
     e.preventDefault()
     
     if (!title.trim() || !content.trim() || !categoryId) {
-      alert('Please fill in all required fields')
+      toast({
+        title: "Incomplete form",
+        description: "Please fill in all required fields: title, content, and category.",
+        variant: "destructive",
+      })
       return
     }
 
     if (!agreedToGuidelines) {
-      alert('Please agree to community guidelines')
+      toast({
+        title: "Guidelines required",
+        description: "Please agree to the community guidelines before posting.",
+        variant: "destructive",
+      })
       return
     }
 
     if (isUploading) {
-      alert('Please wait for all files to finish uploading')
+      toast({
+        title: "Files uploading",
+        description: "Please wait for all files to finish uploading before publishing.",
+        variant: "default",
+      })
       return
     }
 
     const failedUploads = attachments.filter(a => a.uploadStatus === 'error')
     if (failedUploads.length > 0) {
-      alert(`${failedUploads.length} file(s) failed to upload. Please remove them and try again.`)
+      toast({
+        title: "Upload failed",
+        description: `${failedUploads.length} file(s) failed to upload. Please remove them and try again.`,
+        variant: "destructive",
+      })
       return
     }
 
@@ -415,16 +444,20 @@ export default function StartDiscussionModal({
                       </div>
                     )}
                     <ul className="max-h-60 overflow-y-auto">
-                      {mentionResults.map((user, idx) => (
-                        <li key={user.id}>
-                          <button
-                            type="button"
-                            disabled={!user.username}
-                            onMouseDown={(e) => { e.preventDefault(); insertMention(user) }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
-                              idx === mentionSelectedIndex ? 'bg-red-50' : 'hover:bg-gray-50'
-                            }`}
-                          >
+                      {mentionResults.map((user, idx) => {
+                        const isCurrentUser = currentUser && user.id === currentUser.id
+                        return (
+                          <li key={user.id}>
+                            <button
+                              type="button"
+                              disabled={!user.username || isCurrentUser}
+                              onMouseDown={(e) => { e.preventDefault(); insertMention(user) }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                                isCurrentUser 
+                                  ? 'bg-gray-50 opacity-60 cursor-not-allowed' 
+                                  : idx === mentionSelectedIndex ? 'bg-red-50' : 'hover:bg-gray-50'
+                              }`}
+                            >
                             <div className="h-7 w-7 rounded-full bg-[#D52B1E] flex items-center justify-center flex-shrink-0 overflow-hidden">
                               {user.profilePhotoUrl ? (
                                 <img src={user.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
@@ -442,11 +475,13 @@ export default function StartDiscussionModal({
                               )}
                               <p className="text-xs text-[#737692] truncate">
                                 {user.username ? `@${user.username}` : 'No username available'}
+                                {isCurrentUser && <span className="text-xs text-[#737692] ml-1">(you)</span>}
                               </p>
                             </div>
                           </button>
                         </li>
-                      ))}
+                      )
+                      })}
                     </ul>
                   </div>
                 )}

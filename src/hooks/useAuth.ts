@@ -168,20 +168,17 @@ export const useLogin = () => {
 export const useCheckUsername = () => {
   return useMutation({
     mutationFn: async (username: string): Promise<CheckUsernameResult> => {
-      try {
-        const response = await api.get("/auth/check-username", {
-          params: { username },
-        });
-        // API may return { available: true } or simply 200 OK
-        const data = response.data as { available?: boolean };
-        return { available: data.available !== false };
-      } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 409) {
-          return { available: false };
-        }
-        // Unexpected error – let the caller treat as unavailable
-        throw err;
-      }
+      const response = await api.get("/users/search/username", {
+        params: { username },
+      });
+      const results: Array<{ username?: string }> = Array.isArray(response.data)
+        ? response.data
+        : (response.data?.users ?? response.data?.data ?? []);
+      // Taken if any result has an exact username match (case-insensitive)
+      const taken = results.some(
+        (u) => u.username?.toLowerCase() === username.toLowerCase()
+      );
+      return { available: !taken };
     },
   });
 };
