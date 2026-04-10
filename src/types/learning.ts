@@ -8,14 +8,14 @@ export interface PageMetaDto {
 }
 
 export interface EducatorSummaryDto {
-  id: string;
+  id: string | number;
   name: string;
   profilePhotoUrl: string;
   rating: number;
 }
 
 export interface ProgrammeSummaryDto {
-  id: string;
+  id: string | number;
   title: string;
   level?: string;
   totalDurationMinutes?: number;
@@ -28,7 +28,7 @@ export interface StudentCourseDto {
   description: string;
   coverImageUrl: string;
   previewVideoUrl?: string | null;
-  educatorId: string;
+  educatorId: string | number;
   educator: EducatorSummaryDto;
   programmeId?: string | null;
   programme?: ProgrammeSummaryDto | null;
@@ -46,17 +46,22 @@ export interface StudentCourseDto {
   publishedAt: string;
   createdAt: string;
   updatedAt: string;
+  progressPercent?: number;
+  isCompleted?: boolean;
+  completedAt?: string | null;
 }
 
-export interface StudentCourseSectionDto {
-  id: string;
+export interface LearningOutlineItemDto {
+  id: number;
   title: string;
   order: number;
   type: string;
 }
 
+export type StudentCourseSectionDto = LearningOutlineItemDto;
+
 export interface StudentLessonDto {
-  id: string;
+  id: number;
   courseId: number;
   course?: { id: number; title: string };
   title: string;
@@ -70,6 +75,7 @@ export interface StudentLessonDto {
   status: string;
   createdAt: string;
   updatedAt: string;
+  quizId?: number | null;
 }
 
 export interface StudentEnrollmentDto {

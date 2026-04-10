@@ -541,7 +541,7 @@ export default function AdminLearning() { // NOSONAR
                     setUpdateCourseTitle(course.title);
                     setUpdateCourseSlug(course.slug);
                     setUpdateCourseDescription(course.description);
-                    setUpdateCourseEducatorId(course.educatorId);
+                    setUpdateCourseEducatorId(String(course.educatorId ?? ""));
                     setUpdateCourseLevel(course.level);
                     setUpdateCoursePrice(String(course.priceUsd));
                     setUpdateCourseCoverImageUrl(course.coverImageUrl ?? "");
