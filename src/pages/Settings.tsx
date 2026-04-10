@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Bell, Globe2, Lock, Mail, Loader2, Save } from "lucide-react";
 import {
   Card,
@@ -46,6 +47,7 @@ const REGIONS = [
 
 export default function Settings() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const changePassword = useChangePassword();
   const updateSettings = useUpdateSettings();
 
@@ -385,16 +387,34 @@ export default function Settings() {
                 </div>
               </div>
               <div className="mt-4">
-                <Button
-                  onClick={handleChangePassword}
-                  disabled={changePassword.isPending}
-                  className="bg-[#D52B1E] hover:bg-[#B8241B] gap-2"
-                >
-                  {changePassword.isPending && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                  Update Password
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={handleChangePassword}
+                    disabled={changePassword.isPending}
+                    className="bg-[#D52B1E] hover:bg-[#B8241B] gap-2"
+                  >
+                    {changePassword.isPending && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                    Update Password
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-[#D52B1E] text-[#D52B1E] hover:bg-[#D52B1E]/5"
+                    onClick={() =>
+                      navigate(
+                        `/reset-password?email=${encodeURIComponent(user?.email ?? "")}`,
+                      )
+                    }
+                  >
+                    Reset via email code
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-[#737692]">
+                  Use this if you forgot your current password and need a reset
+                  code flow.
+                </p>
               </div>
             </CardContent>
           </Card>

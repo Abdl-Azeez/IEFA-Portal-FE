@@ -20,6 +20,16 @@ interface RegisterData {
   country: string;
 }
 
+interface ForgotPasswordData {
+  email: string;
+}
+
+interface ResetPasswordData {
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
 interface CheckUsernameResult {
   available: boolean;
 }
@@ -108,7 +118,7 @@ const normalizeAuthUser = (user: AuthUserPayload) => {
     id: user.id ?? user.userId ?? "",
     // Only coerce isModerator when the API payload actually includes the field.
     // If absent, omit it so the caller's existing value is preserved via spread merge.
-    ...(Object.prototype.hasOwnProperty.call(user, "isModerator")
+    ...(Object.hasOwn(user, "isModerator")
       ? { isModerator: !!user.isModerator }
       : {}),
     username: user.username ?? storedProfile?.username,
@@ -215,6 +225,53 @@ export const useRegister = () => {
       toast({
         title: "Error",
         description: error.response?.data?.message || "Registration failed",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useForgotPassword = () => {
+  return useMutation({
+    mutationFn: async (data: ForgotPasswordData) => {
+      const response = await api.post("/auth/forgot-password", data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reset code sent",
+        description:
+          "If the email exists, a password reset code has been sent.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description:
+          error.response?.data?.message || "Failed to request password reset",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useResetPassword = () => {
+  return useMutation({
+    mutationFn: async (data: ResetPasswordData) => {
+      const response = await api.post("/auth/reset-password", data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password reset",
+        description: "Your password has been reset successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description:
+          error.response?.data?.message || "Failed to reset password",
         variant: "destructive",
       });
     },

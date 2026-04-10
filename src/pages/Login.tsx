@@ -176,6 +176,17 @@ const Login = () => {
                     )}
                   </motion.button>
                 </motion.div>
+                <div className="text-right">
+                  <motion.button
+                    type="button"
+                    onClick={() => navigate("/forgot-password")}
+                    className="text-sm font-semibold text-red-600 hover:text-red-700"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    Forgot password?
+                  </motion.button>
+                </div>
               </div>
 
               {error && (
