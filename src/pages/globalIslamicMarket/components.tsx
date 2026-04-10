@@ -23,6 +23,8 @@ import {
   BookOpen,
   MapPin,
   Layers,
+  Maximize2,
+  X as XIcon,
 } from "lucide-react";
 import { BarItem, ResponsiveBar } from "@nivo/bar";
 import { ResponsiveFunnel } from "@nivo/funnel";
@@ -1338,6 +1340,67 @@ const REGIONAL_CHART_OPTIONS: Array<{
   { value: "lollipop", label: "Lollipop" },
 ];
 
+function ChartFullscreenModal({
+  open,
+  onClose,
+  title,
+  activeType,
+  items,
+  formatter,
+}: Readonly<{
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  activeType: RegionalChartType;
+  items: Array<{ id: string; label: string; value: number; color: string }>;
+  formatter: (value: number) => string;
+}>) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-5xl flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+        style={{ border: '1px solid #E9E5E5', maxHeight: '92vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: '#E9E5E5' }}>
+          <p className="text-base font-semibold" style={{ color: '#101828' }}>{title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center justify-center h-8 w-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            aria-label="Close fullscreen"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 p-6" style={{ height: 520 }}>
+          {activeType === 'funnel'   && <GimFunnelChart items={items} formatter={formatter} height={460} />}
+          {activeType === 'sunburst' && <WaffleDistributionChart items={items} formatter={formatter} />}
+          {activeType === 'radar'    && <GimChordChart items={items} formatter={formatter} height={460} />}
+          {activeType === 'bar-h'    && <RadialDistributionChart items={items} formatter={formatter} />}
+          {activeType === 'treemap'  && <GimTreemap items={items} formatter={formatter} height={460} />}
+          {activeType === 'bubble'   && <AreaCircleDistributionChart items={items} formatter={formatter} />}
+          {activeType === 'pie'      && <GimPieChart items={items} formatter={formatter} height={460} />}
+          {activeType === 'lollipop' && <LollipopDistributionChart items={items} formatter={formatter} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RegionalMultiChart({
   title,
   items,
@@ -1358,68 +1421,89 @@ function RegionalMultiChart({
   const [activeType, setActiveType] =
     useState<RegionalChartType>(defaultChartType);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const currentOption = REGIONAL_CHART_OPTIONS.find(
     (o) => o.value === activeType,
   )!;
 
   return (
-    <div
-      className={`border rounded-xl bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`}
-      style={{ borderColor: "#E9E5E5" }}
-      role="region"
-      aria-label={title}
-    >
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold" style={{ color: "#667085" }}>
-          {title}
-        </p>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setDropdownOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100"
-          >
-            <span>{currentOption.label}</span>
-            <ChevronDown className="h-3 w-3" />
-          </button>
-          {dropdownOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setDropdownOpen(false)}
-              />
-              <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
-                {REGIONAL_CHART_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      setActiveType(option.value);
-                      setDropdownOpen(false);
-                    }}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-gray-50"
-                    style={{
-                      color:
-                        option.value === activeType
-                          ? COLORS.teal
-                          : COLORS.textSecond,
-                      fontWeight: option.value === activeType ? 600 : 400,
-                    }}
-                  >
-                    {option.label}
-                    {option.value === activeType && (
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: COLORS.teal }}
-                      />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+    <>
+      <ChartFullscreenModal
+        open={fullscreen}
+        onClose={() => setFullscreen(false)}
+        title={title}
+        activeType={activeType}
+        items={items}
+        formatter={formatter}
+      />
+      <div
+        className={`border rounded-xl bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`}
+        style={{ borderColor: "#E9E5E5" }}
+        role="region"
+        aria-label={title}
+      >
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold" style={{ color: "#667085" }}>
+            {title}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFullscreen(true)}
+              className="flex items-center justify-center h-7 w-7 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              aria-label="Expand chart"
+              title="View fullscreen"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100"
+              >
+                <span>{currentOption.label}</span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {dropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                    {REGIONAL_CHART_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setActiveType(option.value);
+                          setDropdownOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-gray-50"
+                        style={{
+                          color:
+                            option.value === activeType
+                              ? COLORS.teal
+                              : COLORS.textSecond,
+                          fontWeight: option.value === activeType ? 600 : 400,
+                        }}
+                      >
+                        {option.label}
+                        {option.value === activeType && (
+                          <span
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: COLORS.teal }}
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
       {activeType === "funnel" && (
         <GimFunnelChart items={items} formatter={formatter} height={height} />
       )}
@@ -1445,7 +1529,9 @@ function RegionalMultiChart({
         <LollipopDistributionChart items={items} formatter={formatter} />
       )}
       {children}
-    </div>
+      {children}
+      </div>
+    </>
   );
 }
 
