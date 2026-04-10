@@ -28,11 +28,14 @@ import { useMe } from "@/hooks/useAuth";
 import {
   useEnrollInLearningCourse,
   useLearningAnnouncements,
+  useLearningCourseContent,
   useLearningCourses,
   useLearningDashboard,
+  useLearningLessonById,
   useLearningMyCourses,
   useLearningPayments,
   useLearningResults,
+  useLearningSectionContent,
   useLearningUpcomingActivities,
   useUnenrollFromLearningCourse,
 } from "@/hooks/useLearning";
@@ -85,6 +88,12 @@ function formatActivityType(type: string): string {
     .split("_")
     .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
     .join(" ");
+}
+
+function toNumericId(value: string | number | null | undefined): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
 }
 
 /* ── Tab chip — matches category chips in Resources/Directory ─────────────── */
@@ -185,12 +194,14 @@ function CourseCard({
   isEnrolled,
   onEnroll,
   onUnenroll,
+  onExplore,
   mutating,
 }: Readonly<{
   course: StudentCourseDto;
   isEnrolled: boolean;
   onEnroll: () => void;
   onUnenroll: () => void;
+  onExplore: () => void;
   mutating: boolean;
 }>) {
   const levelColor: Record<string, string> = {
@@ -276,6 +287,12 @@ function CourseCard({
 
           {/* Footer */}
           <div className="pt-3 border-t border-gray-50">
+            <button
+              onClick={onExplore}
+              className="w-full mb-2 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 py-1.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              View Outline <ChevronRight className="h-3.5 w-3.5" />
+            </button>
             {isEnrolled ? (
               <div className="flex items-center justify-between">
                 <button className="flex items-center gap-1 text-xs font-semibold text-[#D52B1E] hover:gap-2 transition-all">
@@ -309,6 +326,9 @@ function CourseCard({
 export function LearningZone() {
   const [courseSearch, setCourseSearch] = useState("");
   const [activeTab, setActiveTab] = useState("my-learning");
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
+  const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -326,6 +346,15 @@ export function LearningZone() {
     perPage: 24,
     search: courseSearch || undefined,
   });
+  const { data: courseSections = [], isLoading: courseSectionsLoading } = useLearningCourseContent(
+    selectedCourseId ?? undefined,
+  );
+  const { data: sectionItems = [], isLoading: sectionItemsLoading } = useLearningSectionContent(
+    selectedSectionId ?? undefined,
+  );
+  const { data: selectedLesson, isLoading: selectedLessonLoading } = useLearningLessonById(
+    selectedLessonId ?? undefined,
+  );
 
   const enrollMutation = useEnrollInLearningCourse();
   const unenrollMutation = useUnenrollFromLearningCourse();
@@ -342,6 +371,41 @@ export function LearningZone() {
 
   const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(" ").trim();
   const welcomeName = fullName || me?.username || "Learner";
+  const selectedCourse = useMemo(
+    () => (courseList?.data ?? []).find((course) => course.id === selectedCourseId),
+    [courseList?.data, selectedCourseId],
+  );
+
+  useEffect(() => {
+    setSelectedSectionId(null);
+    setSelectedLessonId(null);
+  }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (selectedSectionId !== null) return;
+    if (courseSections.length === 0) return;
+
+    const firstSectionId = courseSections
+      .map((section) => toNumericId(section.id))
+      .find((id): id is number => id !== null);
+
+    if (firstSectionId !== undefined) {
+      setSelectedSectionId(firstSectionId);
+    }
+  }, [courseSections, selectedSectionId]);
+
+  useEffect(() => {
+    if (selectedLessonId !== null) return;
+    if (sectionItems.length === 0) return;
+
+    const firstLessonId = sectionItems
+      .map((itemData) => toNumericId(itemData.id))
+      .find((id): id is number => id !== null);
+
+    if (firstLessonId !== undefined) {
+      setSelectedLessonId(firstLessonId);
+    }
+  }, [sectionItems, selectedLessonId]);
 
   const onRefreshAll = async () => {
     await Promise.all([
@@ -900,25 +964,170 @@ export function LearningZone() {
                 </motion.div>
               )}
               {!coursesLoading && hasCourses && (
-                <motion.div
-                  className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  {courseList?.data.map((course) => (
-                    <CourseCard
-                      key={course.id}
-                      course={course}
-                      isEnrolled={enrolledCourseIds.has(course.id)}
-                      onEnroll={() => enrollMutation.mutate(course.id)}
-                      onUnenroll={() => unenrollMutation.mutate(course.id)}
-                      mutating={
-                        enrollMutation.isPending || unenrollMutation.isPending
-                      }
-                    />
-                  ))}
-                </motion.div>
+                <div className="grid gap-5 xl:grid-cols-5">
+                  <motion.div
+                    className="xl:col-span-3 grid gap-5 sm:grid-cols-2"
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    {courseList?.data.map((course) => (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                        isEnrolled={enrolledCourseIds.has(course.id)}
+                        onEnroll={() => enrollMutation.mutate(course.id)}
+                        onUnenroll={() => unenrollMutation.mutate(course.id)}
+                        onExplore={() => {
+                          setSelectedCourseId(course.id);
+                          setSelectedSectionId(null);
+                          setSelectedLessonId(null);
+                        }}
+                        mutating={
+                          enrollMutation.isPending || unenrollMutation.isPending
+                        }
+                      />
+                    ))}
+                  </motion.div>
+
+                  <div className="xl:col-span-2 rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden self-start">
+                    <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-widest mb-1">
+                          Course Flow Explorer
+                        </p>
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          {selectedCourse ? selectedCourse.title : "Select a course to explore"}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Flow: course to course sections to section lessons to lesson content
+                        </p>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+                        <div className="rounded-xl border border-gray-100 p-3">
+                          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            1. Course Sections
+                          </p>
+                          {selectedCourseId === null && (
+                            <p className="text-xs text-gray-400">Choose a course card first.</p>
+                          )}
+                          {selectedCourseId !== null && courseSectionsLoading && (
+                            <p className="text-xs text-gray-500">Loading sections...</p>
+                          )}
+                          {selectedCourseId !== null &&
+                            !courseSectionsLoading &&
+                            courseSections.length === 0 && (
+                              <p className="text-xs text-gray-400">No sections returned for this course.</p>
+                            )}
+                          <div className="space-y-2">
+                            {courseSections.map((section) => {
+                              const sectionId = toNumericId(section.id);
+                              const isSelected = sectionId !== null && sectionId === selectedSectionId;
+
+                              return (
+                                <button
+                                  key={`${section.id}-${section.order}`}
+                                  disabled={sectionId === null}
+                                  onClick={() => {
+                                    if (sectionId === null) return;
+                                    setSelectedSectionId(sectionId);
+                                    setSelectedLessonId(null);
+                                  }}
+                                  className={`w-full text-left rounded-lg border px-2.5 py-2 transition-colors ${
+                                    isSelected
+                                      ? "border-[#D52B1E]/40 bg-[#D52B1E]/5"
+                                      : "border-gray-100 hover:bg-gray-50"
+                                  } ${sectionId === null ? "opacity-60 cursor-not-allowed" : ""}`}
+                                >
+                                  <p className="text-xs font-semibold text-gray-800 line-clamp-1">{section.title}</p>
+                                  <p className="text-[11px] text-gray-500 mt-0.5">
+                                    Section ID: {section.id}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-gray-100 p-3">
+                          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            2. Lessons In Section
+                          </p>
+                          {selectedSectionId === null && (
+                            <p className="text-xs text-gray-400">Choose a section to load its lessons.</p>
+                          )}
+                          {selectedSectionId !== null && sectionItemsLoading && (
+                            <p className="text-xs text-gray-500">Loading section lessons...</p>
+                          )}
+                          {selectedSectionId !== null &&
+                            !sectionItemsLoading &&
+                            sectionItems.length === 0 && (
+                              <p className="text-xs text-gray-400">No lesson items returned for this section.</p>
+                            )}
+                          <div className="space-y-2">
+                            {sectionItems.map((itemData) => {
+                              const lessonId = toNumericId(itemData.id);
+                              const isSelected = lessonId !== null && lessonId === selectedLessonId;
+
+                              return (
+                                <button
+                                  key={`${itemData.id}-${itemData.order}`}
+                                  disabled={lessonId === null}
+                                  onClick={() => {
+                                    if (lessonId === null) return;
+                                    setSelectedLessonId(lessonId);
+                                  }}
+                                  className={`w-full text-left rounded-lg border px-2.5 py-2 transition-colors ${
+                                    isSelected
+                                      ? "border-[#D52B1E]/40 bg-[#D52B1E]/5"
+                                      : "border-gray-100 hover:bg-gray-50"
+                                  } ${lessonId === null ? "opacity-60 cursor-not-allowed" : ""}`}
+                                >
+                                  <p className="text-xs font-semibold text-gray-800 line-clamp-1">{itemData.title}</p>
+                                  <p className="text-[11px] text-gray-500 mt-0.5">
+                                    Lesson ID: {itemData.id}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-100 p-3">
+                        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                          3. Lesson Content
+                        </p>
+                        {selectedLessonId === null && (
+                          <p className="text-xs text-gray-400">Choose a lesson to load details.</p>
+                        )}
+                        {selectedLessonId !== null && selectedLessonLoading && (
+                          <p className="text-xs text-gray-500">Loading lesson content...</p>
+                        )}
+                        {selectedLessonId !== null && !selectedLessonLoading && !selectedLesson && (
+                          <p className="text-xs text-gray-400">Lesson details not returned.</p>
+                        )}
+                        {selectedLesson && (
+                          <div className="space-y-1.5">
+                            <p className="text-sm font-semibold text-gray-900">{selectedLesson.title}</p>
+                            <p className="text-xs text-gray-500">Lesson ID: {selectedLesson.id}</p>
+                            <p className="text-xs text-gray-500">Course ID: {selectedLesson.courseId}</p>
+                            <p className="text-xs text-gray-500">
+                              Duration: {Math.max(1, Math.round((selectedLesson.durationSeconds ?? 0) / 60))} min
+                            </p>
+                            {selectedLesson.description && (
+                              <p className="text-xs text-gray-600 pt-1 leading-relaxed">
+                                {stripHtml(selectedLesson.description)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
               {!coursesLoading && !hasCourses && (
                 <EmptyState
