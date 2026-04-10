@@ -8,9 +8,6 @@ import {
   Clock3,
   ExternalLink,
   Eye,
-  Film,
-  Hash,
-  ImageIcon,
   ListTree,
   NotepadText,
   PlayCircle,
@@ -225,40 +222,38 @@ function extractCourseDescriptionData(description?: string) {
 
 function buildCourseFieldCards(course: StudentCourseDto | null) {
   return [
-    { label: "Course ID", value: String(course?.id ?? "Not available"), icon: Hash },
-    { label: "Slug", value: course?.slug || "Not available", icon: Tag },
-    { label: "Cover Image", value: course?.coverImageUrl || "Not available", icon: ImageIcon },
-    { label: "Preview Video", value: course?.previewVideoUrl || "Not available", icon: Film },
-    { label: "Educator ID", value: String(course?.educatorId ?? "Not available"), icon: UserRound },
-    {
-      label: "Educator Profile",
-      value: `id=${course?.educator?.id ?? "-"} | name=${course?.educator?.name || "Unknown"} | rating=${course?.educator?.rating ?? 0} | avatar=${course?.educator?.profilePhotoUrl || "none"}`,
-      icon: UserRound,
-    },
+    { label: "Instructor", value: course?.educator?.name || "Unknown educator", icon: UserRound },
     {
       label: "Programme",
-      value: course?.programme
-        ? `id=${course.programme.id} | title=${course.programme.title} | level=${course.programme.level || "-"} | duration=${course.programme.totalDurationMinutes ?? 0} min`
-        : `programmeId=${course?.programmeId ?? "null"} | programme=null`,
+      value: course?.programme?.title || "Independent course",
       icon: BookOpen,
     },
-    { label: "Module Count", value: String(course?.moduleCount ?? 0), icon: ListTree },
-    { label: "Video Count", value: String(course?.videoCount ?? 0), icon: PlayCircle },
-    { label: "Total Duration", value: formatCourseDuration(course?.totalDurationMinutes), icon: Clock3 },
-    { label: "Enrolled Count", value: String(course?.enrolledCount ?? 0), icon: Users },
-    { label: "Level", value: course?.level || "Not available", icon: Sparkles },
-    { label: "Price", value: formatPrice(course?.priceUsd), icon: Tag },
-    { label: "Free Access", value: String(course?.isFree ?? false), icon: Eye },
-    { label: "Rating", value: String(course?.rating ?? 0), icon: Sparkles },
-    { label: "Review Count", value: String(course?.reviewCount ?? 0), icon: NotepadText },
-    { label: "Status", value: course?.status || "Not available", icon: Eye },
-    { label: "Tags", value: course?.tags?.length ? course.tags.join(", ") : "No tags", icon: Tag },
-    { label: "Published At", value: formatDate(course?.publishedAt), icon: CalendarDays },
-    { label: "Created At", value: formatDate(course?.createdAt), icon: CalendarDays },
-    { label: "Updated At", value: formatDate(course?.updatedAt), icon: CalendarDays },
-    { label: "Progress Percent", value: `${course?.progressPercent ?? 0}%`, icon: Eye },
-    { label: "Completed", value: String(course?.isCompleted ?? false), icon: Eye },
-    { label: "Completed At", value: formatDate(course?.completedAt), icon: CalendarDays },
+    { label: "Duration", value: formatCourseDuration(course?.totalDurationMinutes), icon: Clock3 },
+    { label: "Lessons", value: `${course?.videoCount ?? 0} lessons`, icon: PlayCircle },
+    { label: "Students Enrolled", value: `${course?.enrolledCount ?? 0} students`, icon: Users },
+    { label: "Level", value: course?.level || "Not specified", icon: Sparkles },
+    { label: "Price", value: course?.isFree ? "Free" : formatPrice(course?.priceUsd), icon: Tag },
+    {
+      label: "Rating",
+      value: course?.rating ? `${course.rating.toFixed(1)} / 5 (${course?.reviewCount ?? 0} reviews)` : "Not yet rated",
+      icon: Sparkles,
+    },
+    { label: "Topics", value: course?.tags?.length ? course.tags.join(", ") : "General", icon: Tag },
+    { label: "Published", value: formatDate(course?.publishedAt), icon: CalendarDays },
+    {
+      label: "Your Progress",
+      value: course?.progressPercent ? `${course.progressPercent}%` : "Not started",
+      icon: Eye,
+    },
+    {
+      label: "Completion",
+      value: course?.isCompleted
+        ? course.completedAt
+          ? `Completed on ${formatDate(course.completedAt)}`
+          : "Completed"
+        : "In progress",
+      icon: Eye,
+    },
   ];
 }
 
@@ -277,20 +272,26 @@ function CourseHero({
       <div className="absolute -bottom-12 left-0 h-32 w-32 rounded-full bg-orange-300/10 blur-3xl" />
       <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-red-200">
-            Guided Learning Explorer
-          </p>
           <h2 className="mt-2 text-2xl font-bold">{course?.title || "Select a course"}</h2>
           <p className="mt-2 max-w-3xl text-sm text-slate-300">
-            Move from course outline to section lessons and then into lesson content without leaving the catalogue.
+            {course?.educator?.name ? `Taught by ${course.educator.name}` : "Browse sections and lessons below."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge className="border-transparent bg-white/10 text-white">slug: {course?.slug || "n/a"}</Badge>
-            <Badge className="border-transparent bg-white/10 text-white">status: {course?.status || "n/a"}</Badge>
-            <Badge className="border-transparent bg-white/10 text-white">price: {formatPrice(course?.priceUsd)}</Badge>
-            <Badge className="border-transparent bg-white/10 text-white">rating: {course?.rating ?? 0}</Badge>
-            <Badge className="border-transparent bg-white/10 text-white">reviews: {course?.reviewCount ?? 0}</Badge>
-            <Badge className="border-transparent bg-white/10 text-white">progress: {course?.progressPercent ?? 0}%</Badge>
+            {course?.level && (
+              <Badge className="border-transparent bg-white/10 text-white">{course.level}</Badge>
+            )}
+            <Badge className="border-transparent bg-white/10 text-white">
+              {course?.isFree ? "Free" : formatPrice(course?.priceUsd)}
+            </Badge>
+            {(course?.rating ?? 0) > 0 && (
+              <Badge className="border-transparent bg-white/10 text-white">★ {course?.rating?.toFixed(1)}</Badge>
+            )}
+            {(course?.reviewCount ?? 0) > 0 && (
+              <Badge className="border-transparent bg-white/10 text-white">{course?.reviewCount} reviews</Badge>
+            )}
+            {(course?.progressPercent ?? 0) > 0 && (
+              <Badge className="border-transparent bg-white/10 text-white">{course?.progressPercent}% complete</Badge>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:w-[320px]">
@@ -342,10 +343,10 @@ function CourseStoryPanel({
       <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white p-4">
         <div className="flex items-center gap-2">
           <NotepadText className="h-4 w-4 text-[#D52B1E]" />
-          <h3 className="font-semibold text-gray-900">Course Story</h3>
+          <h3 className="font-semibold text-gray-900">About This Course</h3>
         </div>
         <p className="mt-1 text-sm text-gray-500">
-          Description HTML is parsed into readable insights and also rendered in a styled content canvas.
+          Learn what this course covers, who teaches it, and what to expect.
         </p>
       </div>
       <div className="grid gap-4 p-4 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -384,7 +385,7 @@ function CourseStoryPanel({
           <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
             <h4 className="font-semibold text-gray-900">Course Summary</h4>
             <p className="mt-2 text-sm leading-6 text-gray-700">
-              {courseDescriptionData.summary || stripHtml(course?.description || "") || "No summary was available."}
+              {courseDescriptionData.summary || stripHtml(course?.description || "") || "No course description available."}
             </p>
           </div>
 
@@ -394,18 +395,18 @@ function CourseStoryPanel({
           </div>
 
           <div className="rounded-2xl border border-gray-100 p-4">
-            <h4 className="font-semibold text-gray-900">Syllabus Signals</h4>
+            <h4 className="font-semibold text-gray-900">Course Syllabus</h4>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <BadgeCluster
-                title="Section titles"
+                title="Sections"
                 items={courseDescriptionData.syllabusSectionTitles}
-                emptyText="No section titles in description HTML."
+                emptyText="No sections listed."
                 variant="outline"
               />
               <BadgeCluster
-                title="Lesson titles"
+                title="Lessons"
                 items={courseDescriptionData.syllabusLessonTitles.slice(0, 8)}
-                emptyText="No lessons declared in description HTML."
+                emptyText="No lessons listed."
                 className="bg-[#D52B1E]/10 text-[#D52B1E] border-transparent"
               />
             </div>
@@ -418,7 +419,7 @@ function CourseStoryPanel({
 
           {courseDescriptionData.renderedHtml && (
             <div className="rounded-2xl border border-gray-100 p-4">
-              <h4 className="font-semibold text-gray-900">Rendered Description</h4>
+              <h4 className="font-semibold text-gray-900">Full Description</h4>
               <div
                 className="prose prose-sm mt-3 max-w-none overflow-hidden text-gray-700 prose-img:rounded-xl prose-figure:my-4 prose-a:text-[#D52B1E]"
                 dangerouslySetInnerHTML={{ __html: courseDescriptionData.renderedHtml }}
@@ -488,10 +489,10 @@ function PayloadAtlas({ course }: Readonly<{ course: StudentCourseDto | null }>)
     <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-[#D52B1E]" />
-        <h3 className="font-semibold text-gray-900">Payload Atlas</h3>
+        <h3 className="font-semibold text-gray-900">Course Details</h3>
       </div>
       <p className="mt-1 text-sm text-gray-500">
-        Every top-level course response key is surfaced here so the frontend mapping stays explicit.
+        Key information about this course at a glance.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {courseFieldCards.map(({ label, value, icon: Icon }) => (
@@ -509,13 +510,11 @@ function PayloadAtlas({ course }: Readonly<{ course: StudentCourseDto | null }>)
 }
 
 function OutlineColumn({
-  courseId,
   sections,
   sectionsLoading,
   selectedSectionId,
   onSelectSection,
 }: Readonly<{
-  courseId?: number;
   sections: LearningOutlineItemDto[];
   sectionsLoading: boolean;
   selectedSectionId: number | null;
@@ -529,14 +528,14 @@ function OutlineColumn({
         </div>
         <div>
           <p className="text-sm font-semibold text-gray-900">Course Sections</p>
-          <p className="text-xs text-gray-500">From /learning/courses/{courseId}/content</p>
+          <p className="text-xs text-gray-500">Select a section to browse its lessons</p>
         </div>
       </div>
 
       <div className="space-y-2">
         {sectionsLoading && <p className="text-sm text-gray-500">Loading sections...</p>}
         {!sectionsLoading && sections.length === 0 && (
-          <p className="text-sm text-gray-400">No sections were returned for this course.</p>
+          <p className="text-sm text-gray-400">No sections are available for this course yet.</p>
         )}
         {sections.map((section) => {
           const active = section.id === selectedSectionId;
@@ -555,9 +554,8 @@ function OutlineColumn({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 line-clamp-2">{section.title}</p>
-                  <p className="mt-1 text-[11px] text-gray-500">Section ID: {section.id}</p>
                 </div>
-                <Badge variant="outline">{section.order}</Badge>
+                <Badge variant="outline">#{section.order}</Badge>
               </div>
             </button>
           );
@@ -589,20 +587,20 @@ function LessonsColumn({
         <div>
           <p className="text-sm font-semibold text-gray-900">Section Lessons</p>
           <p className="text-xs text-gray-500">
-            {selectedSectionId ? `/learning/sections/${selectedSectionId}/content` : "Select a section first"}
+            {selectedSectionId ? "Select a lesson to view its content" : "Choose a section first"}
           </p>
         </div>
       </div>
 
       <div className="space-y-2">
         {selectedSectionId === null && (
-          <p className="text-sm text-gray-400">Select a section to view its lessons.</p>
+          <p className="text-sm text-gray-400">Select a section to see its lessons.</p>
         )}
         {selectedSectionId !== null && lessonsLoading && (
           <p className="text-sm text-gray-500">Loading lessons...</p>
         )}
         {selectedSectionId !== null && !lessonsLoading && lessons.length === 0 && (
-          <p className="text-sm text-gray-400">No lessons were returned for this section.</p>
+          <p className="text-sm text-gray-400">No lessons are available in this section yet.</p>
         )}
         {lessons.map((lessonItem) => {
           const active = lessonItem.id === selectedLessonId;
@@ -625,8 +623,7 @@ function LessonsColumn({
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 line-clamp-2">{lessonItem.title}</p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
-                    <span>Lesson ID: {lessonItem.id}</span>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 uppercase tracking-wide">
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 capitalize tracking-wide">
                       {lessonItem.type}
                     </span>
                   </div>
@@ -650,10 +647,8 @@ function LessonPanel({
   hasNextLesson,
   onPreviousLesson,
   onNextLesson,
-  selectedSectionId,
   content,
   embedUrl,
-  courseId,
 }: Readonly<{
   lesson: StudentLessonDto | undefined;
   selectedLessonId: number | null;
@@ -664,20 +659,15 @@ function LessonPanel({
   hasNextLesson: boolean;
   onPreviousLesson: () => void;
   onNextLesson: () => void;
-  selectedSectionId: number | null;
   content: ReturnType<typeof extractLessonContent>;
   embedUrl: string | null;
-  courseId?: number;
 }>) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
       <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#D52B1E]">
-              Lesson Experience
-            </p>
-            <h3 className="mt-1 text-xl font-bold text-gray-900">
+            <h3 className="text-xl font-bold text-gray-900">
               {lesson?.title || "Select a lesson"}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
@@ -692,12 +682,8 @@ function LessonPanel({
             <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-transparent">
               <Clock3 className="mr-1 h-3 w-3" /> {formatLessonDuration(lesson.durationSeconds)}
             </Badge>
-            <Badge variant="outline">Lesson ID: {lesson.id}</Badge>
-            <Badge variant="outline">Course ID: {lesson.courseId}</Badge>
-            <Badge variant="outline">{lesson.isFree ? "Free Preview" : "Protected"}</Badge>
-            <Badge variant="outline">Views: {lesson.viewCount}</Badge>
-            <Badge variant="outline">Order: {lesson.orderIndex}</Badge>
-            {lesson.quizId && <Badge variant="outline">Quiz #{lesson.quizId}</Badge>}
+            <Badge variant="outline">{lesson.isFree ? "Free Preview" : "Enrolled Access"}</Badge>
+            {lesson.quizId && <Badge variant="outline">Includes Quiz</Badge>}
           </div>
         )}
 
@@ -713,7 +699,7 @@ function LessonPanel({
             <ArrowLeft className="h-4 w-4" /> Previous lesson
           </Button>
           <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Section navigation</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Lesson navigation</p>
             <p className="text-sm font-medium text-gray-900">
               {lessonIndex >= 0 ? `${lessonIndex + 1} of ${lessonCount}` : "No lesson selected"}
             </p>
@@ -733,13 +719,13 @@ function LessonPanel({
 
       <div className="p-4 space-y-4">
         {selectedLessonId === null && (
-          <p className="text-sm text-gray-400">Choose a lesson to inspect its content.</p>
+          <p className="text-sm text-gray-400">Choose a lesson from the section list to begin.</p>
         )}
         {selectedLessonId !== null && lessonLoading && (
           <p className="text-sm text-gray-500">Loading lesson content...</p>
         )}
         {selectedLessonId !== null && !lessonLoading && !lesson && (
-          <p className="text-sm text-gray-400">No lesson details were returned.</p>
+          <p className="text-sm text-gray-400">This lesson's details could not be loaded.</p>
         )}
 
         {lesson && (
@@ -760,7 +746,7 @@ function LessonPanel({
                 </div>
               ) : (
                 <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
-                  No embeddable video was mapped from the lesson response.
+                  No video is available for this lesson.
                 </div>
               )}
 
@@ -770,7 +756,7 @@ function LessonPanel({
                   <h4 className="font-semibold">Lesson Summary</h4>
                 </div>
                 <p className="text-sm leading-6 text-gray-700">
-                  {content.summary || "No clean summary text was available in the lesson description."}
+                  {content.summary || "No description is available for this lesson."}
                 </p>
               </div>
 
@@ -788,7 +774,7 @@ function LessonPanel({
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-400">No readable lesson copy was extracted from the API response.</p>
+                    <p className="text-sm text-gray-400">No additional content is available for this lesson.</p>
                   )}
                 </div>
               </div>
@@ -813,29 +799,26 @@ function LessonPanel({
                     </Button>
                   )}
                   {!lesson.videoUrl && !content.quizUrl && (
-                    <p className="text-sm text-gray-400">No direct video or quiz action was available.</p>
+                    <p className="text-sm text-gray-400">No video or quiz is available for this lesson.</p>
                   )}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-orange-50 to-white p-4">
-                <h4 className="font-semibold text-gray-900">API Mapping</h4>
-                <div className="mt-3 space-y-2 text-xs text-gray-600">
-                  <p><span className="font-semibold text-gray-900">Course list:</span> /learning/courses?page=1&perPage=24</p>
-                  <p><span className="font-semibold text-gray-900">Sections:</span> /learning/courses/{courseId}/content</p>
-                  <p><span className="font-semibold text-gray-900">Lessons:</span> {selectedSectionId ? `/learning/sections/${selectedSectionId}/content` : "Select section"}</p>
-                  <p><span className="font-semibold text-gray-900">Lesson:</span> {selectedLessonId ? `/learning/lessons/${selectedLessonId}` : "Select lesson"}</p>
+              <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-[#D52B1E]/5 to-white p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <BookOpen className="h-4 w-4 text-[#D52B1E]" />
+                  <h4 className="font-semibold text-gray-900">Lesson Info</h4>
                 </div>
-              </div>
-
-              <div className="rounded-2xl border border-gray-100 bg-slate-950 p-4 text-white">
-                <div className="flex items-center gap-2">
-                  <PlayCircle className="h-4 w-4 text-red-300" />
-                  <h4 className="font-semibold">Reading Mode</h4>
+                <div className="space-y-2 text-sm text-gray-600">
+                  {lesson?.course?.title && (
+                    <p><span className="font-semibold text-gray-900">Course:</span> {lesson.course.title}</p>
+                  )}
+                  <p><span className="font-semibold text-gray-900">Duration:</span> {formatLessonDuration(lesson?.durationSeconds)}</p>
+                  <p><span className="font-semibold text-gray-900">Access:</span> {lesson?.isFree ? "Free preview" : "Available after enrollment"}</p>
+                  {lesson?.quizId && (
+                    <p><span className="font-semibold text-gray-900">Assessment:</span> Quiz included</p>
+                  )}
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  This explorer stays on top of the course list, so learners can inspect content deeply without losing their place in a long catalogue.
-                </p>
               </div>
             </div>
           </div>
@@ -936,7 +919,6 @@ export function CourseExplorerDialog({
 
         <div className="grid gap-4 xl:grid-cols-[280px_320px_minmax(0,1fr)]">
           <OutlineColumn
-            courseId={courseId}
             sections={sections}
             sectionsLoading={sectionsLoading}
             selectedSectionId={selectedSectionId}
@@ -962,10 +944,8 @@ export function CourseExplorerDialog({
             hasNextLesson={hasNextLesson}
             onPreviousLesson={handlePreviousLesson}
             onNextLesson={handleNextLesson}
-            selectedSectionId={selectedSectionId}
             content={content}
             embedUrl={lessonEmbedUrl}
-            courseId={courseId}
           />
         </div>
       </div>
