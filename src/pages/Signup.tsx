@@ -47,26 +47,49 @@ function passwordStrength(pw: string): { score: number; label: string; color: st
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
 
+function generateUsername(first: string, last: string): string {
+  const clean = (s: string) =>
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+  const base = (clean(first) + clean(last)).slice(0, 16);
+  const suffix = Math.floor(100 + Math.random() * 900); // 3-digit number
+  return base ? `${base}${suffix}` : "";
+}
+
 const Signup = () => {
   const [firstName, setFirstName]             = useState('')
   const [lastName, setLastName]               = useState('')
   const [username, setUsername]               = useState('')
-  const [email, setEmail]                     = useState('')
-  const [phone, setPhone]                     = useState('')
-  const [country, setCountry]                 = useState('')
-  const [password, setPassword]               = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPassword, setShowPassword]       = useState(false)
-  const [showConfirm, setShowConfirm]         = useState(false)
-  const [errors, setErrors]                   = useState<Record<string, string>>({})
-  const [usernameStatus, setUsernameStatus]   = useState<UsernameStatus>('idle')
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [usernameManuallyEdited, setUsernameManuallyEdited] = useState(false);
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const navigate = useNavigate()
-  const registerMutation = useRegister()
-  const checkUsernameMutation = useCheckUsername()
+  const navigate = useNavigate();
+  const registerMutation = useRegister();
+  const checkUsernameMutation = useCheckUsername();
 
-  const strength = passwordStrength(password)
+  const strength = passwordStrength(password);
+
+  /* -- Auto-generate username from first+last name (unless user edited it) - */
+  useEffect(() => {
+    if (usernameManuallyEdited) return;
+    if (!firstName && !lastName) return;
+    const generated = generateUsername(firstName, lastName);
+    if (generated) {
+      setUsername(generated);
+      setUsernameStatus("idle");
+    }
+  }, [firstName, lastName, usernameManuallyEdited]);
 
   /* -- Username debounce availability check -------------------------------- */
   useEffect(() => {
@@ -301,6 +324,7 @@ const Signup = () => {
                     placeholder="janedoe123"
                     value={username}
                     onChange={(e) => {
+                      setUsernameManuallyEdited(true);
                       setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))
                       setErrors((p) => ({ ...p, username: '' }))
                     }}
