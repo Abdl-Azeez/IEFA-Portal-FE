@@ -348,7 +348,7 @@ const Signup = () => {
                   </p>
                 )}
                 <FieldError name="username" />
-                <p className="text-gray-400 text-[11px]">3\u201320 characters \u00b7 letters, numbers and underscores only</p>
+                <p className="text-gray-400 text-[11px]">3–20 characters · letters, numbers and underscores only</p>
               </div>
 
               {/* Email */}
