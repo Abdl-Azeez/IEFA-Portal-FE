@@ -32,43 +32,58 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { duration: 0.4 } },
 }
 
+const toText = (value: string | number | null | undefined) => {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return String(value)
+  }
+
+  return ''
+}
+
 export default function Profile() {
   const { user } = useAuthStore()
   const updateProfile = useUpdateProfile()
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   const [form, setForm] = useState({
-    username: user?.username ?? '',
-    lmsStudentId: user?.lmsStudentId ?? '',
-    firstName: user?.firstName ?? '',
-    lastName: user?.lastName ?? '',
-    phone: user?.phone ?? '',
-    country: user?.country ?? '',
-    profilePhotoUrl: user?.profilePhotoUrl ?? '',
+    username: toText(user?.username),
+    lmsStudentId: toText(user?.lmsStudentId),
+    firstName: toText(user?.firstName),
+    lastName: toText(user?.lastName),
+    phone: toText(user?.phone),
+    country: toText(user?.country),
+    profilePhotoUrl: toText(user?.profilePhotoUrl),
   })
 
   // Sync when user data loads from API
   useEffect(() => {
     if (user) {
       setForm({
-        username: user.username ?? '',
-        lmsStudentId: user.lmsStudentId ?? '',
-        firstName: user.firstName ?? '',
-        lastName: user.lastName ?? '',
-        phone: user.phone ?? '',
-        country: user.country ?? '',
-        profilePhotoUrl: user.profilePhotoUrl ?? '',
+        username: toText(user.username),
+        lmsStudentId: toText(user.lmsStudentId),
+        firstName: toText(user.firstName),
+        lastName: toText(user.lastName),
+        phone: toText(user.phone),
+        country: toText(user.country),
+        profilePhotoUrl: toText(user.profilePhotoUrl),
       })
     }
   }, [user?.id])
 
   function handleSave() {
     if (!user?.id) return
+    const username = toText(form.username).trim()
+    const lmsStudentId = toText(form.lmsStudentId).trim()
+
     updateProfile.mutate({
       ...form,
-      username: form.username.trim() || undefined,
-      lmsStudentId: form.lmsStudentId.trim() || null,
-    });
+      username: username || undefined,
+      lmsStudentId: lmsStudentId || null,
+    })
   }
 
   const initials = [form.firstName, form.lastName]

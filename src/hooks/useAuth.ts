@@ -49,7 +49,7 @@ interface AuthUserPayload {
   userId?: string;
   email: string;
   username?: string | null;
-  lmsStudentId?: string | null;
+  lmsStudentId?: string | number | null;
   role: "student" | "instructor" | "admin" | "staff";
   isModerator?: boolean;
   firstName?: string;
@@ -64,6 +64,13 @@ interface AuthUserPayload {
 }
 
 const AUTH_PROFILE_STORAGE_KEY = "authProfile";
+
+const normalizeNullableString = (
+  value: string | number | null | undefined,
+): string | null | undefined => {
+  if (value === null || value === undefined) return value;
+  return String(value);
+};
 
 type StoredAuthProfile = Pick<
   AuthUserPayload,
@@ -122,7 +129,9 @@ const normalizeAuthUser = (user: AuthUserPayload) => {
       ? { isModerator: !!user.isModerator }
       : {}),
     username: user.username ?? storedProfile?.username,
-    lmsStudentId: user.lmsStudentId ?? storedProfile?.lmsStudentId,
+    lmsStudentId: normalizeNullableString(
+      user.lmsStudentId ?? storedProfile?.lmsStudentId,
+    ),
     firstName: user.firstName ?? storedProfile?.firstName,
     lastName: user.lastName ?? storedProfile?.lastName,
     profilePhotoUrl: user.profilePhotoUrl ?? storedProfile?.profilePhotoUrl,
@@ -470,8 +479,8 @@ export const useUpdateProfile = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      if (data?.user) setUser(data.user);
-      else if (data?.id) setUser(data);
+      if (data?.user) setUser(normalizeAuthUser(data.user));
+      else if (data?.id) setUser(normalizeAuthUser(data));
       queryClient.invalidateQueries({ queryKey: ["me"] });
       toast({
         title: "Profile updated",

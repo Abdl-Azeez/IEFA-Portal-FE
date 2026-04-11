@@ -283,7 +283,7 @@ export const useLearningAnnouncements = () =>
     staleTime: 30_000,
   });
 
-export const useLearningPayments = () =>
+export const useLearningPayments = (enabled = true) =>
   useQuery<StudentPaymentsDto>({
     queryKey: ["learning", "payments"],
     queryFn: () =>
@@ -292,10 +292,11 @@ export const useLearningPayments = () =>
           await api.get<StudentPaymentsDto>("/learning/payments");
         return data;
       }, "Failed to load payment information."),
+    enabled,
     staleTime: 30_000,
   });
 
-export const useLearningResults = () =>
+export const useLearningResults = (enabled = true) =>
   useQuery<StudentResultsDto>({
     queryKey: ["learning", "results"],
     queryFn: () =>
@@ -303,6 +304,7 @@ export const useLearningResults = () =>
         const { data } = await api.get<StudentResultsDto>("/learning/results");
         return data;
       }, "Failed to load learning results."),
+    enabled,
     staleTime: 30_000,
   });
 

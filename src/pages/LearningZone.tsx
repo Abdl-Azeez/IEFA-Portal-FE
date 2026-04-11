@@ -318,9 +318,12 @@ function CourseCard({
 /* -------------------- Main Component ---------------------------------------- */
 export function LearningZone() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const showPaymentsAndResults = false;
   const allowedTabs = useMemo(
-    () => new Set(["my-learning", "courses", "payments", "results"]),
-    [],
+    () => new Set(showPaymentsAndResults
+      ? ["my-learning", "courses", "payments", "results"]
+      : ["my-learning", "courses"]),
+    [showPaymentsAndResults],
   );
   const [courseSearch, setCourseSearch] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
@@ -349,8 +352,8 @@ export function LearningZone() {
   const { data: myCourses = [], isLoading: myCoursesLoading, refetch: refetchMyCourses } = useLearningMyCourses();
   const { data: upcoming = [], isLoading: upcomingLoading, refetch: refetchUpcoming } = useLearningUpcomingActivities();
   const { data: announcements = [], isLoading: announcementsLoading, refetch: refetchAnnouncements } = useLearningAnnouncements();
-  const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments } = useLearningPayments();
-  const { data: results, isLoading: resultsLoading, refetch: refetchResults } = useLearningResults();
+  const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments } = useLearningPayments(showPaymentsAndResults);
+  const { data: results, isLoading: resultsLoading, refetch: refetchResults } = useLearningResults(showPaymentsAndResults);
   const { data: courseList, isLoading: coursesLoading, refetch: refetchCourses } = useLearningCourses({
     page: 1,
     perPage: 24,
@@ -378,22 +381,24 @@ export function LearningZone() {
   );
 
   const onRefreshAll = async () => {
-    await Promise.all([
+    const refreshTasks = [
       refetchDashboard(),
       refetchMyCourses(),
       refetchUpcoming(),
       refetchAnnouncements(),
-      refetchPayments(),
-      refetchResults(),
       refetchCourses(),
-    ]);
+    ];
+
+    if (showPaymentsAndResults) {
+      refreshTasks.push(refetchPayments(), refetchResults());
+    }
+
+    await Promise.all(refreshTasks);
   };
 
   const TABS = [
     { id: "my-learning", label: "My Learning",    icon: BookOpen },
     { id: "courses",     label: "Browse Courses",  icon: GraduationCap },
-    { id: "payments",    label: "Payments",         icon: CreditCard },
-    { id: "results",     label: "Results & Certs",  icon: Award },
   ] as const;
 
   const hasCourses        = (courseList?.data?.length ?? 0) > 0;
