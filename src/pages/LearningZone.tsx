@@ -381,19 +381,26 @@ export function LearningZone() {
   );
 
   const onRefreshAll = async () => {
-    const refreshTasks = [
+    if (showPaymentsAndResults) {
+      await Promise.all([
+        refetchDashboard(),
+        refetchMyCourses(),
+        refetchUpcoming(),
+        refetchAnnouncements(),
+        refetchCourses(),
+        refetchPayments(),
+        refetchResults(),
+      ]);
+      return;
+    }
+
+    await Promise.all([
       refetchDashboard(),
       refetchMyCourses(),
       refetchUpcoming(),
       refetchAnnouncements(),
       refetchCourses(),
-    ];
-
-    if (showPaymentsAndResults) {
-      refreshTasks.push(refetchPayments(), refetchResults());
-    }
-
-    await Promise.all(refreshTasks);
+    ]);
   };
 
   const TABS = [
