@@ -101,6 +101,49 @@ function getGroupActionLabel(group: CommunityGroupAPI): string {
   return "Join Group";
 }
 
+function mergeGroupsWithJoinedMembership(
+  allGroups: CommunityGroupAPI[],
+  joinedGroups: CommunityGroupAPI[],
+  userId?: string | null,
+) {
+  const joinedById = new Map(joinedGroups.map((group) => [group.id, group]));
+  const mergedGroups = allGroups.map((group) => {
+    const joinedGroup = joinedById.get(group.id);
+    const mergedGroup = joinedGroup
+      ? {
+          ...group,
+          ...joinedGroup,
+          memberships: joinedGroup.memberships ?? group.memberships,
+          members: joinedGroup.members ?? group.members,
+          memberCount: joinedGroup.memberCount ?? group.memberCount,
+          isMember: true,
+        }
+      : group;
+
+    return {
+      ...mergedGroup,
+      memberCount: getCommunityGroupMemberCount(mergedGroup),
+      isMember: joinedGroup
+        ? true
+        : getCommunityGroupIsMember(mergedGroup, userId),
+    };
+  });
+
+  for (const joinedGroup of joinedGroups) {
+    if (joinedById.has(joinedGroup.id) && mergedGroups.some((group) => group.id === joinedGroup.id)) {
+      continue;
+    }
+
+    mergedGroups.push({
+      ...joinedGroup,
+      memberCount: getCommunityGroupMemberCount(joinedGroup),
+      isMember: true,
+    });
+  }
+
+  return mergedGroups;
+}
+
 /* -- API -> UI mapping helpers ---------------------------------------------- */
 function apiDiscussionToPost(
   d: DiscussionAPI,
@@ -348,6 +391,72 @@ export default function Community() {
   const posterProfileCache = useRef<Map<string, UserProfile>>(new Map());
   const hoverCloseTimeoutRef = useRef<number | null>(null);
 
+  const loadGroups = useCallback(
+    async (errorMessage: string, options?: { showLoading?: boolean }) => {
+      const showLoading = options?.showLoading ?? true;
+      if (showLoading) setGroupsLoading(true);
+      try {
+        const [allGroups, joinedGroups] = await Promise.all([
+          communityService.getGroups(),
+          isAuthenticated && hasAuthToken
+            ? communityService.getJoinedGroups().catch(
+                () => [] as CommunityGroupAPI[],
+              )
+            : Promise.resolve([] as CommunityGroupAPI[]),
+        ]);
+
+        const mergedGroups = mergeGroupsWithJoinedMembership(
+          allGroups,
+          joinedGroups,
+          user?.id,
+        );
+
+        setGroups(mergedGroups);
+      } catch (err) {
+        console.error(errorMessage, err);
+      } finally {
+        if (showLoading) setGroupsLoading(false);
+      }
+    },
+    [hasAuthToken, isAuthenticated, user?.id],
+  );
+
+  const handleGroupAction = useCallback(
+    async (group: CommunityGroupAPI) => {
+      if (!requireAuth("join or leave groups")) return;
+
+      setGroupActionGroupId(group.id);
+      try {
+        if (group.isMember) {
+          try {
+            await communityService.leaveGroup(group.id);
+          } catch {
+            await communityService.leaveGroupWithDelete(group.id);
+          }
+          toast.success("You left the group.");
+        } else if (group.isPrivate) {
+          await communityService.requestJoinGroup(group.id);
+          toast.success(
+            "Join request sent! The group moderator will review your request.",
+          );
+        } else {
+          await communityService.joinGroup(group.id);
+          toast.success("You joined the group.");
+        }
+
+        await loadGroups(
+          "Failed to refresh groups after membership change:",
+          { showLoading: false },
+        );
+      } catch (err) {
+        console.error("Failed to join/leave group:", err);
+      } finally {
+        setGroupActionGroupId(null);
+      }
+    },
+    [loadGroups, requireAuth],
+  );
+
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (!tab) return;
@@ -463,10 +572,10 @@ export default function Community() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [discussionPosts, setDiscussionPosts] = useState<DiscussionPost[]>([]);
   const [groups, setGroups] = useState<CommunityGroupAPI[]>([]);
-  const [joinedGroupIds, setJoinedGroupIds] = useState<string[]>([]);
   const [events, setEvents] = useState<CommunityEventAPI[]>([]);
   const [discussionsLoading, setDiscussionsLoading] = useState(true);
   const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupActionGroupId, setGroupActionGroupId] = useState<string | null>(null);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   /** Maps discussionId -> likeInteractionId (so we can delete the like later) */
@@ -525,13 +634,8 @@ export default function Community() {
 
   /* -- Eagerly load groups on mount so the hero count is visible immediately -- */
   useEffect(() => {
-    if (groups.length > 0) return;
-    communityService
-      .getGroups()
-      .then((allGroups) => setGroups(allGroups))
-      .catch((err) => console.error("Failed to pre-load groups for hero:", err));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void loadGroups("Failed to pre-load groups for hero:");
+  }, [loadGroups]);
 
   /* -- Load discussions (re-fetches when filters change) -- */
   useEffect(() => {
@@ -576,56 +680,14 @@ export default function Community() {
   /* -- Load groups when tab is selected -- */
   useEffect(() => {
     if (selectedTab !== "study-groups") return;
-    setGroupsLoading(true);
-    Promise.all([
-      communityService.getGroups(),
-      isAuthenticated && hasAuthToken
-        ? communityService.getJoinedGroups().catch(() => [] as CommunityGroupAPI[])
-        : Promise.resolve([] as CommunityGroupAPI[]),
-    ])
-      .then(([allGroups, joinedGroups]) => {
-        const joinedIds = new Set(joinedGroups.map((group) => group.id));
-        setJoinedGroupIds(Array.from(joinedIds));
-        setGroups(
-          allGroups.map((group) => ({
-            ...group,
-            memberCount: getCommunityGroupMemberCount(group),
-            isMember:
-              joinedIds.has(group.id) || getCommunityGroupIsMember(group, user?.id),
-          })),
-        );
-      })
-      .catch((err) => console.error("Failed to load groups:", err))
-      .finally(() => setGroupsLoading(false));
-  }, [selectedTab, user?.id, isAuthenticated, hasAuthToken]);
+    void loadGroups("Failed to load groups:");
+  }, [loadGroups, selectedTab]);
 
   // Ensure groups are available in discussion modal for optional group selection.
   useEffect(() => {
-    if (!showStartDiscussionModal || groups.length > 0) return;
-    setGroupsLoading(true);
-    Promise.all([
-      communityService.getGroups(),
-      isAuthenticated && hasAuthToken
-        ? communityService.getJoinedGroups().catch(() => [] as CommunityGroupAPI[])
-        : Promise.resolve([] as CommunityGroupAPI[]),
-    ])
-      .then(([allGroups, joinedGroups]) => {
-        const joinedIds = new Set(joinedGroups.map((group) => group.id));
-        setJoinedGroupIds(Array.from(joinedIds));
-        setGroups(
-          allGroups.map((group) => ({
-            ...group,
-            memberCount: getCommunityGroupMemberCount(group),
-            isMember:
-              joinedIds.has(group.id) || getCommunityGroupIsMember(group, user?.id),
-          })),
-        );
-      })
-      .catch((err) =>
-        console.error("Failed to load groups for discussion modal:", err),
-      )
-      .finally(() => setGroupsLoading(false));
-  }, [showStartDiscussionModal, groups.length, user?.id, isAuthenticated, hasAuthToken]);
+    if (!showStartDiscussionModal) return;
+    void loadGroups("Failed to load groups for discussion modal:");
+  }, [loadGroups, showStartDiscussionModal]);
 
   /* -- Load bookmarked discussions when tab is selected -- */
   useEffect(() => {
@@ -2629,72 +2691,12 @@ export default function Community() {
                           )}
                           <Button
                             className="w-full bg-[#D52B1E] hover:bg-[#B8241B] text-white"
-                            onClick={async () => {
-                              if (!requireAuth("join or leave groups")) return;
-                              try {
-                                if (group.isMember) {
-                                  try {
-                                    await communityService.leaveGroup(group.id);
-                                  } catch {
-                                    await communityService.leaveGroupWithDelete(
-                                      group.id,
-                                    );
-                                  }
-                                  setJoinedGroupIds((prev) =>
-                                    prev.filter((id) => id !== group.id),
-                                  );
-                                  setGroups((prev) =>
-                                    prev.map((g) =>
-                                      g.id === group.id
-                                        ? {
-                                            ...g,
-                                            isMember: false,
-                                            memberCount: Math.max(
-                                              0,
-                                              getCommunityGroupMemberCount(g) -
-                                                1,
-                                            ),
-                                          }
-                                        : g,
-                                    ),
-                                  );
-                                } else if (group.isPrivate) {
-                                  await communityService.requestJoinGroup(
-                                    group.id,
-                                  );
-                                  toast.success(
-                                    "Join request sent! The group moderator will review your request.",
-                                  );
-                                } else {
-                                  await communityService.joinGroup(group.id);
-                                  setJoinedGroupIds((prev) =>
-                                    prev.includes(group.id)
-                                      ? prev
-                                      : [...prev, group.id],
-                                  );
-                                  setGroups((prev) =>
-                                    prev.map((g) =>
-                                      g.id === group.id
-                                        ? {
-                                            ...g,
-                                            isMember: true,
-                                            memberCount:
-                                              getCommunityGroupMemberCount(g) +
-                                              1,
-                                          }
-                                        : g,
-                                    ),
-                                  );
-                                }
-                              } catch (err) {
-                                console.error(
-                                  "Failed to join/leave group:",
-                                  err,
-                                );
-                              }
-                            }}
+                            disabled={groupActionGroupId === group.id}
+                            onClick={() => void handleGroupAction(group)}
                           >
-                            {getGroupActionLabel(group)}
+                            {groupActionGroupId === group.id
+                              ? "Updating..."
+                              : getGroupActionLabel(group)}
                           </Button>
                           {isModerator && group.isPrivate && (
                             <Button
@@ -3081,9 +3083,7 @@ export default function Community() {
           isOpen={showStartDiscussionModal}
           onClose={() => setShowStartDiscussionModal(false)}
           categories={apiCategories.map((c) => ({ id: c.id, name: c.name }))}
-          groups={joinedGroupsForModal
-            .filter((group) => joinedGroupIds.includes(group.id))
-            .map((g) => ({ id: g.id, name: g.name }))}
+          groups={joinedGroupsForModal.map((g) => ({ id: g.id, name: g.name }))}
           categoriesLoading={categoriesLoading}
           groupsLoading={groupsLoading}
           onSubmit={handleCreateDiscussion}

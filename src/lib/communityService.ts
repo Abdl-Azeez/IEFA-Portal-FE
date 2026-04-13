@@ -130,6 +130,7 @@ export interface CommunityGroupAPI {
   description?: string;
   coverImageUrl?: string;
   memberCount?: number;
+  membershipStatus?: string | null;
   memberships?: Array<{
     id: string;
     groupId: string;
@@ -158,6 +159,7 @@ export interface CommunityGroupAPI {
         updatedAt?: string;
       }>;
   isPrivate?: boolean;
+  isActive?: boolean;
   createdAt?: string;
   topic?: string;
   nextSession?: string;
@@ -189,6 +191,15 @@ export function getCommunityGroupIsMember(
   userId?: string | null,
 ): boolean {
   if (typeof group.isMember === "boolean") return group.isMember;
+  if (typeof group.membershipStatus === "string") {
+    const normalizedStatus = group.membershipStatus.trim().toLowerCase();
+    if (["member", "admin", "moderator", "owner", "approved"].includes(normalizedStatus)) {
+      return true;
+    }
+    if (["pending", "rejected", "left", "removed", "none"].includes(normalizedStatus)) {
+      return false;
+    }
+  }
   if (!userId || !Array.isArray(group.memberships)) return false;
   return group.memberships.some(
     (m) => m.userId === userId && m.status === "approved",
