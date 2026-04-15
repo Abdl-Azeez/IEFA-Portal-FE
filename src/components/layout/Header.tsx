@@ -79,9 +79,9 @@ const SEARCH_ITEMS: SearchItem[] = [
   },
   {
     icon: GraduationCap,
-    label: "Learning Zone",
+    label: "Academy",
     description: "Courses and learning content",
-    path: "/learning-zone",
+    path: "/academy",
     keywords: ["courses", "lessons", "training"],
   },
   {
@@ -158,7 +158,7 @@ const SEARCH_ITEMS: SearchItem[] = [
     label: "Course Results",
     description: "Browse and enroll in available courses",
     path: "/course-results",
-    parent: "Learning Zone",
+    parent: "Academy",
     keywords: ["catalog", "course explorer", "enrollment"],
   },
   {
@@ -237,34 +237,34 @@ const SEARCH_ITEMS: SearchItem[] = [
     path: "/market-insights?tab=halal-crypto",
     parent: "Market Insights",
   },
-  // ── Learning Zone tabs ──
+  // ── Academy tabs ──
   {
     icon: BookOpen,
     label: "My Learning",
     description: "Track enrollments, progress and upcoming activities",
-    path: "/learning-zone?tab=my-learning",
-    parent: "Learning Zone",
+    path: "/academy?tab=my-learning",
+    parent: "Academy",
   },
   {
     icon: GraduationCap,
     label: "Browse Courses",
     description: "Explore courses and open course explorer",
-    path: "/learning-zone?tab=courses",
-    parent: "Learning Zone",
+    path: "/academy?tab=courses",
+    parent: "Academy",
   },
   {
     icon: CreditCard,
     label: "Learning Payments",
     description: "View payment history and invoices",
-    path: "/learning-zone?tab=payments",
-    parent: "Learning Zone",
+    path: "/academy?tab=my-learning",
+    parent: "Academy",
   },
   {
     icon: BookA,
     label: "Learning Results & Certificates",
     description: "Review course results and certificates",
-    path: "/learning-zone?tab=results",
-    parent: "Learning Zone",
+    path: "/academy?tab=my-learning",
+    parent: "Academy",
   },
   // ── Community tabs ──
   {

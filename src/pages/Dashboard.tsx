@@ -581,7 +581,7 @@ export function Dashboard() {
                   whileHover={{ x: 3 }}
                   onClick={() => {
                     if (!requireAuth('view courses')) return
-                    navigate('/learning-zone')
+                    navigate('/academy')
                   }}
                 >
                   See All <ChevronRight className="h-4 w-4" />
@@ -646,7 +646,7 @@ export function Dashboard() {
                         whileHover={{ y: -5 }}
                         onClick={() => {
                           if (!requireAuth('open learning courses')) return
-                          navigate('/learning-zone')
+                          navigate('/academy')
                         }}
                       >
                         <div className="relative rounded-xl overflow-hidden aspect-video mb-3">

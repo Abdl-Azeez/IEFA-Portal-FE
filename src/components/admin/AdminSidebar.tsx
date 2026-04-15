@@ -7,7 +7,6 @@ import {
   Users,
   Newspaper,
   Mic,
-  GraduationCap,
   FileText,
   Database,
   MessageSquare,
@@ -21,13 +20,13 @@ import {
   ShieldCheck,
   Briefcase,
 } from "lucide-react";
-import { useState } from 'react'
+import { useState } from "react";
 
 interface NavItem {
-  name: string
-  href: string
-  icon: React.ElementType
-  children?: { name: string; href: string; icon: React.ElementType }[]
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  children?: { name: string; href: string; icon: React.ElementType }[];
 }
 
 const adminNav: NavItem[] = [
@@ -35,7 +34,7 @@ const adminNav: NavItem[] = [
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "News", href: "/admin/news", icon: Newspaper },
   { name: "Podcasts", href: "/admin/podcasts", icon: Mic },
-  { name: "Learning Management", href: "/admin/learning", icon: GraduationCap },
+  { name: "Academy Management", href: "/admin/academy", icon: ShieldCheck },
   { name: "Resources", href: "/admin/research", icon: FileText },
   { name: "Data Management", href: "/admin/data", icon: Database },
   {

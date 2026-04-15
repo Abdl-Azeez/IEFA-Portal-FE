@@ -38,7 +38,18 @@ import {
   useLearningUpcomingActivities,
   useUnenrollFromLearningCourse,
 } from "@/hooks/useLearning";
-import type { StudentCourseDto, StudentEnrollmentDto } from "@/types/learning";
+import {
+  useInstructorAcademyCourses,
+  useInstructorCreateCourse,
+  useInstructorAddSection,
+  useInstructorAddLesson,
+  useInstructorCourseDetails,
+} from "@/hooks/useAcademy";
+import type {
+  AcademyInstructorCourseDto,
+  StudentCourseDto,
+  StudentEnrollmentDto,
+} from "@/types/learning";
 
 /* ── Animation variants ──────────────────────────────────────────────────── */
 const containerVariants = {
@@ -56,7 +67,11 @@ function formatDate(value?: string | null) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function formatMoney(amountCents: number, currency: string) {
@@ -122,14 +137,18 @@ function EnrollmentCard({
   courseTitle,
 }: Readonly<{ item: StudentEnrollmentDto; courseTitle?: string }>) {
   const programmeName = (item.programme as { title?: string } | null)?.title;
-  const displayName = courseTitle ?? programmeName ?? `${item.itemType} enrollment`;
+  const displayName =
+    courseTitle ?? programmeName ?? `${item.itemType} enrollment`;
 
   const statusStyle: Record<string, { bg: string; text: string }> = {
     completed: { bg: "bg-emerald-50", text: "text-emerald-700" },
     active: { bg: "bg-blue-50", text: "text-blue-700" },
     in_progress: { bg: "bg-amber-50", text: "text-amber-700" },
   };
-  const ss = statusStyle[item.status] ?? { bg: "bg-gray-100", text: "text-gray-600" };
+  const ss = statusStyle[item.status] ?? {
+    bg: "bg-gray-100",
+    text: "text-gray-600",
+  };
 
   return (
     <motion.div
@@ -160,7 +179,9 @@ function EnrollmentCard({
             <span className="text-gray-400 flex items-center gap-1">
               <Clock className="h-3 w-3" /> {formatDate(item.lastActivityAt)}
             </span>
-            <span className="font-bold text-[#D52B1E]">{item.progressPercent}%</span>
+            <span className="font-bold text-[#D52B1E]">
+              {item.progressPercent}%
+            </span>
           </div>
           <Progress
             value={item.progressPercent}
@@ -205,7 +226,11 @@ function CourseCard({
   const lc = levelColor[course.level?.toLowerCase() ?? ""] ?? "#6d28d9";
 
   return (
-    <motion.div variants={itemVariants} whileHover={{ y: -3 }} className="group">
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ y: -3 }}
+      className="group"
+    >
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full">
         {/* Cover */}
         <div className="h-44 relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
@@ -250,8 +275,12 @@ function CourseCard({
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 group-hover:text-[#D52B1E] transition-colors mb-1">
             {course.title}
           </h3>
-          <p className="text-xs text-gray-400 mb-1">{course.educator?.name || "IEFA Educator"}</p>
-          <p className="text-xs text-gray-500 line-clamp-2 mb-4 flex-1">{stripHtml(course.description)}</p>
+          <p className="text-xs text-gray-400 mb-1">
+            {course.educator?.name || "IEFA Educator"}
+          </p>
+          <p className="text-xs text-gray-500 line-clamp-2 mb-4 flex-1">
+            {stripHtml(course.description)}
+          </p>
 
           {/* Meta */}
           <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
@@ -259,10 +288,12 @@ function CourseCard({
               <PlayCircle className="h-3 w-3" /> {course.videoCount} lessons
             </span>
             <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" /> {durationLabel(course.totalDurationMinutes)}
+              <Clock className="h-3 w-3" />{" "}
+              {durationLabel(course.totalDurationMinutes)}
             </span>
             <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" /> {course.enrolledCount.toLocaleString()}
+              <Users className="h-3 w-3" />{" "}
+              {course.enrolledCount.toLocaleString()}
             </span>
           </div>
 
@@ -270,11 +301,17 @@ function CourseCard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-1">
               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              <span className="text-xs font-semibold text-gray-700">{course.rating.toFixed(1)}</span>
-              <span className="text-xs text-gray-400">({course.reviewCount})</span>
+              <span className="text-xs font-semibold text-gray-700">
+                {course.rating.toFixed(1)}
+              </span>
+              <span className="text-xs text-gray-400">
+                ({course.reviewCount})
+              </span>
             </div>
             {!course.isFree && (
-              <span className="text-sm font-bold text-gray-900">${course.priceUsd}</span>
+              <span className="text-sm font-bold text-gray-900">
+                ${course.priceUsd}
+              </span>
             )}
           </div>
 
@@ -315,14 +352,530 @@ function CourseCard({
   );
 }
 
+function InstructorLearningWorkspace({
+  name,
+  educatorId,
+}: Readonly<{ name: string; educatorId: string }>) {
+  const [tab, setTab] = useState<"courses" | "builder" | "progress">("courses");
+  const [courseTitle, setCourseTitle] = useState("");
+  const [courseDescription, setCourseDescription] = useState("");
+  const [courseLevel, setCourseLevel] = useState("Beginner");
+  const [coursePriceUsd, setCoursePriceUsd] = useState(0);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | "">("");
+  const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [newLessonTitle, setNewLessonTitle] = useState("");
+
+  const coursesQuery = useInstructorAcademyCourses();
+  const createCourseMutation = useInstructorCreateCourse();
+  const addSectionMutation = useInstructorAddSection();
+  const addLessonMutation = useInstructorAddLesson();
+  const courseDetailsQuery = useInstructorCourseDetails(
+    typeof selectedCourseId === "number" ? selectedCourseId : undefined,
+  );
+
+  const selectedCourseDetails = courseDetailsQuery.data as
+    | AcademyInstructorCourseDto
+    | undefined;
+  const selectedSectionId = selectedCourseDetails?.sections?.[0]?.id;
+
+  let selectedCourseDetailsBlock: React.JSX.Element;
+  if (!selectedCourseId) {
+    selectedCourseDetailsBlock = (
+      <p className="mt-4 text-sm text-gray-500">
+        Select a course from the list to manage its content.
+      </p>
+    );
+  } else if (courseDetailsQuery.isLoading) {
+    selectedCourseDetailsBlock = (
+      <p className="mt-4 text-sm text-gray-500">Loading course details…</p>
+    );
+  } else if (selectedCourseDetails) {
+    selectedCourseDetailsBlock = (
+      <div className="mt-4 space-y-3 text-sm text-gray-600">
+        <p className="font-semibold text-gray-900">
+          {selectedCourseDetails.title}
+        </p>
+        <p>{selectedCourseDetails.description}</p>
+        <p>Sections: {selectedCourseDetails.sections?.length ?? 0}</p>
+        <p>Lessons: {selectedCourseDetails.lessonCount ?? 0}</p>
+        <p>Enrolled students: {selectedCourseDetails.enrolledCount ?? 0}</p>
+      </div>
+    );
+  } else {
+    selectedCourseDetailsBlock = (
+      <p className="mt-4 text-sm text-gray-500">
+        Select a course to view details.
+      </p>
+    );
+  }
+
+  const totalCourses =
+    (coursesQuery.data as AcademyInstructorCourseDto[] | undefined)?.length ??
+    0;
+  const publishedCourses =
+    (coursesQuery.data as AcademyInstructorCourseDto[] | undefined)?.filter(
+      (course) => course.status === "published",
+    ).length ?? 0;
+
+  const handleCreateCourse = async () => {
+    const slug = courseTitle
+      .trim()
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/g, "-")
+      .replaceAll(/(^-|-$)/g, "");
+
+    await createCourseMutation.mutateAsync({
+      title: courseTitle,
+      slug,
+      description: courseDescription,
+      coverImageUrl: undefined,
+      previewVideoUrl: null,
+      educatorId,
+      programmeId: null,
+      level: courseLevel.toLowerCase(),
+      priceUsd: coursePriceUsd,
+      isFree: coursePriceUsd === 0,
+      status: "draft",
+      tags: [],
+    });
+    setCourseTitle("");
+    setCourseDescription("");
+    setCoursePriceUsd(0);
+  };
+
+  const handleAddSection = async () => {
+    if (
+      !selectedCourseId ||
+      typeof selectedCourseId !== "number" ||
+      !newSectionTitle
+    )
+      return;
+    await addSectionMutation.mutateAsync({
+      courseId: selectedCourseId,
+      payload: { title: newSectionTitle },
+    });
+    setNewSectionTitle("");
+  };
+
+  const handleAddLesson = async () => {
+    if (!selectedSectionId || !newLessonTitle) return;
+    await addLessonMutation.mutateAsync({
+      sectionId: selectedSectionId,
+      payload: { title: newLessonTitle },
+    });
+    setNewLessonTitle("");
+  };
+
+  return (
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6"
+    >
+      <div className="rounded-[2rem] border border-gray-200 bg-gradient-to-br from-white via-white to-orange-50 p-8 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#D52B1E] uppercase tracking-[0.2em]">
+              <Users className="h-4 w-4" /> Instructor Workspace
+            </span>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Welcome back, {name}
+            </h1>
+            <p className="max-w-2xl text-sm text-gray-600">
+              Manage academy courses, publish new content, and monitor student
+              progress from one place.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-3xl bg-white border border-gray-100 p-4 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                Courses
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-gray-900">
+                {totalCourses}
+              </p>
+            </div>
+            <div className="rounded-3xl bg-white border border-gray-100 p-4 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                Published
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-gray-900">
+                {publishedCourses}
+              </p>
+            </div>
+            <div className="rounded-3xl bg-white border border-gray-100 p-4 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-500">
+                Students
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-gray-900">
+                {(
+                  coursesQuery.data as AcademyInstructorCourseDto[] | undefined
+                )?.reduce(
+                  (sum, course) => sum + (course.enrolledCount ?? 0),
+                  0,
+                ) ?? 0}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: "courses", label: "Courses" },
+            { id: "builder", label: "Course Builder" },
+            { id: "progress", label: "Student Progress" },
+          ].map((tabItem) => (
+            <button
+              key={tabItem.id}
+              type="button"
+              onClick={() => setTab(tabItem.id as typeof tab)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === tabItem.id
+                  ? "bg-[#D52B1E] text-white"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              {tabItem.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "courses" && (
+          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="space-y-4">
+              <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      Your academy courses
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      Review your published content and manage course details.
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-[#D52B1E]">
+                    {coursesQuery.isLoading
+                      ? "Loading..."
+                      : `${totalCourses} courses`}
+                  </span>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {(
+                    coursesQuery.data as
+                      | AcademyInstructorCourseDto[]
+                      | undefined
+                  )?.length ? (
+                    (coursesQuery.data as AcademyInstructorCourseDto[]).map(
+                      (course) => (
+                        <div
+                          key={course.id}
+                          className="rounded-3xl border border-gray-100 p-4 hover:border-[#D52B1E]/40 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="font-semibold text-gray-900">
+                                {course.title}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {course.level} • {course.enrolledCount ?? 0}{" "}
+                                learners
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCourseId(typeof course.id === 'number' ? course.id : Number(course.id) || "")}
+                              className="text-sm font-semibold text-[#D52B1E] hover:text-[#b42216]"
+                            >
+                              Manage
+                            </button>
+                          </div>
+                        </div>
+                      ),
+                    )
+                  ) : (
+                    <EmptyState
+                      title="No courses created yet"
+                      description="Create your first course and publish it to students."
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Selected course
+                </h3>
+                {selectedCourseDetailsBlock}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Quick actions
+                </h3>
+                <div className="mt-4 flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setTab("builder")}
+                    className="rounded-2xl bg-[#D52B1E] px-4 py-3 text-sm font-semibold text-white hover:bg-[#b32a1c] transition-colors"
+                  >
+                    Create new course
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("progress")}
+                    className="rounded-2xl bg-white border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Track student progress
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "builder" && (
+          <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+            <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Publish a new course
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                Set course metadata and pricing, then create the first content
+                sections.
+              </p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label
+                    htmlFor="instructor-course-title"
+                    className="block text-sm font-semibold text-gray-700"
+                  >
+                    Title
+                  </label>
+                  <Input
+                    id="instructor-course-title"
+                    value={courseTitle}
+                    onChange={(event) => setCourseTitle(event.target.value)}
+                    placeholder="Course title"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="instructor-course-description"
+                    className="block text-sm font-semibold text-gray-700"
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    id="instructor-course-description"
+                    value={courseDescription}
+                    onChange={(event) =>
+                      setCourseDescription(event.target.value)
+                    }
+                    className="mt-2 w-full rounded-3xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm focus:border-[#D52B1E] focus:outline-none"
+                    rows={5}
+                    placeholder="Course description"
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="instructor-course-level"
+                      className="block text-sm font-semibold text-gray-700"
+                    >
+                      Level
+                    </label>
+                    <select
+                      id="instructor-course-level"
+                      value={courseLevel}
+                      onChange={(event) => setCourseLevel(event.target.value)}
+                      className="mt-2 w-full rounded-3xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm focus:border-[#D52B1E] focus:outline-none"
+                    >
+                      <option>Beginner</option>
+                      <option>Intermediate</option>
+                      <option>Advanced</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="instructor-course-price"
+                      className="block text-sm font-semibold text-gray-700"
+                    >
+                      Price (USD)
+                    </label>
+                    <Input
+                      id="instructor-course-price"
+                      type="number"
+                      value={coursePriceUsd}
+                      onChange={(event) =>
+                        setCoursePriceUsd(Number(event.target.value))
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCreateCourse}
+                  disabled={
+                    createCourseMutation.status === "pending" || !courseTitle
+                  }
+                >
+                  Publish Course
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Add content
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                Create sections and lessons for your selected course.
+              </p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label
+                    className="block text-sm font-semibold text-gray-700"
+                    htmlFor="instructor-section-title"
+                  >
+                    Section title
+                    <Input
+                      id="instructor-section-title"
+                      value={newSectionTitle}
+                      onChange={(event) =>
+                        setNewSectionTitle(event.target.value)
+                      }
+                      placeholder="Section title"
+                      className="mt-2"
+                    />
+                  </label>
+                  <Button
+                    className="mt-3"
+                    onClick={handleAddSection}
+                    disabled={
+                      !selectedCourseId ||
+                      addSectionMutation.status === "pending" ||
+                      !newSectionTitle
+                    }
+                  >
+                    Add Section
+                  </Button>
+                </div>
+                <div>
+                  <label
+                    className="block text-sm font-semibold text-gray-700"
+                    htmlFor="instructor-lesson-title"
+                  >
+                    Lesson title
+                    <Input
+                      id="instructor-lesson-title"
+                      value={newLessonTitle}
+                      onChange={(event) =>
+                        setNewLessonTitle(event.target.value)
+                      }
+                      placeholder="Lesson title"
+                      className="mt-2"
+                    />
+                  </label>
+                  <Button
+                    className="mt-3"
+                    onClick={handleAddLesson}
+                    disabled={
+                      !selectedSectionId ||
+                      addLessonMutation.status === "pending" ||
+                      !newLessonTitle
+                    }
+                  >
+                    Add Lesson
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "progress" && (
+          <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Student progress
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Select a course to see enrolled learners and review progress at a
+              glance.
+            </p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  className="block text-sm font-semibold text-gray-700"
+                  htmlFor="instructor-progress-course"
+                >
+                  Course{" "}
+                  <select
+                    id="instructor-progress-course"
+                    value={selectedCourseId}
+                    onChange={(event) =>
+                      setSelectedCourseId(Number(event.target.value) || "")
+                    }
+                    className="mt-2 w-full rounded-3xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm focus:border-[#D52B1E] focus:outline-none"
+                  >
+                    <option value="">Select a course</option>
+                    {(
+                      coursesQuery.data as
+                        | AcademyInstructorCourseDto[]
+                        | undefined
+                    )?.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+            {typeof selectedCourseId === "number" && selectedCourseDetails && (
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-3xl bg-gray-50 p-4">
+                  <p className="text-xs text-gray-500">Total learners</p>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {selectedCourseDetails.enrolledCount ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-3xl bg-gray-50 p-4">
+                  <p className="text-xs text-gray-500">Published sections</p>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {selectedCourseDetails.sections?.length ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-3xl bg-gray-50 p-4">
+                  <p className="text-xs text-gray-500">Lesson count</p>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {selectedCourseDetails.lessonCount ?? 0}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 /* -------------------- Main Component ---------------------------------------- */
 export function LearningZone() {
   const [searchParams, setSearchParams] = useSearchParams();
   const showPaymentsAndResults = false;
   const allowedTabs = useMemo(
-    () => new Set(showPaymentsAndResults
-      ? ["my-learning", "courses", "payments", "results"]
-      : ["my-learning", "courses"]),
+    () =>
+      new Set(
+        showPaymentsAndResults
+          ? ["my-learning", "courses", "payments", "results"]
+          : ["my-learning", "courses"],
+      ),
     [showPaymentsAndResults],
   );
   const [courseSearch, setCourseSearch] = useState("");
@@ -330,7 +883,7 @@ export function LearningZone() {
     const tab = searchParams.get("tab");
     return tab && allowedTabs.has(tab) ? tab : "my-learning";
   });
-  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | number | null>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -348,13 +901,41 @@ export function LearningZone() {
   }, [activeTab, allowedTabs, searchParams]);
 
   const { data: me } = useMe();
-  const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } = useLearningDashboard();
-  const { data: myCourses = [], isLoading: myCoursesLoading, refetch: refetchMyCourses } = useLearningMyCourses();
-  const { data: upcoming = [], isLoading: upcomingLoading, refetch: refetchUpcoming } = useLearningUpcomingActivities();
-  const { data: announcements = [], isLoading: announcementsLoading, refetch: refetchAnnouncements } = useLearningAnnouncements();
-  const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments } = useLearningPayments(showPaymentsAndResults);
-  const { data: results, isLoading: resultsLoading, refetch: refetchResults } = useLearningResults(showPaymentsAndResults);
-  const { data: courseList, isLoading: coursesLoading, refetch: refetchCourses } = useLearningCourses({
+  const {
+    data: dashboard,
+    isLoading: dashboardLoading,
+    refetch: refetchDashboard,
+  } = useLearningDashboard();
+  const {
+    data: myCourses = [],
+    isLoading: myCoursesLoading,
+    refetch: refetchMyCourses,
+  } = useLearningMyCourses();
+  const {
+    data: upcoming = [],
+    isLoading: upcomingLoading,
+    refetch: refetchUpcoming,
+  } = useLearningUpcomingActivities();
+  const {
+    data: announcements = [],
+    isLoading: announcementsLoading,
+    refetch: refetchAnnouncements,
+  } = useLearningAnnouncements();
+  const {
+    data: payments,
+    isLoading: paymentsLoading,
+    refetch: refetchPayments,
+  } = useLearningPayments(showPaymentsAndResults);
+  const {
+    data: results,
+    isLoading: resultsLoading,
+    refetch: refetchResults,
+  } = useLearningResults(showPaymentsAndResults);
+  const {
+    data: courseList,
+    isLoading: coursesLoading,
+    refetch: refetchCourses,
+  } = useLearningCourses({
     page: 1,
     perPage: 24,
     search: courseSearch || undefined,
@@ -366,19 +947,33 @@ export function LearningZone() {
   const enrolledCourseIds = useMemo(() => {
     const ids = new Set<number>();
     for (const item of myCourses) {
-      if (typeof item.currentCourseId === "number") ids.add(item.currentCourseId);
+      if (typeof item.currentCourseId === "number")
+        ids.add(item.currentCourseId);
       const n = Number(item.itemId);
       if (Number.isFinite(n)) ids.add(n);
     }
     return ids;
   }, [myCourses]);
 
-  const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(" ").trim();
+  const fullName = [me?.firstName, me?.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   const welcomeName = fullName || me?.username || "Learner";
   const selectedCourse = useMemo(
-    () => (courseList?.data ?? []).find((course) => course.id === selectedCourseId),
+    () =>
+      (courseList?.data ?? []).find((course) => course.id === selectedCourseId),
     [courseList?.data, selectedCourseId],
   );
+
+  if (me?.role === "instructor") {
+    return (
+      <InstructorLearningWorkspace
+        name={welcomeName}
+        educatorId={`${me?.id ?? ""}`}
+      />
+    );
+  }
 
   const onRefreshAll = async () => {
     if (showPaymentsAndResults) {
@@ -404,19 +999,26 @@ export function LearningZone() {
   };
 
   const TABS = [
-    { id: "my-learning", label: "My Learning",    icon: BookOpen },
-    { id: "courses",     label: "Browse Courses",  icon: GraduationCap },
+    { id: "my-learning", label: "My Learning", icon: BookOpen },
+    { id: "courses", label: "Browse Courses", icon: GraduationCap },
   ] as const;
 
-  const hasCourses        = (courseList?.data?.length ?? 0) > 0;
+  const hasCourses = (courseList?.data?.length ?? 0) > 0;
   const hasPaymentHistory = (payments?.paymentHistory?.length ?? 0) > 0;
-  const totalLearners = (courseList?.data ?? []).reduce((sum, c) => sum + (c.enrolledCount || 0), 0);
+  const totalLearners = (courseList?.data ?? []).reduce(
+    (sum, c) => sum + (c.enrolledCount || 0),
+    0,
+  );
   const totalLearningHours = Math.round(
-    (courseList?.data ?? []).reduce((sum, c) => sum + (c.totalDurationMinutes || 0), 0) / 60,
+    (courseList?.data ?? []).reduce(
+      (sum, c) => sum + (c.totalDurationMinutes || 0),
+      0,
+    ) / 60,
   );
   const avgCourseRating =
     (courseList?.data?.length ?? 0) > 0
-      ? (courseList?.data ?? []).reduce((sum, c) => sum + (c.rating || 0), 0) / (courseList?.data?.length ?? 1)
+      ? (courseList?.data ?? []).reduce((sum, c) => sum + (c.rating || 0), 0) /
+        (courseList?.data?.length ?? 1)
       : 0;
 
   return (
@@ -961,9 +1563,9 @@ export function LearningZone() {
                     <CourseCard
                       key={course.id}
                       course={course}
-                      isEnrolled={enrolledCourseIds.has(course.id)}
-                      onEnroll={() => enrollMutation.mutate(course.id)}
-                      onUnenroll={() => unenrollMutation.mutate(course.id)}
+                      isEnrolled={enrolledCourseIds.has(typeof course.id === 'number' ? course.id : Number(course.id))}
+                      onEnroll={() => enrollMutation.mutate(typeof course.id === 'number' ? course.id : Number(course.id))}
+                      onUnenroll={() => unenrollMutation.mutate(typeof course.id === 'number' ? course.id : Number(course.id))}
                       onExplore={() => setSelectedCourseId(course.id)}
                       mutating={
                         enrollMutation.isPending || unenrollMutation.isPending

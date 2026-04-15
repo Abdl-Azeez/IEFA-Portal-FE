@@ -14,12 +14,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 const FEATURES = [
-  { icon: FolderOpen,  label: 'Islamic Finance Directory' },
-  { icon: BookOpen,    label: 'Learning Zone'             },
-  { icon: Database,    label: 'Market Data & Datasets'    },
-  { icon: Mic,         label: 'Expert Podcasts'           },
-  { icon: Briefcase,   label: 'IF Professionals Network'  },
-  { icon: Wrench,      label: 'Finance Tools'             },
+  { icon: FolderOpen, label: "Islamic Finance Directory" },
+  { icon: BookOpen, label: "Academy" },
+  { icon: Database, label: "Market Data & Datasets" },
+  { icon: Mic, label: "Expert Podcasts" },
+  { icon: Briefcase, label: "IF Professionals Network" },
+  { icon: Wrench, label: "Finance Tools" },
 ];
 
 const BG_RINGS = [320, 520, 720, 920];

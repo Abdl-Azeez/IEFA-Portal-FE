@@ -292,3 +292,227 @@ export interface UpdateLessonDto {
   video_embed?: string;
   audio_embed?: string;
 }
+
+export interface AcademyCourseFilters {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  categoryId?: string;
+}
+
+export interface AcademyCategoryTypeDto {
+  id: string | number;
+  title: string;
+}
+
+export interface AcademyQuizTypeDto {
+  id: string | number;
+  name: string;
+  description?: string;
+}
+
+export interface AcademyCourseDetailsDto extends StudentCourseDto {
+  category?: string;
+  syllabus?: string;
+  topics?: string[];
+  sections?: AcademySectionDto[];
+  lessonCount?: number;
+}
+
+export interface AcademyCourseWithProgressDto extends AcademyCourseDetailsDto {
+  progressPercent: number;
+  completedModules: number;
+  totalModules: number;
+}
+
+export interface AcademyEnrollmentCourseDto {
+  id: string;
+  title: string;
+  slug: string;
+  thumbnailUrl?: string | null;
+  price?: string;
+  currency?: string;
+}
+
+export interface AcademyEnrollmentDto {
+  id: string;
+  userId: string;
+  courseId: string | number;
+  currentCourseId?: string | number;
+  itemType?: string;
+  itemId?: string;
+  programme?: ProgrammeSummaryDto | null;
+  status: string;
+  enrolledAt: string;
+  expiresAt?: string | null;
+  lastActivityAt?: string;
+  completedLessonIds?: Array<string | number>;
+  progressPercent: number;
+  completedAt?: string | null;
+  paymentId?: string | null;
+  course?: AcademyEnrollmentCourseDto;
+}
+
+export interface AcademyDashboardEnrollmentDto {
+  id: string;
+  courseId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  instructorName: string;
+  progress: number;
+  status: string;
+  enrolledAt: string;
+  completedAt: string | null;
+  hasCertificate: boolean;
+}
+
+export interface AcademyDashboardDto {
+  totalCourses: number;
+  completedCourses: number;
+  enrollments: AcademyDashboardEnrollmentDto[];
+}
+
+export interface AcademyUpcomingActivityDto {
+  id: string;
+  title: string;
+  type: string;
+  dueDate?: string | null;
+  courseId?: string | number;
+}
+
+export interface AcademyUpcomingActivitiesApiDto {
+  liveSessions: Array<{
+    id: string;
+    title: string;
+    type?: string;
+    scheduledAt?: string | null;
+    courseId?: string | number;
+  }>;
+  pendingLessons: Array<{
+    courseTitle: string;
+    lessonId: string;
+    lessonTitle: string;
+    lessonType: string;
+  }>;
+}
+
+export interface AcademyQuizDto {
+  id: string;
+  courseId: number;
+  title: string;
+  description?: string;
+  questions: Array<Record<string, unknown>>;
+}
+
+export interface AcademyLessonDto {
+  id: string;
+  title: string;
+  description: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  durationSeconds: number;
+  courseId: number;
+  sectionId?: number;
+}
+
+export interface AcademySectionDto {
+  id: string;
+  title: string;
+  order: number;
+  courseId: number;
+}
+
+export interface AcademyInstructorCourseDto extends AcademyCourseDetailsDto {
+  status: string;
+  enrolledCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AcademyInstructorCreateCourseDto {
+  title: string;
+  slug: string;
+  description: string;
+  coverImageUrl?: string;
+  previewVideoUrl?: string | null;
+  educatorId: string;
+  programmeId?: string | null;
+  level: string;
+  priceUsd: number;
+  isFree: boolean;
+  status: string;
+  tags: string[];
+}
+
+export interface AcademyInstructorCreateSectionDto {
+  title: string;
+  order?: number;
+}
+
+export interface AcademyInstructorCreateLessonDto {
+  title: string;
+  content?: string;
+  order?: number;
+}
+
+export interface AcademyInstructorCreateQuizDto {
+  title: string;
+  description: string;
+  courseId: string | number;
+}
+
+export interface AcademyInstructorUpdateQuizDto {
+  title?: string;
+  description?: string;
+}
+
+export interface AcademyInstructorUpdateQuestionDto {
+  text?: string;
+  type?: string;
+}
+
+export interface AcademyInstructorUpdateOptionDto {
+  text?: string;
+  isCorrect?: boolean;
+}
+
+export interface AcademyQuizAttemptDto {
+  id: string;
+  quizId: number;
+  studentId: string;
+  score: number;
+  status: string;
+  submittedAt: string;
+}
+
+export interface AcademyInstructorCourseUpdateDto {
+  title?: string;
+  slug?: string;
+  description?: string;
+  coverImageUrl?: string;
+  previewVideoUrl?: string | null;
+  educatorId?: string;
+  programmeId?: string | null;
+  level?: string;
+  priceUsd?: number;
+  isFree?: boolean;
+  status?: string;
+  tags?: string[];
+}
+
+export interface AcademyQuizDetailsDto {
+  id: string;
+  courseId: number;
+  title: string;
+  questions: Array<Record<string, unknown>>;
+}
+
+export interface AcademySectionDetailsDto {
+  id: string;
+  title: string;
+  lessons: AcademyLessonDto[];
+}
+
+export interface AcademyLessonDetailsDto extends AcademyLessonDto {
+  sectionId: number;
+}

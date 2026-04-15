@@ -9,7 +9,7 @@ const menuNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "News", href: "/news", icon: Newspaper },
   { name: "Market Insights", href: "/market-insights", icon: TrendingUp },
-  { name: "Learning Zone", href: "/learning-zone", icon: BookOpen },
+  { name: "Academy", href: "/academy", icon: BookOpen },
   { name: "Community", href: "/community", icon: Users },
   { name: "Directory", href: "/directory", icon: FolderOpen },
   { name: "Resources", href: "/resources", icon: FileText },

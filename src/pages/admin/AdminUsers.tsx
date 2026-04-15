@@ -1019,7 +1019,7 @@ export default function AdminUsers() {
                     dto: {
                       ...editForm,
                       username: editForm.username.trim() || undefined,
-                      lmsStudentId: editForm.lmsStudentId.trim() || null,
+                      lmsStudentId: (editForm.lmsStudentId || "").trim() || null,
                     },
                   },
                   {

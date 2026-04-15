@@ -885,7 +885,12 @@ export function CourseExplorerDialog({
   open,
   onClose,
 }: CourseExplorerDialogProps) {
-  const courseId = course?.id;
+  const courseId = (() => {
+    if (typeof course?.id === "number") return course.id;
+    if (typeof course?.id === "string" && /^\d+$/.test(course.id))
+      return Number(course.id);
+    return undefined;
+  })();
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(
     null,
   );

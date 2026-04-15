@@ -2,13 +2,12 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Dashboard } from '@/pages/Dashboard'
 import { News } from '@/pages/News'
-import { MarketInsights } from '@/pages/MarketInsights'
-import { LearningZone } from '@/pages/LearningZone'
-import Community from '@/pages/Community'
-import Directory from '@/pages/Directory'
-import { NotAvailable } from '@/pages/NotAvailable'
-import Questionnaire from '@/pages/Questionnaire'
-import CourseResults from '@/pages/CourseResults'
+import { MarketInsights } from "@/pages/MarketInsights";
+import Community from "@/pages/Community";
+import Directory from "@/pages/Directory";
+import { NotAvailable } from "@/pages/NotAvailable";
+import Questionnaire from "@/pages/Questionnaire";
+import CourseResults from "@/pages/CourseResults";
 import Resources from "@/pages/Resources";
 import Data from "@/pages/Data";
 import Podcast from "@/pages/Podcast";
@@ -27,6 +26,10 @@ import HalalCryptoScreening from "@/pages/tools/HalalCryptoScreening";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+/* ── Page imports ──────────────────────────────────────────────────────── */
+import { Academy } from "@/pages/Academy";
+import { LearningZone } from "@/pages/LearningZone";
+
 /* ── Admin imports ─────────────────────────────────────────────────────── */
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ProtectedAdminRoute } from "@/components/admin/ProtectedAdminRoute";
@@ -35,6 +38,7 @@ import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminNews from "@/pages/admin/AdminNews";
 import AdminPodcasts from "@/pages/admin/AdminPodcasts";
 import AdminLearning from "@/pages/admin/AdminLearning";
+import AdminAcademy from "@/pages/admin/AdminAcademy";
 import AdminResources from "@/pages/admin/AdminResources";
 import AdminData from "@/pages/admin/AdminData";
 import AdminCommunity from "@/pages/admin/AdminCommunity";
@@ -62,6 +66,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <LearningZone />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="academy"
+              element={
+                <ProtectedRoute>
+                  <Academy />
                 </ProtectedRoute>
               }
             />
@@ -202,6 +214,15 @@ function App() {
             <Route path="learning/videos" element={<AdminLearning />} />
             <Route path="learning/programmes" element={<AdminLearning />} />
             <Route path="learning/certificates" element={<AdminLearning />} />
+            <Route path="learning/payments" element={<AdminLearning />} />
+            <Route path="learning/paths" element={<AdminLearning />} />
+            <Route path="learning/assessments" element={<AdminLearning />} />
+            <Route path="learning/results" element={<AdminLearning />} />
+            <Route path="academy" element={<AdminAcademy />} />
+            <Route path="academy/courses" element={<AdminAcademy />} />
+            <Route path="academy/analytics" element={<AdminAcademy />} />
+            <Route path="academy/enrollments" element={<AdminAcademy />} />
+            <Route path="academy/content" element={<AdminAcademy />} />
             <Route path="learning/payments" element={<AdminLearning />} />
             <Route path="learning/paths" element={<AdminLearning />} />
             <Route path="learning/assessments" element={<AdminLearning />} />
