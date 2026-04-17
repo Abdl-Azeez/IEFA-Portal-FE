@@ -32,7 +32,7 @@ interface AcademyCourseApiResponse {
   slug: string;
   subtitle: string | null;
   description: string;
-  category: {
+  category?: {
     id: string;
     name: string;
     slug: string;
@@ -40,9 +40,9 @@ interface AcademyCourseApiResponse {
     iconUrl: string | null;
     sortOrder: number;
     isActive: boolean;
-  };
-  categoryId: string;
-  instructor: {
+  } | null;
+  categoryId: string | null;
+  instructor?: {
     id: string;
     userId: string;
     title: string;
@@ -54,8 +54,8 @@ interface AcademyCourseApiResponse {
     isFeatured: boolean;
     approvedAt: string;
     approvedBy: string | null;
-  };
-  instructorId: string;
+  } | null;
+  instructorId: string | null;
   level: string;
   language: string;
   thumbnailUrl: string | null;
@@ -64,7 +64,7 @@ interface AcademyCourseApiResponse {
   currency: string;
   discountPrice: string | null;
   isFree: boolean;
-  durationHours: string;
+  durationHours: string | number | null;
   status: string;
   isFeatured: boolean;
   shariahCompliant: boolean;
@@ -72,7 +72,7 @@ interface AcademyCourseApiResponse {
   maxStudents: number | null;
   ratingAvg: string;
   totalEnrollments: number;
-  publishedAt: string;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
   sections?: Array<{
@@ -105,9 +105,21 @@ interface AcademyCourseApiResponse {
 function mapAcademyCourseApiResponse(
   course: AcademyCourseApiResponse,
 ): AcademyCourseDetailsDto {
-  const durationMinutes = Number(course.durationHours) * 60 || 0;
-  const instructorRating = Number(course.instructor.ratingAvg) || 0;
+  const durationMinutes = Number(course.durationHours ?? 0) * 60 || 0;
+  const instructorRating = Number(course.instructor?.ratingAvg ?? 0) || 0;
   const courseRating = Number(course.ratingAvg) || 0;
+  const educatorName =
+    course.instructor?.title?.trim() ||
+    (course.instructorId ? "Course Instructor" : "IEFA Educator");
+  const programme =
+    course.categoryId || course.category
+      ? {
+          id: course.categoryId ?? course.category?.id ?? "",
+          title: course.category?.name ?? "Uncategorized",
+          level: course.level,
+          totalDurationMinutes: durationMinutes,
+        }
+      : null;
 
   return {
     id: course.id,
@@ -116,25 +128,20 @@ function mapAcademyCourseApiResponse(
     description: course.description,
     coverImageUrl: course.thumbnailUrl ?? "",
     previewVideoUrl: course.trailerUrl ?? null,
-    educatorId: course.instructorId,
+    educatorId: course.instructorId ?? "",
     educator: {
-      id: course.instructor.userId,
-      name: course.instructor.title,
+      id: course.instructor?.userId ?? course.instructorId ?? "",
+      name: educatorName,
       profilePhotoUrl: "",
       rating: instructorRating,
-      title: course.instructor.title,
-      specialization: course.instructor.specialization,
-      qualifications: course.instructor.qualifications,
-      bioLong: course.instructor.bioLong,
-      totalStudents: course.instructor.totalStudents,
+      title: educatorName,
+      specialization: course.instructor?.specialization,
+      qualifications: course.instructor?.qualifications,
+      bioLong: course.instructor?.bioLong,
+      totalStudents: course.instructor?.totalStudents,
     },
     programmeId: course.categoryId,
-    programme: {
-      id: course.categoryId,
-      title: course.category.name,
-      level: course.level,
-      totalDurationMinutes: durationMinutes,
-    },
+    programme,
     sections: (course.sections ?? []).map((section) => ({
       id: section.id,
       courseId: section.courseId,
@@ -176,7 +183,7 @@ function mapAcademyCourseApiResponse(
     reviewCount: 0,
     status: course.status,
     tags: [],
-    publishedAt: course.publishedAt,
+    publishedAt: course.publishedAt ?? course.createdAt,
     createdAt: course.createdAt,
     updatedAt: course.updatedAt,
   };
