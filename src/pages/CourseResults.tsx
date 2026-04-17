@@ -8,48 +8,46 @@ import { CourseExplorerDialog } from "@/components/learning/CourseExplorerDialog
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import {
-  useEnrollInLearningCourse,
-  useLearningCourses,
-  useLearningMyCourses,
-  useUnenrollFromLearningCourse,
-} from "@/hooks/useLearning";
+  useAcademyCourses,
+  useAcademyMyEnrollments,
+  useEnrollInAcademyCourse,
+} from "@/hooks/useAcademy";
 
 export default function CourseResults() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<
+    string | number | null
+  >(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const { data: myCourses = [] } = useLearningMyCourses();
+  const { data: myEnrollments = [] } = useAcademyMyEnrollments();
   const {
-    data: coursesResponse,
+    data: courses = [],
     isLoading,
     isError,
-  } = useLearningCourses({ page, perPage: 12, search: search || undefined });
+  } = useAcademyCourses({ page, perPage: 12, search: search || undefined });
 
-  const enrollMutation = useEnrollInLearningCourse();
-  const unenrollMutation = useUnenrollFromLearningCourse();
+  const enrollMutation = useEnrollInAcademyCourse();
 
   const enrolledCourseIds = useMemo(() => {
-    const ids = new Set<number>();
-    myCourses.forEach((item) => {
-      if (typeof item.currentCourseId === "number") ids.add(item.currentCourseId);
-      const idAsNum = Number(item.itemId);
-      if (Number.isFinite(idAsNum)) ids.add(idAsNum);
+    const ids = new Set<string | number>();
+    myEnrollments.forEach((item) => {
+      if (item.courseId) ids.add(item.courseId);
+      if (item.currentCourseId) ids.add(item.currentCourseId);
     });
     return ids;
-  }, [myCourses]);
+  }, [myEnrollments]);
 
-  const courses = coursesResponse?.data ?? [];
   const selectedCourse = useMemo(
     () => courses.find((course) => course.id === selectedCourseId),
     [courses, selectedCourseId],
   );
-  const hasNext = coursesResponse?.meta?.hasNextPage ?? false;
-  const hasPrev = coursesResponse?.meta?.hasPreviousPage ?? page > 1;
+  const hasNext = courses.length >= 12;
+  const hasPrev = page > 1;
 
   let coursesContent: ReactNode;
   if (isLoading) {
@@ -74,18 +72,33 @@ export default function CourseResults() {
               <Card className="h-full flex flex-col">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-[#D52B1E]/20">{course.status}</Badge>
-                    <Badge variant="outline">{course.isFree ? "Free" : `$${course.priceUsd}`}</Badge>
+                    <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-[#D52B1E]/20">
+                      {course.status}
+                    </Badge>
+                    <Badge variant="outline">
+                      {course.isFree ? "Free" : `$${course.priceUsd}`}
+                    </Badge>
                   </div>
-                  <CardTitle className="text-base line-clamp-2">{course.title}</CardTitle>
-                  <CardDescription className="line-clamp-2">{course.description}</CardDescription>
+                  <CardTitle className="text-base line-clamp-2">
+                    {course.title}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-2">
+                    {course.description}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 mt-auto">
                   <div className="flex items-center justify-between text-xs text-[#737692]">
-                    <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" /> {course.level}</span>
-                    <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" /> {course.videoCount} videos</span>
+                    <span className="flex items-center gap-1">
+                      <GraduationCap className="h-3.5 w-3.5" /> {course.level}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="h-3.5 w-3.5" /> {course.videoCount}{" "}
+                      videos
+                    </span>
                   </div>
-                  <p className="text-xs text-[#737692]">Educator: {course.educator?.name ?? "-"}</p>
+                  <p className="text-xs text-[#737692]">
+                    Educator: {course.educator?.name ?? "-"}
+                  </p>
                   <Button
                     variant="outline"
                     onClick={() => setSelectedCourseId(course.id)}
@@ -96,15 +109,13 @@ export default function CourseResults() {
                     className="w-full"
                     variant={isEnrolled ? "outline" : "default"}
                     onClick={() => {
-                      if (isEnrolled) {
-                        unenrollMutation.mutate(course.id);
-                      } else {
+                      if (!isEnrolled) {
                         enrollMutation.mutate(course.id);
                       }
                     }}
-                    disabled={enrollMutation.isPending || unenrollMutation.isPending}
+                    disabled={enrollMutation.isPending}
                   >
-                    {isEnrolled ? "Unenroll" : "Enroll"}
+                    {isEnrolled ? "Enrolled" : "Enroll"}
                   </Button>
                 </CardContent>
               </Card>
@@ -120,7 +131,9 @@ export default function CourseResults() {
       <div className="bg-gradient-to-r from-[#D52B1E] to-[#8B1E1E] text-white py-10 px-4 sm:px-6 rounded-xl">
         <div className="max-w-5xl mx-auto">
           <h1 className="text-3xl font-bold mb-2">Learning Catalogue</h1>
-          <p className="text-sm opacity-95">Integrated with GET /learning/courses and enroll endpoints from the current API contract.</p>
+          <p className="text-sm opacity-95">
+            Browse all available academy courses and enroll.
+          </p>
         </div>
       </div>
 
@@ -140,7 +153,7 @@ export default function CourseResults() {
           </div>
           <div className="text-xs text-[#737692] flex items-center gap-2">
             <Filter className="h-3.5 w-3.5" />
-            API supports `search`, `page`, `perPage`, `categoryId`.
+            Supports search, pagination, and category filter.
           </div>
         </CardContent>
       </Card>
@@ -149,11 +162,18 @@ export default function CourseResults() {
 
       <Card>
         <CardContent className="p-4 flex items-center justify-between">
-          <Button variant="outline" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={!hasPrev}>
+          <Button
+            variant="outline"
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            disabled={!hasPrev}
+          >
             Previous
           </Button>
-          <p className="text-sm text-[#737692]">Page {coursesResponse?.meta?.page ?? page}</p>
-          <Button onClick={() => setPage((prev) => prev + 1)} disabled={!hasNext}>
+          <p className="text-sm text-[#737692]">Page {page}</p>
+          <Button
+            onClick={() => setPage((prev) => prev + 1)}
+            disabled={!hasNext}
+          >
             Next
           </Button>
         </CardContent>

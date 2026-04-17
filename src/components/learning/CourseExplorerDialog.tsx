@@ -1,77 +1,68 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
-  ArrowRight,
+  Award,
   BookOpen,
-  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
   ChevronRight,
-  Clock3,
-  ExternalLink,
-  Eye,
-  ListTree,
-  NotepadText,
+  ClipboardList,
+  Clock,
+  FileText,
+  GraduationCap,
+  Globe,
+  HelpCircle,
+  Lock,
+  Play,
   PlayCircle,
-  Sparkles,
-  Tag,
-  UserRound,
+  Star,
   Users,
+  Video,
+  Volume2,
+  VolumeX,
+  CheckCircle,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Dialog } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  useLearningCourseContent,
-  useLearningLessonById,
-  useLearningSectionContent,
-} from "@/hooks/useLearning";
-import type { LearningOutlineItemDto, StudentCourseDto, StudentLessonDto } from "@/types/learning";
+  useAcademyCourseDetails,
+  useAcademyCourseWithProgress,
+  useAcademyQuiz,
+  useCompleteAcademyLesson,
+  useStartAcademyQuiz,
+  useSubmitAcademyAttempt,
+} from "@/hooks/useAcademy";
+import { useUser } from "@/hooks/useAuth";
+import { Progress } from "@/components/ui/progress";
+import type {
+  AcademyLessonDto,
+  AcademySectionDto,
+  StudentCourseDto,
+} from "@/types/learning";
 
-function stripHtml(value: string): string {
-  if (!value) return "";
-  if (typeof document === "undefined") {
-    return value.replaceAll(/<[^>]+>/g, " ").replaceAll(/\s+/g, " ").trim();
+// -- Helpers --
+
+function fmtDuration(seconds?: number | null): string {
+  if (!seconds || seconds <= 0) return "---";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? `${h}h ${rem}m` : `${h}h`;
   }
-
-  const element = document.createElement("div");
-  element.innerHTML = value;
-  return (element.textContent ?? "").replaceAll(/\s+/g, " ").trim();
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function formatDate(value?: string | null): string {
-  if (!value) return "Not available";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function fmtTotalSeconds(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
 }
 
-function formatCourseDuration(totalDurationMinutes?: number): string {
-  if (!totalDurationMinutes || totalDurationMinutes <= 0) return "Self-paced";
-  if (totalDurationMinutes < 60) return `${totalDurationMinutes} min`;
-
-  const hours = Math.floor(totalDurationMinutes / 60);
-  const minutes = totalDurationMinutes % 60;
-  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-}
-
-function formatLessonDuration(durationSeconds?: number): string {
-  if (!durationSeconds || durationSeconds <= 0) return "Self-paced";
-
-  const totalMinutes = Math.max(1, Math.round(durationSeconds / 60));
-  if (totalMinutes < 60) return `${totalMinutes} min`;
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-}
-
-function formatPrice(priceUsd?: number): string {
-  if (!priceUsd || priceUsd <= 0) return "$0";
+function fmtPrice(priceUsd?: number, isFree?: boolean): string {
+  if (isFree || !priceUsd) return "Free";
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: "USD",
@@ -79,594 +70,285 @@ function formatPrice(priceUsd?: number): string {
   }).format(priceUsd);
 }
 
-function getYouTubeEmbedUrl(videoUrl?: string | null): string | null {
-  if (!videoUrl) return null;
+// -- Lesson type metadata --
 
-  try {
-    const url = new URL(videoUrl);
+const LESSON_TYPE = {
+  video: {
+    Icon: PlayCircle,
+    label: "Video",
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+  },
+  article: {
+    Icon: FileText,
+    label: "Article",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+  },
+  quiz: {
+    Icon: HelpCircle,
+    label: "Quiz",
+    color: "text-violet-600",
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+  },
+  assignment: {
+    Icon: ClipboardList,
+    label: "Assignment",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+  },
+  live_session: {
+    Icon: Video,
+    label: "Live",
+    color: "text-rose-600",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+  },
+} as const;
 
-    if (url.hostname.includes("youtu.be")) {
-      const id = url.pathname.replaceAll("/", "").trim();
-      return id ? `https://www.youtube.com/embed/${id}` : null;
+function getLessonMeta(type?: string) {
+  return LESSON_TYPE[type as keyof typeof LESSON_TYPE] ?? LESSON_TYPE.video;
+}
+
+// -- Video Player --
+
+function VideoPlayer({
+  src,
+  title,
+}: Readonly<{ src: string | null | undefined; title: string }>) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load();
     }
+  }, [src]);
 
-    if (url.hostname.includes("youtube.com")) {
-      const id = url.searchParams.get("v");
-      return id ? `https://www.youtube.com/embed/${id}` : null;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function getEmbeddableVideoUrl(videoUrl?: string | null): string | null {
-  return getYouTubeEmbedUrl(videoUrl) ?? videoUrl ?? null;
-}
-
-function extractLessonContent(description?: string) {
-  if (!description) {
-    return { summary: "", paragraphs: [] as string[], quizUrl: null as string | null };
-  }
-
-  if (typeof document === "undefined") {
-    const text = stripHtml(description);
-    return {
-      summary: text,
-      paragraphs: text ? [text] : [],
-      quizUrl: null,
-    };
-  }
-
-  const root = document.createElement("div");
-  root.innerHTML = description;
-
-  root
-    .querySelectorAll(
-      ".llms-parent-course-link, .llms-favorite-wrapper, .llms-course-navigation, .llms-lesson-button-wrapper .llms-button-action.auto",
-    )
-    .forEach((node) => node.remove());
-
-  const quizAnchor = root.querySelector<HTMLAnchorElement>("#llms_start_quiz, a[href*='llms_quiz']");
-  const paragraphs = Array.from(root.querySelectorAll("p, li, h1, h2, h3, h4"))
-    .map((node) => (node.textContent ?? "").replaceAll(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .filter((text) => text.toLowerCase() !== "back to course");
-
-  const uniqueParagraphs = paragraphs.filter(
-    (paragraph, index) => paragraphs.indexOf(paragraph) === index,
-  );
-
-  return {
-    summary: uniqueParagraphs[0] ?? stripHtml(description),
-    paragraphs: uniqueParagraphs,
-    quizUrl: quizAnchor?.href ?? null,
-  };
-}
-
-function extractCourseDescriptionData(description?: string) {
-  if (!description) {
-    return {
-      summary: "",
-      imageUrl: null as string | null,
-      imageCaption: null as string | null,
-      instructors: [] as string[],
-      accessPlans: [] as string[],
-      syllabusSectionTitles: [] as string[],
-      syllabusLessonTitles: [] as string[],
-      syllabusNotice: null as string | null,
-      renderedHtml: "",
-    };
-  }
-
-  if (typeof document === "undefined") {
-    const text = stripHtml(description);
-    return {
-      summary: text,
-      imageUrl: null,
-      imageCaption: null,
-      instructors: [],
-      accessPlans: [],
-      syllabusSectionTitles: [],
-      syllabusLessonTitles: [],
-      syllabusNotice: null,
-      renderedHtml: description,
-    };
-  }
-
-  const root = document.createElement("div");
-  root.innerHTML = description;
-
-  const summary =
-    Array.from(root.querySelectorAll("p"))
-      .map((node) => (node.textContent ?? "").replaceAll(/\s+/g, " ").trim())
-      .find((text) => text.length > 20) ?? stripHtml(description);
-
-  const image = root.querySelector("img");
-  const caption = root.querySelector("figcaption");
-  const instructors = Array.from(root.querySelectorAll(".llms-author-info.name"))
-    .map((node) => (node.textContent ?? "").trim())
-    .filter(Boolean);
-  const accessPlans = Array.from(root.querySelectorAll(".llms-access-plan-title"))
-    .map((node) => (node.textContent ?? "").replaceAll(/\s+/g, " ").trim())
-    .filter(Boolean);
-  const syllabusSectionTitles = Array.from(root.querySelectorAll(".llms-section-title"))
-    .map((node) => (node.textContent ?? "").replaceAll(/\s+/g, " ").trim())
-    .filter(Boolean);
-  const syllabusLessonTitles = Array.from(root.querySelectorAll(".llms-lesson-title"))
-    .map((node) => (node.textContent ?? "").replaceAll(/\s+/g, " ").trim())
-    .filter(Boolean);
-  const syllabusNotice = Array.from(root.querySelectorAll("p"))
-    .map((node) => (node.textContent ?? "").replaceAll(/\s+/g, " ").trim())
-    .find((text) => text.toLowerCase().includes("does not have any sections")) ?? null;
-
-  root
-    .querySelectorAll(
-      "form, input, button, script, style, .clear, .llms-favorite-wrapper, .screen-reader-text",
-    )
-    .forEach((node) => node.remove());
-
-  return {
-    summary,
-    imageUrl: image?.getAttribute("src") ?? null,
-    imageCaption: (caption?.textContent ?? "").trim() || null,
-    instructors,
-    accessPlans,
-    syllabusSectionTitles,
-    syllabusLessonTitles,
-    syllabusNotice,
-    renderedHtml: root.innerHTML,
-  };
-}
-
-function buildCourseFieldCards(course: StudentCourseDto | null) {
-  return [
-    { label: "Instructor", value: course?.educator?.name || "Unknown educator", icon: UserRound },
-    {
-      label: "Programme",
-      value: course?.programme?.title || "Independent course",
-      icon: BookOpen,
-    },
-    { label: "Duration", value: formatCourseDuration(course?.totalDurationMinutes), icon: Clock3 },
-    { label: "Lessons", value: `${course?.videoCount ?? 0} lessons`, icon: PlayCircle },
-    { label: "Students Enrolled", value: `${course?.enrolledCount ?? 0} students`, icon: Users },
-    { label: "Level", value: course?.level || "Not specified", icon: Sparkles },
-    { label: "Price", value: course?.isFree ? "Free" : formatPrice(course?.priceUsd), icon: Tag },
-    {
-      label: "Rating",
-      value: course?.rating ? `${course.rating.toFixed(1)} / 5 (${course?.reviewCount ?? 0} reviews)` : "Not yet rated",
-      icon: Sparkles,
-    },
-    { label: "Topics", value: course?.tags?.length ? course.tags.join(", ") : "General", icon: Tag },
-    { label: "Published", value: formatDate(course?.publishedAt), icon: CalendarDays },
-    {
-      label: "Your Progress",
-      value: course?.progressPercent ? `${course.progressPercent}%` : "Not started",
-      icon: Eye,
-    },
-    {
-      label: "Completion",
-      value: course?.isCompleted
-        ? course.completedAt
-          ? `Completed on ${formatDate(course.completedAt)}`
-          : "Completed"
-        : "In progress",
-      icon: Eye,
-    },
-  ];
-}
-
-function CourseHero({
-  course,
-  sectionCount,
-  lessonCount,
-}: Readonly<{
-  course: StudentCourseDto | null;
-  sectionCount: number;
-  lessonCount: number;
-}>) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-br from-slate-950 via-slate-900 to-[#280909] p-5 text-white">
-      <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#D52B1E]/25 blur-3xl" />
-      <div className="absolute -bottom-12 left-0 h-32 w-32 rounded-full bg-orange-300/10 blur-3xl" />
-      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h2 className="mt-2 text-2xl font-bold">{course?.title || "Select a course"}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-300">
-            {course?.educator?.name ? `Taught by ${course.educator.name}` : "Browse sections and lessons below."}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {course?.level && (
-              <Badge className="border-transparent bg-white/10 text-white">{course.level}</Badge>
-            )}
-            <Badge className="border-transparent bg-white/10 text-white">
-              {course?.isFree ? "Free" : formatPrice(course?.priceUsd)}
-            </Badge>
-            {(course?.rating ?? 0) > 0 && (
-              <Badge className="border-transparent bg-white/10 text-white">★ {course?.rating?.toFixed(1)}</Badge>
-            )}
-            {(course?.reviewCount ?? 0) > 0 && (
-              <Badge className="border-transparent bg-white/10 text-white">{course?.reviewCount} reviews</Badge>
-            )}
-            {(course?.progressPercent ?? 0) > 0 && (
-              <Badge className="border-transparent bg-white/10 text-white">{course?.progressPercent}% complete</Badge>
-            )}
+  if (!src) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center bg-gray-950">
+        <div className="text-center">
+          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
+            <PlayCircle className="h-8 w-8 text-white/40" />
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 lg:w-[320px]">
-          <StatCard label="Sections" value={sectionCount} />
-          <StatCard label="Lessons" value={lessonCount} />
-          <StatCard label="Level" value={course?.level || "Unknown"} compact />
-          <StatCard label="Access" value={course?.isFree ? "Free" : "Enrollment required"} compact />
+          <p className="text-sm font-medium text-white/40">
+            No video available for this lesson
+          </p>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-function StatCard({
-  label,
-  value,
-  compact = false,
-}: Readonly<{ label: string; value: string | number; compact?: boolean }>) {
+  const ytMatch = src.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
+  );
+  if (ytMatch) {
+    return (
+      <div className="aspect-video w-full overflow-hidden bg-black">
+        <iframe
+          className="h-full w-full"
+          src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=0`}
+          title={title}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-      <p className="text-[11px] uppercase tracking-widest text-slate-400">{label}</p>
-      <p className={`mt-1 font-bold ${compact ? "text-sm" : "text-xl"}`}>{value}</p>
+    <div className="group relative aspect-video w-full overflow-hidden bg-black">
+      <video
+        ref={videoRef}
+        key={src}
+        controls
+        className="h-full w-full"
+        muted={muted}
+        preload="metadata"
+      >
+        <source src={src} />
+        Your browser does not support HTML5 video.
+      </video>
+      <button
+        type="button"
+        onClick={() => setMuted((m) => !m)}
+        className="absolute right-3 top-3 hidden rounded-full bg-black/50 p-2 text-white group-hover:flex"
+        aria-label={muted ? "Unmute" : "Mute"}
+      >
+        {muted ? (
+          <VolumeX className="h-4 w-4" />
+        ) : (
+          <Volume2 className="h-4 w-4" />
+        )}
+      </button>
     </div>
   );
 }
 
-function CourseStoryPanel({
-  course,
-  previewEmbedUrl,
-  courseDescriptionData,
+// -- Curriculum Sidebar --
+
+function CurriculumSidebar({
+  sections,
+  activeLesson,
+  expandedIds,
+  onToggleSection,
+  onSelectLesson,
+  allLessons,
+  lockedLessonIds,
 }: Readonly<{
-  course: StudentCourseDto | null;
-  previewEmbedUrl: string | null;
-  courseDescriptionData: ReturnType<typeof extractCourseDescriptionData>;
+  sections: AcademySectionDto[];
+  activeLesson: AcademyLessonDto | null;
+  expandedIds: Set<string>;
+  onToggleSection: (id: string) => void;
+  onSelectLesson: (lesson: AcademyLessonDto) => void;
+  allLessons: AcademyLessonDto[];
+  hasFullAccess: boolean;
+  lockedLessonIds: Set<string>;
 }>) {
-  const artworkAlt = course?.title || "Course artwork";
-  const artworkSrc = course?.coverImageUrl || courseDescriptionData.imageUrl;
-  const instructors =
-    courseDescriptionData.instructors.length > 0
-      ? courseDescriptionData.instructors
-      : [course?.educator?.name || "Unknown educator"];
-  const accessPlans =
-    courseDescriptionData.accessPlans.length > 0
-      ? courseDescriptionData.accessPlans
-      : [course?.isFree ? "Free access" : "Paid access"];
+  const totalSections = sections.length;
+  const totalLessons = allLessons.length;
+  const totalSeconds = allLessons.reduce(
+    (acc, l) => acc + (l.durationSeconds ?? 0),
+    0,
+  );
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-      <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white p-4">
-        <div className="flex items-center gap-2">
-          <NotepadText className="h-4 w-4 text-[#D52B1E]" />
-          <h3 className="font-semibold text-gray-900">About This Course</h3>
-        </div>
-        <p className="mt-1 text-sm text-gray-500">
-          Learn what this course covers, who teaches it, and what to expect.
+    <div className="flex flex-col h-full">
+      <div className="shrink-0 px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+        <h3 className="text-sm font-bold text-gray-900">Course Content</h3>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {totalSections} section{totalSections !== 1 ? "s" : ""} &middot;{" "}
+          {totalLessons} lesson{totalLessons !== 1 ? "s" : ""} &middot;{" "}
+          {fmtTotalSeconds(totalSeconds)}
         </p>
       </div>
-      <div className="grid gap-4 p-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <div className="space-y-3">
-          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
-            {artworkSrc ? (
-              <img
-                src={artworkSrc}
-                alt={artworkAlt}
-                className="h-44 w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-44 items-center justify-center text-sm text-gray-400">
-                No course image available
-              </div>
-            )}
-          </div>
-
-          {courseDescriptionData.imageCaption && (
-            <p className="text-xs text-gray-500">
-              Image caption: {courseDescriptionData.imageCaption}
-            </p>
-          )}
-
-          <div className="grid gap-3">
-            <InfoListCard
-              title="Instructors"
-              items={instructors}
-              itemClassName="bg-gray-50 text-gray-700"
-            />
-            <InfoListCard
-              title="Access Plans"
-              items={accessPlans}
-              itemClassName="bg-orange-50 text-orange-700"
-            />
-          </div>
-
-          {previewEmbedUrl ? (
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-black shadow-sm">
-              <div className="aspect-video">
-                <iframe
-                  className="h-full w-full"
-                  src={previewEmbedUrl}
-                  title={`${artworkAlt} preview`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                />
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
-            <h4 className="font-semibold text-gray-900">Course Summary</h4>
-            <p className="mt-2 text-sm leading-6 text-gray-700">
-              {courseDescriptionData.summary ||
-                stripHtml(course?.description || "") ||
-                "No course description available."}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-100 p-4">
-            <h4 className="font-semibold text-gray-900">Course Syllabus</h4>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <BadgeCluster
-                title="Sections"
-                items={courseDescriptionData.syllabusSectionTitles}
-                emptyText="No sections listed."
-                variant="outline"
-              />
-              <BadgeCluster
-                title="Lessons"
-                items={courseDescriptionData.syllabusLessonTitles.slice(0, 8)}
-                emptyText="No lessons listed."
-                className="bg-[#D52B1E]/10 text-[#D52B1E] border-transparent"
-              />
-            </div>
-            {courseDescriptionData.syllabusNotice && (
-              <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                {courseDescriptionData.syllabusNotice}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InfoListCard({
-  title,
-  items,
-  itemClassName,
-}: Readonly<{ title: string; items: string[]; itemClassName: string }>) {
-  return (
-    <div className="rounded-2xl border border-gray-100 p-4">
-      <h4 className="font-semibold text-gray-900">{title}</h4>
-      <div className="mt-2 space-y-2">
-        {items.map((item) => (
-          <div
-            key={item}
-            className={`rounded-xl px-3 py-2 text-sm ${itemClassName}`}
-          >
-            {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BadgeCluster({
-  title,
-  items,
-  emptyText,
-  variant,
-  className,
-}: Readonly<{
-  title: string;
-  items: string[];
-  emptyText: string;
-  variant?: "outline";
-  className?: string;
-}>) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-        {title}
-      </p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {items.length > 0 ? (
-          items.map((item, index) => (
-            <Badge
-              key={`${item}-${index}`}
-              variant={variant}
-              className={className}
-            >
-              {item}
-            </Badge>
-          ))
-        ) : (
-          <p className="text-sm text-gray-400">{emptyText}</p>
+      <div className="flex-1 overflow-y-auto">
+        {sections.length === 0 && (
+          <p className="p-4 text-sm text-gray-400">No sections available.</p>
         )}
-      </div>
-    </div>
-  );
-}
-
-function PayloadAtlas({
-  course,
-}: Readonly<{ course: StudentCourseDto | null }>) {
-  const courseFieldCards = useMemo(
-    () => buildCourseFieldCards(course),
-    [course],
-  );
-
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
-        <Sparkles className="h-4 w-4 text-[#D52B1E]" />
-        <h3 className="font-semibold text-gray-900">Course Details</h3>
-      </div>
-      <div className="divide-y divide-gray-50">
-        {courseFieldCards.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="flex items-start gap-3 px-4 py-2.5">
-            <Icon className="h-4 w-4 shrink-0 text-[#D52B1E]" />
-            <span className="w-32 shrink-0 pt-0.5 text-xs font-medium text-gray-500">
-              {label}
-            </span>
-            <span className="min-w-0 whitespace-normal break-words text-sm text-gray-900">
-              {value}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function OutlineColumn({
-  sections,
-  sectionsLoading,
-  selectedSectionId,
-  onSelectSection,
-}: Readonly<{
-  sections: LearningOutlineItemDto[];
-  sectionsLoading: boolean;
-  selectedSectionId: number | null;
-  onSelectSection: (sectionId: number) => void;
-}>) {
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D52B1E]/10 text-[#D52B1E]">
-          <ListTree className="h-4 w-4" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900">Course Sections</p>
-          <p className="text-xs text-gray-500">
-            Select a section to browse its lessons
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {sectionsLoading && (
-          <p className="text-sm text-gray-500">Loading sections...</p>
-        )}
-        {!sectionsLoading && sections.length === 0 && (
-          <p className="text-sm text-gray-400">
-            No sections are available for this course yet.
-          </p>
-        )}
-        {sections.map((section) => {
-          const active = section.id === selectedSectionId;
+        {sections.map((section, sIdx) => {
+          const sectionId = String(section.id);
+          const isExpanded = expandedIds.has(sectionId);
+          const sectionLessons = [...(section.lessons ?? [])].sort(
+            (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+          );
+          const sectionSeconds = sectionLessons.reduce(
+            (acc, l) => acc + (l.durationSeconds ?? 0),
+            0,
+          );
 
           return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => onSelectSection(section.id)}
-              className={`w-full rounded-xl border p-3 text-left transition-all ${
-                active
-                  ? "border-[#D52B1E]/30 bg-[#D52B1E]/5 shadow-sm"
-                  : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
-              }`}
+            <div
+              key={sectionId}
+              className="border-b border-gray-100 last:border-0"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 line-clamp-2">
+              <button
+                type="button"
+                onClick={() => onToggleSection(sectionId)}
+                className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+              >
+                <div className="shrink-0 h-6 w-6 rounded-md bg-[#D52B1E]/10 flex items-center justify-center mt-0.5">
+                  <span className="text-[10px] font-bold text-[#D52B1E]">
+                    {sIdx + 1}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 leading-snug">
                     {section.title}
                   </p>
-                </div>
-                <Badge variant="outline">#{section.order}</Badge>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function LessonsColumn({
-  selectedSectionId,
-  lessons,
-  lessonsLoading,
-  selectedLessonId,
-  onSelectLesson,
-}: Readonly<{
-  selectedSectionId: number | null;
-  lessons: LearningOutlineItemDto[];
-  lessonsLoading: boolean;
-  selectedLessonId: number | null;
-  onSelectLesson: (lessonId: number) => void;
-}>) {
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
-          <BookOpen className="h-4 w-4" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900">Section Lessons</p>
-          <p className="text-xs text-gray-500">
-            {selectedSectionId
-              ? "Select a lesson to view its content"
-              : "Choose a section first"}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {selectedSectionId === null && (
-          <p className="text-sm text-gray-400">
-            Select a section to see its lessons.
-          </p>
-        )}
-        {selectedSectionId !== null && lessonsLoading && (
-          <p className="text-sm text-gray-500">Loading lessons...</p>
-        )}
-        {selectedSectionId !== null &&
-          !lessonsLoading &&
-          lessons.length === 0 && (
-            <p className="text-sm text-gray-400">
-              No lessons are available in this section yet.
-            </p>
-          )}
-        {lessons.map((lessonItem) => {
-          const active = lessonItem.id === selectedLessonId;
-
-          return (
-            <button
-              key={lessonItem.id}
-              type="button"
-              onClick={() => onSelectLesson(lessonItem.id)}
-              className={`w-full rounded-xl border p-3 text-left transition-all ${
-                active
-                  ? "border-orange-300 bg-orange-50 shadow-sm"
-                  : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-gray-700 shadow-sm">
-                  {lessonItem.order}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 line-clamp-2">
-                    {lessonItem.title}
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {sectionLessons.length} lesson
+                    {sectionLessons.length !== 1 ? "s" : ""} &middot;{" "}
+                    {fmtTotalSeconds(sectionSeconds)}
                   </p>
-                  <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 capitalize tracking-wide">
-                      {lessonItem.type}
-                    </span>
-                  </div>
                 </div>
-              </div>
-            </button>
+                <ChevronDown
+                  className={`h-4 w-4 text-gray-400 shrink-0 mt-1 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                />
+              </button>
+              <AnimatePresence initial={false}>
+                {isExpanded && (
+                  <motion.div
+                    key="lessons"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="overflow-hidden"
+                  >
+                    {sectionLessons.map((lesson) => {
+                      const meta = getLessonMeta(lesson.type);
+                      const LIcon = meta.Icon;
+                      const isActive =
+                        String(lesson.id) === String(activeLesson?.id);
+                      const isLocked = lockedLessonIds.has(String(lesson.id));
+
+                      return (
+                        <button
+                          key={String(lesson.id)}
+                          type="button"
+                          onClick={() => !isLocked && onSelectLesson(lesson)}
+                          disabled={isLocked}
+                          className={`w-full flex items-start gap-3 pl-10 pr-4 py-2.5 text-left transition-colors ${
+                            isLocked
+                              ? "opacity-60 cursor-not-allowed"
+                              : isActive
+                                ? "bg-[#D52B1E]/8 border-r-[3px] border-[#D52B1E]"
+                                : "hover:bg-gray-50"
+                          }`}
+                        >
+                          {isLocked ? (
+                            <div className="shrink-0 h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center mt-0.5">
+                              <Lock className="h-3 w-3 text-gray-400" />
+                            </div>
+                          ) : isActive ? (
+                            <div className="shrink-0 h-6 w-6 rounded-full bg-[#D52B1E] flex items-center justify-center mt-0.5">
+                              <Play className="h-3 w-3 text-white fill-white" />
+                            </div>
+                          ) : (
+                            <div
+                              className={`shrink-0 h-6 w-6 rounded-full ${meta.bg} flex items-center justify-center mt-0.5`}
+                            >
+                              <LIcon className={`h-3 w-3 ${meta.color}`} />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-xs leading-snug line-clamp-2 ${isLocked ? "text-gray-400" : isActive ? "font-semibold text-[#D52B1E]" : "text-gray-700"}`}
+                            >
+                              {lesson.title}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-gray-400">
+                                {fmtDuration(lesson.durationSeconds)}
+                              </span>
+                              {lesson.isFreePreview && (
+                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                                  Preview
+                                </span>
+                              )}
+                              {isLocked && (
+                                <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                                  Enroll to unlock
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {isLocked && (
+                            <Lock className="h-3 w-3 text-gray-300 shrink-0 mt-1.5" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           );
         })}
       </div>
@@ -674,205 +356,48 @@ function LessonsColumn({
   );
 }
 
-function LessonPanel({
-  lesson,
-  selectedLessonId,
-  lessonLoading,
-  lessonIndex,
-  lessonCount,
-  hasPreviousLesson,
-  hasNextLesson,
-  onPreviousLesson,
-  onNextLesson,
-  content,
-  embedUrl,
+// -- Course Stats Bar --
+
+function CourseStatsBar({
+  course,
+  totalLessons,
+  totalSeconds,
 }: Readonly<{
-  lesson: StudentLessonDto | undefined;
-  selectedLessonId: number | null;
-  lessonLoading: boolean;
-  lessonIndex: number;
-  lessonCount: number;
-  hasPreviousLesson: boolean;
-  hasNextLesson: boolean;
-  onPreviousLesson: () => void;
-  onNextLesson: () => void;
-  content: ReturnType<typeof extractLessonContent>;
-  embedUrl: string | null;
+  course: StudentCourseDto;
+  totalLessons: number;
+  totalSeconds: number;
 }>) {
+  const stats = [
+    {
+      Icon: Star,
+      value: course.rating ? course.rating.toFixed(1) : "---",
+      label: "Rating",
+    },
+    { Icon: Users, value: `${course.enrolledCount ?? 0}`, label: "Students" },
+    { Icon: BookOpen, value: `${totalLessons}`, label: "Lessons" },
+    { Icon: Clock, value: fmtTotalSeconds(totalSeconds), label: "Duration" },
+    { Icon: Globe, value: "English", label: "Language" },
+    {
+      Icon: GraduationCap,
+      value: course.level ?? "All levels",
+      label: "Level",
+    },
+  ];
+
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-      <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-xl font-bold text-gray-900">
-              {lesson?.title || "Select a lesson"}
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {lesson?.course?.title || "Lesson details will appear here."}
-            </p>
-          </div>
-          {lesson && <Badge variant="outline">{lesson.status}</Badge>}
+    <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4">
+      {stats.map(({ Icon, value, label }) => (
+        <div key={label} className="flex items-center gap-1.5 text-white/80">
+          <Icon className="h-3.5 w-3.5 text-[#D52B1E]" />
+          <span className="text-sm font-semibold">{value}</span>
+          <span className="text-xs text-white/50">{label}</span>
         </div>
-
-        {lesson && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge className="bg-[#D52B1E]/10 text-[#D52B1E] border-transparent">
-              <Clock3 className="mr-1 h-3 w-3" />{" "}
-              {formatLessonDuration(lesson.durationSeconds)}
-            </Badge>
-            <Badge variant="outline">
-              {lesson.isFree ? "Free Preview" : "Enrolled Access"}
-            </Badge>
-            {lesson.quizId && <Badge variant="outline">Includes Quiz</Badge>}
-          </div>
-        )}
-
-        <div className="mt-4 flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-2.5 shadow-sm">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={!hasPreviousLesson}
-            onClick={onPreviousLesson}
-            className="rounded-xl"
-          >
-            <ArrowLeft className="h-4 w-4" /> Previous lesson
-          </Button>
-          <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-              Lesson navigation
-            </p>
-            <p className="text-sm font-medium text-gray-900">
-              {lessonIndex >= 0
-                ? `${lessonIndex + 1} of ${lessonCount}`
-                : "No lesson selected"}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={!hasNextLesson}
-            onClick={onNextLesson}
-            className="rounded-xl"
-          >
-            Next lesson <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
-        {selectedLessonId === null && (
-          <p className="text-sm text-gray-400">
-            Choose a lesson from the section list to begin.
-          </p>
-        )}
-        {selectedLessonId !== null && lessonLoading && (
-          <p className="text-sm text-gray-500">Loading lesson content...</p>
-        )}
-        {selectedLessonId !== null && !lessonLoading && !lesson && (
-          <p className="text-sm text-gray-400">
-            This lesson's details could not be loaded.
-          </p>
-        )}
-
-        {lesson && (
-          <div className="space-y-4">
-            {embedUrl ? (
-              <div className="overflow-hidden rounded-2xl border border-gray-100 bg-black shadow-md">
-                <div className="aspect-video">
-                  <iframe
-                    className="h-full w-full"
-                    src={embedUrl}
-                    title={lesson.title}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
-                No video is available for this lesson.
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-2.5">
-              <div className="flex items-center gap-4 text-sm text-gray-600 mr-auto">
-                <span className="flex items-center gap-1.5">
-                  <Clock3 className="h-3.5 w-3.5 text-[#D52B1E]" />
-                  {formatLessonDuration(lesson.durationSeconds)}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Eye className="h-3.5 w-3.5 text-[#D52B1E]" />
-                  {lesson.isFree ? "Free preview" : "Enrolled access"}
-                </span>
-                {lesson.quizId && (
-                  <span className="flex items-center gap-1.5">
-                    <NotepadText className="h-3.5 w-3.5 text-[#D52B1E]" />
-                    Quiz included
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {lesson.videoUrl && (
-                  <Button
-                    asChild
-                    size="sm"
-                    className="bg-[#D52B1E] hover:bg-[#B8241B]"
-                  >
-                    <a href={lesson.videoUrl} target="_blank" rel="noreferrer">
-                      Open video <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                )}
-                {content.quizUrl && (
-                  <Button asChild size="sm" variant="outline">
-                    <a href={content.quizUrl} target="_blank" rel="noreferrer">
-                      Take quiz <ChevronRight className="ml-1 h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50/80 to-white p-5">
-              <div className="mb-3 flex items-center gap-2 text-gray-900">
-                <Sparkles className="h-4 w-4 text-[#D52B1E]" />
-                <h4 className="font-semibold">Lesson Summary</h4>
-              </div>
-              <p className="text-sm leading-7 text-gray-700">
-                {content.summary ||
-                  "No description is available for this lesson."}
-              </p>
-            </div>
-
-            {content.paragraphs.length > 1 && (
-              <div className="rounded-2xl border border-gray-100 p-5">
-                <h4 className="font-semibold text-gray-900 mb-4">
-                  Content Highlights
-                </h4>
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {content.paragraphs.slice(0, 8).map((paragraph) => (
-                    <div
-                      key={paragraph}
-                      className="flex items-start gap-3 rounded-xl bg-gray-50 px-3.5 py-3"
-                    >
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#D52B1E]" />
-                      <p className="text-sm leading-6 text-gray-700">
-                        {paragraph}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      ))}
     </div>
   );
 }
+
+// -- Main Dialog --
 
 interface CourseExplorerDialogProps {
   readonly course: StudentCourseDto | null;
@@ -880,141 +405,848 @@ interface CourseExplorerDialogProps {
   readonly onClose: () => void;
 }
 
+interface QuizOptionView {
+  id: string;
+  text: string;
+}
+
+interface QuizQuestionView {
+  id: string;
+  text: string;
+  type: string;
+  options: QuizOptionView[];
+}
+
+function pickString(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) return value;
+    if (typeof value === "number") return String(value);
+  }
+  return "";
+}
+
+function normalizeQuizQuestions(payload: unknown): QuizQuestionView[] {
+  if (!payload || typeof payload !== "object") return [];
+  const quiz = payload as { questions?: unknown[] };
+  const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+
+  return questions
+    .map((rawQuestion, index) => {
+      if (!rawQuestion || typeof rawQuestion !== "object") return null;
+      const questionRecord = rawQuestion as Record<string, unknown>;
+      const questionId =
+        pickString(questionRecord, ["id", "questionId"]) || `q-${index}`;
+      const text =
+        pickString(questionRecord, ["text", "question", "title"]) ||
+        `Question ${index + 1}`;
+      const type = pickString(questionRecord, ["type"]).toLowerCase() || "mcq";
+
+      const rawOptions = (
+        Array.isArray(questionRecord.options)
+          ? questionRecord.options
+          : Array.isArray(questionRecord.answers)
+            ? questionRecord.answers
+            : []
+      ) as unknown[];
+
+      const options = rawOptions
+        .map((rawOption, optionIndex) => {
+          if (!rawOption || typeof rawOption !== "object") return null;
+          const optionRecord = rawOption as Record<string, unknown>;
+          const optionId =
+            pickString(optionRecord, ["id", "optionId"]) ||
+            `${questionId}-o-${optionIndex}`;
+          const optionText =
+            pickString(optionRecord, ["text", "label", "value"]) ||
+            `Option ${optionIndex + 1}`;
+          return { id: optionId, text: optionText };
+        })
+        .filter((option): option is QuizOptionView => Boolean(option));
+
+      return {
+        id: questionId,
+        text,
+        type,
+        options,
+      };
+    })
+    .filter((question): question is QuizQuestionView => Boolean(question));
+}
+
+function getQuizIdFromLesson(
+  lesson: AcademyLessonDto | null,
+): string | number | undefined {
+  if (!lesson) return undefined;
+  if (lesson.quizId !== undefined && lesson.quizId !== null)
+    return lesson.quizId;
+
+  const firstQuiz = lesson.quizzes?.[0];
+  if (!firstQuiz) return undefined;
+  if (typeof firstQuiz === "string" || typeof firstQuiz === "number") {
+    return firstQuiz;
+  }
+  if (typeof firstQuiz === "object") {
+    const id = (firstQuiz as { id?: unknown }).id;
+    if (typeof id === "string" || typeof id === "number") return id;
+  }
+
+  return undefined;
+}
+
+function getAttemptId(payload: unknown): string | number | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const candidate = payload as {
+    id?: unknown;
+    attemptId?: unknown;
+    data?: { id?: unknown; attemptId?: unknown };
+  };
+
+  const direct = candidate.attemptId ?? candidate.id;
+  if (typeof direct === "string" || typeof direct === "number") return direct;
+
+  const nested = candidate.data?.attemptId ?? candidate.data?.id;
+  if (typeof nested === "string" || typeof nested === "number") return nested;
+
+  return undefined;
+}
+
 export function CourseExplorerDialog({
   course,
   open,
   onClose,
 }: CourseExplorerDialogProps) {
-  const courseId = (() => {
-    if (typeof course?.id === "number") return course.id;
-    if (typeof course?.id === "string" && /^\d+$/.test(course.id))
-      return Number(course.id);
-    return undefined;
-  })();
-  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(
+  const courseId = course?.id !== undefined ? String(course.id) : undefined;
+
+  const [activeLesson, setActiveLesson] = useState<AcademyLessonDto | null>(
     null,
   );
-  const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [activeAttemptId, setActiveAttemptId] = useState<
+    string | number | undefined
+  >(undefined);
+  const [selectedAnswers, setSelectedAnswers] = useState<
+    Record<string, string>
+  >({});
 
-  const { data: sections = [], isLoading: sectionsLoading } =
-    useLearningCourseContent(open ? courseId : undefined);
-  const { data: lessons = [], isLoading: lessonsLoading } =
-    useLearningSectionContent(
-      open ? (selectedSectionId ?? undefined) : undefined,
-    );
-  const { data: lesson, isLoading: lessonLoading } = useLearningLessonById(
-    open ? (selectedLessonId ?? undefined) : undefined,
+  const { data: courseDetails, isLoading } = useAcademyCourseDetails(
+    open ? courseId : undefined,
+  );
+  const { data: courseWithProgress } = useAcademyCourseWithProgress(
+    open ? courseId : undefined,
+  );
+  const completeLessonMutation = useCompleteAcademyLesson();
+  const startQuizMutation = useStartAcademyQuiz();
+  const submitAttemptMutation = useSubmitAcademyAttempt();
+
+  const sortedSections: AcademySectionDto[] = useMemo(
+    () =>
+      [...(courseDetails?.sections ?? [])].sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+      ),
+    [courseDetails?.sections],
+  );
+
+  const allLessons: AcademyLessonDto[] = useMemo(
+    () =>
+      sortedSections.flatMap((s) =>
+        [...(s.lessons ?? [])].sort(
+          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+        ),
+      ),
+    [sortedSections],
+  );
+
+  const totalSeconds = useMemo(
+    () => allLessons.reduce((acc, l) => acc + (l.durationSeconds ?? 0), 0),
+    [allLessons],
+  );
+
+  const activeQuizId = useMemo(
+    () => getQuizIdFromLesson(activeLesson),
+    [activeLesson],
+  );
+  const { data: activeQuiz } = useAcademyQuiz(activeQuizId);
+  const quizQuestions = useMemo(
+    () => normalizeQuizQuestions(activeQuiz),
+    [activeQuiz],
   );
 
   useEffect(() => {
-    if (!open) return;
-    setSelectedSectionId(null);
-    setSelectedLessonId(null);
-  }, [courseId, open]);
+    if (allLessons.length === 0) return;
+    setActiveLesson((prev) => prev ?? allLessons[0] ?? null);
+    setExpandedIds((prev) => {
+      if (prev.size > 0) return prev;
+      const first = sortedSections[0];
+      return first ? new Set([String(first.id)]) : prev;
+    });
+  }, [allLessons, sortedSections]);
 
   useEffect(() => {
-    if (selectedSectionId !== null || sections.length === 0) return;
-    setSelectedSectionId(sections[0].id);
-  }, [sections, selectedSectionId]);
+    if (!open) {
+      setActiveLesson(null);
+      setExpandedIds(new Set());
+      setActiveAttemptId(undefined);
+      setSelectedAnswers({});
+    }
+  }, [open, courseId]);
 
   useEffect(() => {
-    if (selectedLessonId !== null || lessons.length === 0) return;
-    setSelectedLessonId(lessons[0].id);
-  }, [lessons, selectedLessonId]);
+    setSelectedAnswers({});
+  }, [activeQuizId]);
 
-  const content = useMemo(
-    () => extractLessonContent(lesson?.description),
-    [lesson?.description],
-  );
-  const courseDescriptionData = useMemo(
-    () => extractCourseDescriptionData(course?.description),
-    [course?.description],
-  );
-  const previewEmbedUrl = useMemo(
-    () => getEmbeddableVideoUrl(course?.previewVideoUrl),
-    [course?.previewVideoUrl],
-  );
-  const lessonEmbedUrl = useMemo(
-    () => getEmbeddableVideoUrl(lesson?.videoUrl),
-    [lesson?.videoUrl],
-  );
-  const selectedLessonIndex = useMemo(
-    () => lessons.findIndex((lessonItem) => lessonItem.id === selectedLessonId),
-    [lessons, selectedLessonId],
-  );
-  const hasPreviousLesson = selectedLessonIndex > 0;
-  const hasNextLesson =
-    selectedLessonIndex >= 0 && selectedLessonIndex < lessons.length - 1;
+  const activeMeta = getLessonMeta(activeLesson?.type);
+  const ActiveIcon = activeMeta.Icon;
 
-  const handlePreviousLesson = () => {
-    if (!hasPreviousLesson) return;
-    const previousLesson = lessons[selectedLessonIndex - 1];
-    if (previousLesson) setSelectedLessonId(previousLesson.id);
+  const displayCourse = courseDetails ?? course;
+  const progressPercent =
+    courseWithProgress?.progressPercent ?? displayCourse?.progressPercent ?? 0;
+  const completedModules = courseWithProgress?.completedModules ?? 0;
+  const totalModules =
+    courseWithProgress?.totalModules ?? sortedSections.length;
+  const isEnrolled = Boolean(courseWithProgress?.courseProgress?.enrolledAt);
+  const hasFullAccess = isEnrolled;
+
+  // If user is NOT enrolled, only the first lesson is accessible; all others are locked
+  const lockedLessonIds = useMemo(() => {
+    if (hasFullAccess) return new Set<string>();
+    const ids = new Set<string>();
+    allLessons.forEach((lesson, index) => {
+      if (index > 0) ids.add(String(lesson.id));
+    });
+    return ids;
+  }, [hasFullAccess, allLessons]);
+
+  const activeLessonIndex = activeLesson
+    ? allLessons.findIndex((l) => String(l.id) === String(activeLesson.id))
+    : -1;
+  const hasPrev =
+    activeLessonIndex > 0 &&
+    !lockedLessonIds.has(String(allLessons[activeLessonIndex - 1]?.id));
+  const hasNext =
+    activeLessonIndex >= 0 &&
+    activeLessonIndex < allLessons.length - 1 &&
+    !lockedLessonIds.has(String(allLessons[activeLessonIndex + 1]?.id));
+
+  const handlePrev = () => {
+    if (!hasPrev) return;
+    const prev = allLessons[activeLessonIndex - 1];
+    if (prev && !lockedLessonIds.has(String(prev.id))) setActiveLesson(prev);
   };
 
-  const handleNextLesson = () => {
-    if (!hasNextLesson) return;
-    const nextLesson = lessons[selectedLessonIndex + 1];
-    if (nextLesson) setSelectedLessonId(nextLesson.id);
+  const handleNext = () => {
+    if (!hasNext) return;
+    const next = allLessons[activeLessonIndex + 1];
+    if (next && !lockedLessonIds.has(String(next.id))) setActiveLesson(next);
   };
+
+  const handleSelectLesson = (lesson: AcademyLessonDto) => {
+    if (lockedLessonIds.has(String(lesson.id))) return;
+    setActiveLesson(lesson);
+    if (lesson.sectionId) {
+      setExpandedIds((prev) => new Set([...prev, String(lesson.sectionId)]));
+    }
+  };
+
+  const handleToggleSection = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const instructorUserId = displayCourse?.educator?.id
+    ? String(displayCourse.educator.id)
+    : "";
+  const { data: instructorUser } = useUser(instructorUserId);
+  const instructorFullName = [
+    instructorUser?.firstName,
+    instructorUser?.lastName,
+  ]
+    .filter(
+      (part): part is string =>
+        typeof part === "string" && part.trim().length > 0,
+    )
+    .join(" ")
+    .trim();
+  const instructorDisplayName =
+    instructorFullName ||
+    instructorUser?.username ||
+    displayCourse?.educator?.name ||
+    "IEFA Educator";
+  const instructorPhoto =
+    instructorUser?.profilePhotoUrl ||
+    displayCourse?.educator?.profilePhotoUrl ||
+    "";
+
+  const handleCompleteLesson = async () => {
+    if (!activeLesson) return;
+    await completeLessonMutation.mutateAsync(activeLesson.id);
+  };
+
+  const handleStartQuiz = async () => {
+    if (!activeQuizId) return;
+    const response = await startQuizMutation.mutateAsync(activeQuizId);
+    setActiveAttemptId(getAttemptId(response));
+  };
+
+  const handleSubmitAttempt = async () => {
+    if (!activeAttemptId) return;
+    const answers = quizQuestions
+      .map((question) => {
+        const value = selectedAnswers[question.id];
+        if (!value) return null;
+
+        if (question.type === "short_answer") {
+          return {
+            questionId: question.id,
+            answerText: value,
+            answer: value,
+          };
+        }
+
+        if (question.type === "true_false") {
+          const boolValue = value === "true";
+          return {
+            questionId: question.id,
+            answerBoolean: boolValue,
+            answer: boolValue,
+          };
+        }
+
+        return {
+          questionId: question.id,
+          selectedOptionId: value,
+          optionId: value,
+          answer: value,
+        };
+      })
+      .filter((entry) => entry !== null);
+
+    await submitAttemptMutation.mutateAsync({
+      attemptId: activeAttemptId,
+      payload: { answers },
+    });
+    setActiveAttemptId(undefined);
+    setSelectedAnswers({});
+  };
+
+  const answeredQuestions = quizQuestions.filter((q) => {
+    const value = selectedAnswers[q.id];
+    return typeof value === "string" && value.trim().length > 0;
+  }).length;
+  const hasRequiredAnswers =
+    quizQuestions.length === 0 || answeredQuestions === quizQuestions.length;
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={course?.title || "Course Explorer"}
-      maxWidth="max-w-7xl"
+      title={displayCourse?.title ?? "Course"}
+      maxWidth="max-w-[1400px]"
     >
-      <div className="space-y-5">
-        <CourseHero
-          course={course}
-          sectionCount={sections.length}
-          lessonCount={lessons.length}
-        />
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <CourseStoryPanel
-            course={course}
-            previewEmbedUrl={previewEmbedUrl}
-            courseDescriptionData={courseDescriptionData}
-          />
-          <PayloadAtlas course={course} />
+      {isLoading && !courseDetails ? (
+        <div className="flex flex-col gap-4">
+          <div className="aspect-video w-full rounded-xl bg-gray-100 animate-pulse" />
+          <div className="h-6 w-1/2 rounded-full bg-gray-100 animate-pulse" />
+          <div className="h-4 w-1/3 rounded-full bg-gray-100 animate-pulse" />
         </div>
+      ) : (
+        <div className="flex flex-col lg:flex-row gap-0 -m-6">
+          {/* Left: Player + Info */}
+          <div className="flex-1 min-w-0 overflow-y-auto">
+            {/* Dark hero banner */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-[#1a0404] to-gray-900 px-6 py-6">
+              <div className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full bg-[#D52B1E]/20 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-8 left-0 h-32 w-32 rounded-full bg-orange-600/10 blur-3xl" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  {displayCourse?.isFree ? (
+                    <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-full border border-emerald-400/20">
+                      Free Course
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-[#D52B1E] bg-[#D52B1E]/15 px-2.5 py-1 rounded-full border border-[#D52B1E]/25">
+                      {fmtPrice(displayCourse?.priceUsd, displayCourse?.isFree)}
+                    </span>
+                  )}
+                  {displayCourse?.level && (
+                    <span className="text-xs font-semibold text-white/60 bg-white/8 px-2.5 py-1 rounded-full capitalize border border-white/10">
+                      {displayCourse.level}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xl font-bold text-white leading-tight">
+                  {displayCourse?.title}
+                </h2>
+                {displayCourse?.description && (
+                  <p className="mt-1.5 text-sm text-gray-400 line-clamp-2">
+                    {displayCourse.description}
+                  </p>
+                )}
+                {displayCourse && (
+                  <CourseStatsBar
+                    course={displayCourse}
+                    totalLessons={allLessons.length}
+                    totalSeconds={totalSeconds}
+                  />
+                )}
+                {hasFullAccess ? (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 max-w-xl">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="text-white/70 font-semibold">
+                        Your progress
+                      </span>
+                      <span className="text-white font-bold">
+                        {Math.round(progressPercent)}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={Math.max(0, Math.min(100, progressPercent))}
+                      className="h-2 bg-white/15 [&>div]:bg-gradient-to-r [&>div]:from-[#D52B1E] [&>div]:to-orange-400"
+                    />
+                    <p className="text-[11px] text-white/50 mt-2">
+                      {completedModules} of {totalModules} modules completed
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 max-w-xl">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-amber-400" />
+                      <p className="text-sm font-semibold text-amber-300">
+                        Enroll to unlock all lessons
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-amber-400/70 mt-1">
+                      Only the first lesson is available as a preview
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
 
-        <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="space-y-4 xl:max-h-[700px] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
-            <OutlineColumn
-              sections={sections}
-              sectionsLoading={sectionsLoading}
-              selectedSectionId={selectedSectionId}
-              onSelectSection={(sectionId) => {
-                setSelectedSectionId(sectionId);
-                setSelectedLessonId(null);
-              }}
-            />
-            <LessonsColumn
-              selectedSectionId={selectedSectionId}
-              lessons={lessons}
-              lessonsLoading={lessonsLoading}
-              selectedLessonId={selectedLessonId}
-              onSelectLesson={setSelectedLessonId}
+            {/* Video player */}
+            <div className="bg-black">
+              <VideoPlayer
+                src={activeLesson?.contentUrl}
+                title={activeLesson?.title ?? ""}
+              />
+            </div>
+
+            {/* Lesson navigation bar */}
+            <div className="flex items-center justify-between px-6 py-3 bg-gray-950 border-b border-gray-800">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!hasPrev}
+                onClick={handlePrev}
+                className="text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </Button>
+              <p className="text-[11px] text-white/40 uppercase tracking-wider">
+                {activeLessonIndex >= 0
+                  ? `Lesson ${activeLessonIndex + 1} of ${allLessons.length}`
+                  : "No lesson selected"}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!hasNext}
+                onClick={handleNext}
+                className="text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 gap-1"
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Lesson details */}
+            <div className="p-6 space-y-5">
+              {activeLesson ? (
+                <>
+                  <div>
+                    <div className="flex items-start gap-3 justify-between">
+                      <h3 className="text-xl font-bold text-gray-900 leading-tight flex-1 min-w-0">
+                        {activeLesson.title}
+                      </h3>
+                      <div
+                        className={`shrink-0 flex h-10 w-10 items-center justify-center rounded-xl ${activeMeta.bg}`}
+                      >
+                        <ActiveIcon className={`h-5 w-5 ${activeMeta.color}`} />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${activeMeta.bg} ${activeMeta.color} ${activeMeta.border}`}
+                      >
+                        <ActiveIcon className="h-3 w-3" /> {activeMeta.label}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
+                        <Clock className="h-3 w-3" />{" "}
+                        {fmtDuration(activeLesson.durationSeconds)}
+                      </span>
+                      {activeLesson.isFreePreview && (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle className="h-3 w-3" /> Free Preview
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {activeLesson.contentText && (
+                    <div className="rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-100 p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <FileText className="h-4 w-4 text-[#D52B1E]" />
+                        <h4 className="text-sm font-bold text-gray-800">
+                          Lesson Overview
+                        </h4>
+                      </div>
+                      <p className="text-sm leading-7 text-gray-700">
+                        {activeLesson.contentText}
+                      </p>
+                    </div>
+                  )}
+
+                  {activeLesson.meetingLink && (
+                    <div className="rounded-2xl bg-rose-50 border border-rose-100 p-4 flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                        <Video className="h-5 w-5 text-rose-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-rose-800">
+                          Live Session
+                        </p>
+                        {activeLesson.scheduledAt && (
+                          <p className="text-xs text-rose-600 mt-0.5">
+                            Scheduled:{" "}
+                            {new Date(
+                              activeLesson.scheduledAt,
+                            ).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      <a
+                        href={activeLesson.meetingLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 px-4 py-2 rounded-xl transition-colors"
+                      >
+                        Join Now
+                      </a>
+                    </div>
+                  )}
+
+                  {activeLesson.contentUrl && activeLesson.type === "video" && (
+                    <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <PlayCircle className="h-4 w-4 text-blue-500" />
+                        <span>Video source available</span>
+                      </div>
+                      <a
+                        href={activeLesson.contentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        Open externally
+                      </a>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-3">
+                    <h4 className="text-sm font-bold text-gray-800">
+                      Learning Actions
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleCompleteLesson}
+                        disabled={completeLessonMutation.isPending}
+                        className="bg-[#D52B1E] hover:bg-[#b92418] text-white"
+                      >
+                        {completeLessonMutation.isPending
+                          ? "Completing..."
+                          : "Mark Lesson Complete"}
+                      </Button>
+                      {activeQuizId && (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleStartQuiz}
+                            disabled={startQuizMutation.isPending}
+                          >
+                            {startQuizMutation.isPending
+                              ? "Starting..."
+                              : "Start Quiz"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSubmitAttempt}
+                            disabled={
+                              !activeAttemptId ||
+                              submitAttemptMutation.isPending ||
+                              !hasRequiredAnswers
+                            }
+                          >
+                            {submitAttemptMutation.isPending
+                              ? "Submitting..."
+                              : "Submit Attempt"}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {activeQuizId && (
+                      <div className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2">
+                        <p className="text-xs font-semibold text-violet-700">
+                          Quiz Details
+                        </p>
+                        <p className="text-xs text-violet-600 mt-0.5">
+                          {activeQuiz?.title ?? "Quiz"} ·{" "}
+                          {activeQuiz?.questions?.length ?? 0} questions
+                        </p>
+                      </div>
+                    )}
+                    {activeQuizId && (
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-gray-700">
+                          Assessment Checklist
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {activeAttemptId
+                            ? "1. Attempt started"
+                            : "1. Start quiz attempt"}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          2. Answer all questions ({answeredQuestions}/
+                          {quizQuestions.length})
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          3. Submit attempt
+                        </p>
+                      </div>
+                    )}
+                    {activeQuizId && quizQuestions.length > 0 && (
+                      <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4">
+                        <h5 className="text-sm font-bold text-gray-800">
+                          Answer Quiz Questions
+                        </h5>
+                        {!activeAttemptId && (
+                          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                            Start the quiz attempt first, then select your
+                            answers.
+                          </p>
+                        )}
+                        {quizQuestions.map((question, index) => {
+                          const selectedValue =
+                            selectedAnswers[question.id] ?? "";
+                          const canAnswer = Boolean(activeAttemptId);
+                          return (
+                            <div
+                              key={question.id}
+                              className="rounded-xl border border-gray-100 p-3 space-y-2"
+                            >
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                Question {index + 1}
+                              </p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {question.text}
+                              </p>
+
+                              {question.type === "short_answer" ? (
+                                <textarea
+                                  value={selectedValue}
+                                  onChange={(e) =>
+                                    setSelectedAnswers((prev) => ({
+                                      ...prev,
+                                      [question.id]: e.target.value,
+                                    }))
+                                  }
+                                  disabled={!canAnswer}
+                                  rows={3}
+                                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                                  placeholder="Type your answer"
+                                />
+                              ) : question.type === "true_false" ? (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {["true", "false"].map((value) => (
+                                    <button
+                                      key={value}
+                                      type="button"
+                                      disabled={!canAnswer}
+                                      onClick={() =>
+                                        setSelectedAnswers((prev) => ({
+                                          ...prev,
+                                          [question.id]: value,
+                                        }))
+                                      }
+                                      className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
+                                        selectedValue === value
+                                          ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
+                                          : "border-gray-200 hover:border-gray-300"
+                                      }`}
+                                    >
+                                      {value === "true" ? "True" : "False"}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {question.options.map((option) => (
+                                    <button
+                                      key={option.id}
+                                      type="button"
+                                      disabled={!canAnswer}
+                                      onClick={() =>
+                                        setSelectedAnswers((prev) => ({
+                                          ...prev,
+                                          [question.id]: option.id,
+                                        }))
+                                      }
+                                      className={`w-full rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
+                                        selectedValue === option.id
+                                          ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
+                                          : "border-gray-200 hover:border-gray-300"
+                                      }`}
+                                    >
+                                      {option.text}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                    <PlayCircle className="h-8 w-8 text-gray-300" />
+                  </div>
+                  <p className="text-gray-500 font-medium">
+                    Select a lesson to start learning
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Choose from the curriculum on the right
+                  </p>
+                </div>
+              )}
+
+              {/* Course info */}
+              <div className="rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                  <Award className="h-4 w-4 text-[#D52B1E]" />
+                  <h4 className="text-sm font-bold text-gray-800">
+                    About This Course
+                  </h4>
+                </div>
+                <div className="p-5 grid sm:grid-cols-2 gap-3">
+                  {[
+                    {
+                      label: "Instructor",
+                      value: instructorDisplayName,
+                    },
+                    {
+                      label: "Category",
+                      value: displayCourse?.programme?.title ?? "---",
+                    },
+                    { label: "Level", value: displayCourse?.level ?? "---" },
+                    {
+                      label: "Price",
+                      value: fmtPrice(
+                        displayCourse?.priceUsd,
+                        displayCourse?.isFree,
+                      ),
+                    },
+                    {
+                      label: "Rating",
+                      value: displayCourse?.rating
+                        ? `${displayCourse.rating.toFixed(2)} / 5`
+                        : "Not rated",
+                    },
+                    {
+                      label: "Students",
+                      value: `${displayCourse?.enrolledCount ?? 0} enrolled`,
+                    },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-start gap-2">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider w-20 shrink-0 pt-0.5">
+                        {label}
+                      </span>
+                      <span className="text-sm text-gray-800 font-medium">
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-white p-5">
+                <div className="flex items-start gap-3">
+                  {instructorPhoto ? (
+                    <img
+                      src={instructorPhoto}
+                      alt={instructorDisplayName}
+                      className="h-14 w-14 rounded-full object-cover border border-gray-200"
+                    />
+                  ) : (
+                    <div className="h-14 w-14 rounded-full bg-[#D52B1E]/10 text-[#D52B1E] flex items-center justify-center font-bold">
+                      {instructorDisplayName.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900">
+                      {instructorDisplayName}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {displayCourse?.educator?.title ?? "Instructor"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {displayCourse?.educator?.specialization ||
+                        "Islamic finance educator"}
+                    </p>
+                    {displayCourse?.educator?.qualifications && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Qualifications: {displayCourse.educator.qualifications}
+                      </p>
+                    )}
+                    {displayCourse?.educator?.bioLong && (
+                      <p className="text-sm text-gray-700 mt-2 leading-6 line-clamp-4">
+                        {displayCourse.educator.bioLong}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Curriculum sidebar */}
+          <div className="lg:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-100 flex flex-col bg-white">
+            <CurriculumSidebar
+              sections={sortedSections}
+              activeLesson={activeLesson}
+              expandedIds={expandedIds}
+              onToggleSection={handleToggleSection}
+              onSelectLesson={handleSelectLesson}
+              allLessons={allLessons}
+              hasFullAccess={hasFullAccess}
+              lockedLessonIds={lockedLessonIds}
             />
           </div>
-          <LessonPanel
-            lesson={lesson}
-            selectedLessonId={selectedLessonId}
-            lessonLoading={lessonLoading}
-            lessonIndex={selectedLessonIndex}
-            lessonCount={lessons.length}
-            hasPreviousLesson={hasPreviousLesson}
-            hasNextLesson={hasNextLesson}
-            onPreviousLesson={handlePreviousLesson}
-            onNextLesson={handleNextLesson}
-            content={content}
-            embedUrl={lessonEmbedUrl}
-          />
         </div>
-      </div>
+      )}
     </Dialog>
   );
 }

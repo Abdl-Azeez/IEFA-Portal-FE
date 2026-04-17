@@ -12,6 +12,11 @@ export interface EducatorSummaryDto {
   name: string;
   profilePhotoUrl: string;
   rating: number;
+  title?: string;
+  specialization?: string;
+  qualifications?: string | null;
+  bioLong?: string;
+  totalStudents?: number;
 }
 
 export interface ProgrammeSummaryDto {
@@ -22,7 +27,7 @@ export interface ProgrammeSummaryDto {
 }
 
 export interface StudentCourseDto {
-  id: number;
+  id: string | number;
   title: string;
   slug: string;
   description: string;
@@ -302,7 +307,12 @@ export interface AcademyCourseFilters {
 
 export interface AcademyCategoryTypeDto {
   id: string | number;
-  title: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  iconUrl?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
 }
 
 export interface AcademyQuizTypeDto {
@@ -323,6 +333,12 @@ export interface AcademyCourseWithProgressDto extends AcademyCourseDetailsDto {
   progressPercent: number;
   completedModules: number;
   totalModules: number;
+  courseProgress?: {
+    completionPercent: number;
+    enrolledAt?: string | null;
+    completedAt?: string | null;
+    status?: string | null;
+  };
 }
 
 export interface AcademyEnrollmentCourseDto {
@@ -405,21 +421,45 @@ export interface AcademyQuizDto {
 }
 
 export interface AcademyLessonDto {
-  id: string;
+  id: string | number;
   title: string;
-  description: string;
-  videoUrl: string;
+  type: string;
+  contentUrl?: string | null;
+  contentText?: string | null;
+  durationSeconds?: number | null;
+  sortOrder?: number;
+  isFreePreview?: boolean;
+  isPublished?: boolean;
+  resources?: unknown;
+  meetingLink?: string | null;
+  scheduledAt?: string | null;
+  quizzes?: unknown[];
+  sectionId?: string | number;
+  courseId?: string | number;
+  // Legacy compat fields
+  description?: string;
+  videoUrl?: string;
   thumbnailUrl?: string;
-  durationSeconds: number;
-  courseId: number;
-  sectionId?: number;
+  orderIndex?: number;
+  viewCount?: number;
+  isFree?: boolean;
+  status?: string;
+  quizId?: string | number | null;
+  course?: { id: string | number; title: string };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AcademySectionDto {
-  id: string;
+  id: string | number;
   title: string;
-  order: number;
-  courseId: number;
+  description?: string | null;
+  sortOrder?: number;
+  isFreePreview?: boolean;
+  courseId?: string | number;
+  lessons?: AcademyLessonDto[];
+  // Legacy compat
+  order?: number;
 }
 
 export interface AcademyInstructorCourseDto extends AcademyCourseDetailsDto {
@@ -432,48 +472,79 @@ export interface AcademyInstructorCourseDto extends AcademyCourseDetailsDto {
 export interface AcademyInstructorCreateCourseDto {
   title: string;
   slug: string;
-  description: string;
-  coverImageUrl?: string;
-  previewVideoUrl?: string | null;
-  educatorId: string;
-  programmeId?: string | null;
-  level: string;
-  priceUsd: number;
+  subtitle?: string;
+  description?: string;
+  categoryId?: string;
+  level: "beginner" | "intermediate" | "advanced";
+  thumbnailUrl?: string;
+  price: number;
   isFree: boolean;
-  status: string;
-  tags: string[];
 }
 
 export interface AcademyInstructorCreateSectionDto {
   title: string;
-  order?: number;
+  description?: string;
+  sortOrder?: number;
 }
 
 export interface AcademyInstructorCreateLessonDto {
   title: string;
-  content?: string;
-  order?: number;
+  type: "video" | "article" | "quiz" | "assignment" | "live_session";
+  contentText?: string;
+  contentUrl?: string;
+  meetingLink?: string;
+  scheduledAt?: string;
+  durationSeconds?: number;
+  sortOrder?: number;
 }
 
 export interface AcademyInstructorCreateQuizDto {
   title: string;
-  description: string;
-  courseId: string | number;
+  description?: string;
+  passPercentage: number;
+  timeLimitMinutes?: number;
+  lessonId?: string;
 }
 
 export interface AcademyInstructorUpdateQuizDto {
   title?: string;
   description?: string;
+  passPercentage?: number;
+  timeLimitMinutes?: number;
+  maxAttempts?: number;
+  isPublished?: boolean;
 }
 
 export interface AcademyInstructorUpdateQuestionDto {
   text?: string;
   type?: string;
+  points?: number;
+  sortOrder?: number;
+  explanation?: string;
 }
 
 export interface AcademyInstructorUpdateOptionDto {
   text?: string;
   isCorrect?: boolean;
+  sortOrder?: number;
+}
+
+export interface AdminCourseEnrollmentDto {
+  id: string;
+  userId: string;
+  courseId: string;
+  status: string;
+  enrolledAt: string;
+  completedAt: string | null;
+  progressPercent?: number;
+  expiresAt?: string | null;
+  user?: {
+    id: string;
+    username?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+  };
 }
 
 export interface AcademyQuizAttemptDto {
@@ -488,16 +559,13 @@ export interface AcademyQuizAttemptDto {
 export interface AcademyInstructorCourseUpdateDto {
   title?: string;
   slug?: string;
+  subtitle?: string;
   description?: string;
-  coverImageUrl?: string;
-  previewVideoUrl?: string | null;
-  educatorId?: string;
-  programmeId?: string | null;
-  level?: string;
-  priceUsd?: number;
+  categoryId?: string;
+  level?: "beginner" | "intermediate" | "advanced";
+  thumbnailUrl?: string;
+  price?: number;
   isFree?: boolean;
-  status?: string;
-  tags?: string[];
 }
 
 export interface AcademyQuizDetailsDto {
@@ -514,5 +582,5 @@ export interface AcademySectionDetailsDto {
 }
 
 export interface AcademyLessonDetailsDto extends AcademyLessonDto {
-  sectionId: number;
+  sectionId: string | number;
 }

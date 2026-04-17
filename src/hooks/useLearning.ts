@@ -451,7 +451,7 @@ export const useDeleteLearningCourse = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string | number) => {
       await api.delete(`/learning/courses/${id}`);
       return id;
     },

@@ -23,6 +23,7 @@ import type {
   AcademyQuizDetailsDto,
   AcademySectionDetailsDto,
   AcademyLessonDetailsDto,
+  AdminCourseEnrollmentDto,
 } from "@/types/learning";
 
 interface AcademyCourseApiResponse {
@@ -74,15 +75,42 @@ interface AcademyCourseApiResponse {
   publishedAt: string;
   createdAt: string;
   updatedAt: string;
+  sections?: Array<{
+    id: string;
+    courseId: string;
+    title: string;
+    description: string | null;
+    sortOrder: number;
+    isFreePreview: boolean;
+    lessons: Array<{
+      id: string;
+      sectionId: string;
+      courseId: string;
+      title: string;
+      type: string;
+      contentUrl: string | null;
+      contentText: string | null;
+      durationSeconds: number | null;
+      sortOrder: number;
+      isFreePreview: boolean;
+      isPublished: boolean;
+      resources: unknown;
+      meetingLink: string | null;
+      scheduledAt: string | null;
+      quizzes: unknown[];
+    }>;
+  }>;
 }
 
-function mapAcademyCourseApiResponse(course: AcademyCourseApiResponse): AcademyCourseDetailsDto {
+function mapAcademyCourseApiResponse(
+  course: AcademyCourseApiResponse,
+): AcademyCourseDetailsDto {
   const durationMinutes = Number(course.durationHours) * 60 || 0;
   const instructorRating = Number(course.instructor.ratingAvg) || 0;
   const courseRating = Number(course.ratingAvg) || 0;
 
   return {
-    id: Number(course.id) || 0,
+    id: course.id,
     title: course.title,
     slug: course.slug,
     description: course.description,
@@ -94,6 +122,11 @@ function mapAcademyCourseApiResponse(course: AcademyCourseApiResponse): AcademyC
       name: course.instructor.title,
       profilePhotoUrl: "",
       rating: instructorRating,
+      title: course.instructor.title,
+      specialization: course.instructor.specialization,
+      qualifications: course.instructor.qualifications,
+      bioLong: course.instructor.bioLong,
+      totalStudents: course.instructor.totalStudents,
     },
     programmeId: course.categoryId,
     programme: {
@@ -102,8 +135,38 @@ function mapAcademyCourseApiResponse(course: AcademyCourseApiResponse): AcademyC
       level: course.level,
       totalDurationMinutes: durationMinutes,
     },
-    moduleCount: 0,
-    videoCount: 0,
+    sections: (course.sections ?? []).map((section) => ({
+      id: section.id,
+      courseId: section.courseId,
+      title: section.title,
+      description: section.description,
+      sortOrder: section.sortOrder,
+      isFreePreview: section.isFreePreview,
+      lessons: [...(section.lessons ?? [])]
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((lesson) => ({
+          id: lesson.id,
+          sectionId: lesson.sectionId,
+          courseId: lesson.courseId,
+          title: lesson.title,
+          type: lesson.type,
+          contentUrl: lesson.contentUrl,
+          contentText: lesson.contentText,
+          durationSeconds: lesson.durationSeconds,
+          sortOrder: lesson.sortOrder,
+          isFreePreview: lesson.isFreePreview,
+          isPublished: lesson.isPublished,
+          resources: lesson.resources,
+          meetingLink: lesson.meetingLink,
+          scheduledAt: lesson.scheduledAt,
+          quizzes: lesson.quizzes ?? [],
+        })),
+    })),
+    moduleCount: (course.sections ?? []).length,
+    videoCount: (course.sections ?? []).reduce(
+      (acc, s) => acc + (s.lessons ?? []).length,
+      0,
+    ),
     totalDurationMinutes: durationMinutes,
     enrolledCount: course.totalEnrollments,
     level: course.level,
@@ -125,12 +188,17 @@ export async function getAcademyCourses(filters: AcademyCourseFilters = {}) {
   if (filters.perPage !== undefined) params.perPage = filters.perPage;
   if (filters.search) params.search = filters.search;
   if (filters.categoryId !== undefined) params.categoryId = filters.categoryId;
-  const response = await api.get<AcademyCourseApiResponse[]>("/academy/courses", { params });
+  const response = await api.get<AcademyCourseApiResponse[]>(
+    "/academy/courses",
+    { params },
+  );
   return response.data.map(mapAcademyCourseApiResponse);
 }
 
 export async function getAcademyCategoryTypes() {
-  const response = await api.get<AcademyCategoryTypeDto[]>("/academy/category-types");
+  const response = await api.get<AcademyCategoryTypeDto[]>(
+    "/academy/category-types",
+  );
   return response.data;
 }
 
@@ -140,13 +208,52 @@ export async function getAcademyQuizTypes() {
 }
 
 export async function getAcademyCourseDetails(id: string | number) {
-  const response = await api.get<AcademyCourseDetailsDto>(`/academy/courses/${id}`);
-  return response.data;
+  const response = await api.get<AcademyCourseApiResponse>(
+    `/academy/courses/${id}`,
+  );
+  return mapAcademyCourseApiResponse(response.data) as AcademyCourseDetailsDto;
 }
 
 export async function getAcademyCourseDetailsWithProgress(id: string | number) {
-  const response = await api.get<AcademyCourseWithProgressDto>(`/academy/courses/${id}/with-progress`);
-  return response.data;
+  const response = await api.get<
+    AcademyCourseApiResponse & {
+      courseProgress?: {
+        completionPercent?: number;
+        enrolledAt?: string;
+        completedAt?: string | null;
+        status?: string;
+      };
+      progressPercent?: number;
+      completedModules?: number;
+      totalModules?: number;
+    }
+  >(`/academy/courses/${id}/with-progress`);
+  const base = mapAcademyCourseApiResponse(
+    response.data,
+  ) as AcademyCourseDetailsDto;
+  return {
+    ...base,
+    progressPercent:
+      response.data.courseProgress?.completionPercent ??
+      response.data.progressPercent ??
+      0,
+    completedModules:
+      response.data.completedModules ??
+      Math.round(
+        ((response.data.courseProgress?.completionPercent ?? 0) / 100) *
+          (base.moduleCount || 0),
+      ),
+    totalModules: response.data.totalModules ?? base.moduleCount ?? 0,
+    courseProgress: {
+      completionPercent:
+        response.data.courseProgress?.completionPercent ??
+        response.data.progressPercent ??
+        0,
+      enrolledAt: response.data.courseProgress?.enrolledAt ?? null,
+      completedAt: response.data.courseProgress?.completedAt ?? null,
+      status: response.data.courseProgress?.status ?? null,
+    },
+  } as AcademyCourseWithProgressDto;
 }
 
 export async function enrollInAcademyCourse(id: string | number) {
@@ -216,7 +323,9 @@ interface AcademyEnrollmentApiResponse {
 }
 
 export async function getAcademyMyEnrollments() {
-  const response = await api.get<AcademyEnrollmentApiResponse[]>("/academy/my-enrollments");
+  const response = await api.get<AcademyEnrollmentApiResponse[]>(
+    "/academy/my-enrollments",
+  );
 
   return response.data.map((enrollment) => ({
     id: enrollment.id,
@@ -279,7 +388,8 @@ interface AcademyUpcomingActivitiesApiResponse {
 }
 
 export async function getAcademyDashboard() {
-  const response = await api.get<AcademyDashboardApiResponse>("/academy/dashboard");
+  const response =
+    await api.get<AcademyDashboardApiResponse>("/academy/dashboard");
   const data = response.data;
 
   return {
@@ -290,7 +400,9 @@ export async function getAcademyDashboard() {
 }
 
 export async function getAcademyUpcomingActivities() {
-  const response = await api.get<AcademyUpcomingActivitiesApiResponse>("/academy/upcoming-activities");
+  const response = await api.get<AcademyUpcomingActivitiesApiResponse>(
+    "/academy/upcoming-activities",
+  );
   const data = response.data;
 
   return [
@@ -307,7 +419,7 @@ export async function getAcademyUpcomingActivities() {
       type: lesson.lessonType,
       dueDate: null,
       courseId: lesson.courseTitle, // using courseTitle as courseId for now
-    }))
+    })),
   ];
 }
 
@@ -321,8 +433,14 @@ export async function startAcademyQuiz(quizId: string | number) {
   return response.data;
 }
 
-export async function submitAcademyAttempt(attemptId: string | number) {
-  const response = await api.post(`/academy/attempts/${attemptId}/submit`);
+export async function submitAcademyAttempt(
+  attemptId: string | number,
+  payload?: Record<string, unknown>,
+) {
+  const response = await api.post(
+    `/academy/attempts/${attemptId}/submit`,
+    payload,
+  );
   return response.data;
 }
 
@@ -342,32 +460,74 @@ export async function getAcademySection(id: string | number) {
 }
 
 export async function instructorGetCourses() {
-  const response = await api.get<AcademyInstructorCourseDto[]>("/instructor/academy/courses");
+  const response = await api.get<AcademyCourseApiResponse[]>(
+    "/instructor/academy/courses",
+  );
+  return response.data.map(
+    (c) => mapAcademyCourseApiResponse(c) as AcademyInstructorCourseDto,
+  );
+}
+
+export async function instructorCreateCourse(
+  payload: AcademyInstructorCreateCourseDto,
+) {
+  // Map frontend DTO to API contract field names
+  const body = {
+    title: payload.title,
+    slug: payload.slug,
+    subtitle: payload.subtitle,
+    description: payload.description,
+    categoryId: payload.categoryId,
+    level: payload.level,
+    thumbnailUrl: payload.thumbnailUrl,
+    price: payload.price,
+    isFree: payload.isFree,
+  };
+  const response = await api.post("/instructor/academy/courses", body);
   return response.data;
 }
 
-export async function instructorCreateCourse(payload: AcademyInstructorCreateCourseDto) {
-  const response = await api.post("/instructor/academy/courses", payload);
+export async function instructorAddSection(
+  courseId: string | number,
+  payload: AcademyInstructorCreateSectionDto,
+) {
+  const response = await api.post(
+    `/instructor/academy/courses/${courseId}/sections`,
+    payload,
+  );
   return response.data;
 }
 
-export async function instructorAddSection(courseId: string | number, payload: AcademyInstructorCreateSectionDto) {
-  const response = await api.post(`/instructor/academy/courses/${courseId}/sections`, payload);
+export async function instructorAddLesson(
+  sectionId: string | number,
+  payload: AcademyInstructorCreateLessonDto,
+) {
+  const response = await api.post(
+    `/instructor/academy/sections/${sectionId}/lessons`,
+    payload,
+  );
   return response.data;
 }
 
-export async function instructorAddLesson(sectionId: string | number, payload: AcademyInstructorCreateLessonDto) {
-  const response = await api.post(`/instructor/academy/sections/${sectionId}/lessons`, payload);
+export async function instructorAddQuiz(
+  courseId: string | number,
+  payload: AcademyInstructorCreateQuizDto,
+) {
+  const response = await api.post(
+    `/instructor/academy/courses/${courseId}/quizzes`,
+    payload,
+  );
   return response.data;
 }
 
-export async function instructorAddQuiz(courseId: string | number, payload: AcademyInstructorCreateQuizDto) {
-  const response = await api.post(`/instructor/academy/courses/${courseId}/quizzes`, payload);
-  return response.data;
-}
-
-export async function instructorUpdateQuiz(id: string | number, payload: AcademyInstructorUpdateQuizDto) {
-  const response = await api.patch(`/instructor/academy/quizzes/${id}`, payload);
+export async function instructorUpdateQuiz(
+  id: string | number,
+  payload: AcademyInstructorUpdateQuizDto,
+) {
+  const response = await api.patch(
+    `/instructor/academy/quizzes/${id}`,
+    payload,
+  );
   return response.data;
 }
 
@@ -376,13 +536,25 @@ export async function instructorDeleteQuiz(id: string | number) {
   return response.data;
 }
 
-export async function instructorAddQuestion(quizId: string | number, payload: Record<string, unknown>) {
-  const response = await api.post(`/instructor/academy/quizzes/${quizId}/questions`, payload);
+export async function instructorAddQuestion(
+  quizId: string | number,
+  payload: Record<string, unknown>,
+) {
+  const response = await api.post(
+    `/instructor/academy/quizzes/${quizId}/questions`,
+    payload,
+  );
   return response.data;
 }
 
-export async function instructorUpdateQuestion(id: string | number, payload: AcademyInstructorUpdateQuestionDto) {
-  const response = await api.patch(`/instructor/academy/questions/${id}`, payload);
+export async function instructorUpdateQuestion(
+  id: string | number,
+  payload: AcademyInstructorUpdateQuestionDto,
+) {
+  const response = await api.patch(
+    `/instructor/academy/questions/${id}`,
+    payload,
+  );
   return response.data;
 }
 
@@ -391,13 +563,25 @@ export async function instructorDeleteQuestion(id: string | number) {
   return response.data;
 }
 
-export async function instructorAddOption(questionId: string | number, payload: Record<string, unknown>) {
-  const response = await api.post(`/instructor/academy/questions/${questionId}/options`, payload);
+export async function instructorAddOption(
+  questionId: string | number,
+  payload: Record<string, unknown>,
+) {
+  const response = await api.post(
+    `/instructor/academy/questions/${questionId}/options`,
+    payload,
+  );
   return response.data;
 }
 
-export async function instructorUpdateOption(id: string | number, payload: AcademyInstructorUpdateOptionDto) {
-  const response = await api.patch(`/instructor/academy/options/${id}`, payload);
+export async function instructorUpdateOption(
+  id: string | number,
+  payload: AcademyInstructorUpdateOptionDto,
+) {
+  const response = await api.patch(
+    `/instructor/academy/options/${id}`,
+    payload,
+  );
   return response.data;
 }
 
@@ -407,12 +591,29 @@ export async function instructorDeleteOption(id: string | number) {
 }
 
 export async function instructorGetQuizAttempts(quizId: string | number) {
-  const response = await api.get<AcademyQuizAttemptDto[]>(`/instructor/academy/quizzes/${quizId}/attempts`);
+  const response = await api.get<AcademyQuizAttemptDto[]>(
+    `/instructor/academy/quizzes/${quizId}/attempts`,
+  );
   return response.data;
 }
 
-export async function instructorUpdateCourse(id: string | number, payload: AcademyInstructorCourseUpdateDto) {
-  const response = await api.patch(`/instructor/academy/courses/${id}`, payload);
+export async function instructorUpdateCourse(
+  id: string | number,
+  payload: AcademyInstructorCourseUpdateDto,
+) {
+  // Map frontend DTO field names to API contract
+  const body = {
+    title: payload.title,
+    slug: payload.slug,
+    subtitle: payload.subtitle,
+    description: payload.description,
+    categoryId: payload.categoryId,
+    level: payload.level,
+    thumbnailUrl: payload.thumbnailUrl,
+    price: payload.price,
+    isFree: payload.isFree,
+  };
+  const response = await api.patch(`/instructor/academy/courses/${id}`, body);
   return response.data;
 }
 
@@ -422,8 +623,12 @@ export async function instructorDeleteCourse(id: string | number) {
 }
 
 export async function instructorGetCourseDetails(id: string | number) {
-  const response = await api.get<AcademyInstructorCourseDto>(`/instructor/academy/courses/${id}`);
-  return response.data;
+  const response = await api.get<AcademyCourseApiResponse>(
+    `/instructor/academy/courses/${id}`,
+  );
+  return mapAcademyCourseApiResponse(
+    response.data,
+  ) as AcademyInstructorCourseDto;
 }
 
 export async function instructorSuspendCourse(id: string | number) {
@@ -432,16 +637,78 @@ export async function instructorSuspendCourse(id: string | number) {
 }
 
 export async function instructorGetQuizDetails(quizId: string | number) {
-  const response = await api.get<AcademyQuizDetailsDto>(`/instructor/academy/quizzes/${quizId}/details`);
+  const response = await api.get<AcademyQuizDetailsDto>(
+    `/instructor/academy/quizzes/${quizId}/details`,
+  );
   return response.data;
 }
 
 export async function instructorGetSectionDetails(sectionId: string | number) {
-  const response = await api.get<AcademySectionDetailsDto>(`/instructor/academy/sections/${sectionId}/details`);
+  const response = await api.get<AcademySectionDetailsDto>(
+    `/instructor/academy/sections/${sectionId}/details`,
+  );
   return response.data;
 }
 
 export async function instructorGetLessonDetails(lessonId: string | number) {
-  const response = await api.get<AcademyLessonDetailsDto>(`/instructor/academy/lessons/${lessonId}/details`);
+  const response = await api.get<AcademyLessonDetailsDto>(
+    `/instructor/academy/lessons/${lessonId}/details`,
+  );
+  return response.data;
+}
+
+// ── Admin Academy APIs ─────────────────────────────────────────────────────
+
+export async function adminGetAllCourses() {
+  const response = await api.get<AcademyCourseApiResponse[]>(
+    "/admin/academy/courses",
+  );
+  return (response.data ?? []).map(
+    (c) => mapAcademyCourseApiResponse(c) as AcademyInstructorCourseDto,
+  );
+}
+
+export async function adminGetCourseEnrollments(courseId: string | number) {
+  const response = await api.get<AdminCourseEnrollmentDto[]>(
+    `/admin/academy/courses/${courseId}/enrollments`,
+  );
+  return response.data ?? [];
+}
+
+export async function adminCreateCourse(
+  payload: AcademyInstructorCreateCourseDto & { instructorId?: string },
+) {
+  const body = {
+    title: payload.title,
+    slug: payload.slug,
+    subtitle: payload.subtitle,
+    description: payload.description,
+    categoryId: payload.categoryId,
+    level: payload.level,
+    thumbnailUrl: payload.thumbnailUrl,
+    price: payload.price,
+    isFree: payload.isFree,
+    ...(payload.instructorId ? { instructorId: payload.instructorId } : {}),
+  };
+  const response = await api.post("/admin/academy/courses", body);
+  return response.data;
+}
+
+export async function adminMakeUserInstructor(userId: string) {
+  const response = await api.post(
+    `/admin/academy/users/${userId}/make-instructor`,
+  );
+  return response.data;
+}
+
+export async function adminSuspendCourse(courseId: string | number) {
+  const response = await api.post(`/admin/academy/courses/${courseId}/suspend`);
+  return response.data;
+}
+
+export async function adminUnsuspendCourse(courseId: string | number) {
+  const response = await api.post(
+    `/admin/academy/courses/${courseId}/unsuspend`,
+  );
   return response.data;
 }

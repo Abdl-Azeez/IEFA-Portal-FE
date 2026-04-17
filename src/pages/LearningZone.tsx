@@ -6,11 +6,8 @@ import {
   BarChart3,
   BookOpen,
   Calendar,
-  CheckCircle2,
   ChevronRight,
   Clock,
-  CreditCard,
-  Download,
   GraduationCap,
   Megaphone,
   PlayCircle,
@@ -28,17 +25,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { useMe } from "@/hooks/useAuth";
 import {
-  useEnrollInLearningCourse,
-  useLearningAnnouncements,
-  useLearningCourses,
-  useLearningDashboard,
-  useLearningMyCourses,
-  useLearningPayments,
-  useLearningResults,
-  useLearningUpcomingActivities,
-  useUnenrollFromLearningCourse,
-} from "@/hooks/useLearning";
-import {
+  useAcademyCourses,
+  useAcademyMyEnrollments,
+  useAcademyDashboard,
+  useAcademyUpcomingActivities,
+  useEnrollInAcademyCourse,
   useInstructorAcademyCourses,
   useInstructorCreateCourse,
   useInstructorAddSection,
@@ -46,9 +37,9 @@ import {
   useInstructorCourseDetails,
 } from "@/hooks/useAcademy";
 import type {
+  AcademyEnrollmentDto,
   AcademyInstructorCourseDto,
-  StudentCourseDto,
-  StudentEnrollmentDto,
+  AcademyCourseDetailsDto,
 } from "@/types/learning";
 
 /* ── Animation variants ──────────────────────────────────────────────────── */
@@ -74,14 +65,6 @@ function formatDate(value?: string | null) {
   });
 }
 
-function formatMoney(amountCents: number, currency: string) {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(amountCents / 100);
-}
-
 function durationLabel(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
   const h = Math.floor(minutes / 60);
@@ -95,6 +78,40 @@ function stripHtml(html: string): string {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
   return (tmp.textContent ?? "").split(/\s+/).filter(Boolean).join(" ");
+}
+
+function buildCourseStub(
+  courseId: string | number,
+  title?: string,
+): AcademyCourseDetailsDto {
+  const now = new Date().toISOString();
+  return {
+    id: courseId,
+    title: title ?? "Course",
+    slug: "",
+    description: "",
+    coverImageUrl: "",
+    previewVideoUrl: null,
+    educatorId: "",
+    educator: { id: "", name: "IEFA Educator", profilePhotoUrl: "", rating: 0 },
+    programmeId: null,
+    programme: null,
+    moduleCount: 0,
+    videoCount: 0,
+    totalDurationMinutes: 0,
+    enrolledCount: 0,
+    level: "beginner",
+    priceUsd: 0,
+    isFree: true,
+    rating: 0,
+    reviewCount: 0,
+    status: "published",
+    tags: [],
+    publishedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    sections: [],
+  };
 }
 
 function formatActivityType(type: string): string {
@@ -135,10 +152,14 @@ function TabChip({
 function EnrollmentCard({
   item,
   courseTitle,
-}: Readonly<{ item: StudentEnrollmentDto; courseTitle?: string }>) {
+  onContinue,
+}: Readonly<{
+  item: AcademyEnrollmentDto;
+  courseTitle?: string;
+  onContinue: () => void;
+}>) {
   const programmeName = (item.programme as { title?: string } | null)?.title;
-  const displayName =
-    courseTitle ?? programmeName ?? `${item.itemType} enrollment`;
+  const displayName = courseTitle ?? programmeName ?? `enrollment`;
 
   const statusStyle: Record<string, { bg: string; text: string }> = {
     completed: { bg: "bg-emerald-50", text: "text-emerald-700" },
@@ -165,7 +186,7 @@ function EnrollmentCard({
             >
               {item.status.replaceAll("_", " ")}
             </span>
-            <h3 className="font-semibold text-gray-900 mt-2 line-clamp-2 group-hover:text-[#D52B1E] transition-colors text-sm">
+            <h3 className="font-semibold text-gray-900 mt-2 line-clamp-2 group-hover:text-[#D52B1E] transition-colors text-sm min-h-[2.5rem]">
               {displayName}
             </h3>
           </div>
@@ -193,7 +214,11 @@ function EnrollmentCard({
           <span className="text-xs text-gray-400">
             {item.completedLessonIds?.length ?? 0} lessons done
           </span>
-          <button className="flex items-center gap-1 text-xs font-semibold text-[#D52B1E] hover:gap-2 transition-all">
+          <button
+            type="button"
+            onClick={onContinue}
+            className="flex items-center gap-1 text-xs font-semibold text-[#D52B1E] hover:gap-2 transition-all"
+          >
             Continue <ChevronRight className="h-3 w-3" />
           </button>
         </div>
@@ -207,15 +232,15 @@ function CourseCard({
   course,
   isEnrolled,
   onEnroll,
-  onUnenroll,
   onExplore,
+  onResume,
   mutating,
 }: Readonly<{
-  course: StudentCourseDto;
+  course: AcademyCourseDetailsDto;
   isEnrolled: boolean;
   onEnroll: () => void;
-  onUnenroll: () => void;
   onExplore: () => void;
+  onResume: () => void;
   mutating: boolean;
 }>) {
   const levelColor: Record<string, string> = {
@@ -324,18 +349,13 @@ function CourseCard({
               View Outline <ChevronRight className="h-3.5 w-3.5" />
             </button>
             {isEnrolled ? (
-              <div className="flex items-center justify-between">
-                <button className="flex items-center gap-1 text-xs font-semibold text-[#D52B1E] hover:gap-2 transition-all">
-                  Resume <ChevronRight className="h-3 w-3" />
-                </button>
-                <button
-                  onClick={onUnenroll}
-                  disabled={mutating}
-                  className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                >
-                  Unenroll
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onResume}
+                className="flex items-center gap-1 text-xs font-semibold text-[#D52B1E] hover:gap-2 transition-all"
+              >
+                Resume <ChevronRight className="h-3 w-3" />
+              </button>
             ) : (
               <button
                 onClick={onEnroll}
@@ -354,7 +374,6 @@ function CourseCard({
 
 function InstructorLearningWorkspace({
   name,
-  educatorId,
 }: Readonly<{ name: string; educatorId: string }>) {
   const [tab, setTab] = useState<"courses" | "builder" | "progress">("courses");
   const [courseTitle, setCourseTitle] = useState("");
@@ -364,11 +383,13 @@ function InstructorLearningWorkspace({
   const [selectedCourseId, setSelectedCourseId] = useState<number | "">("");
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [newLessonTitle, setNewLessonTitle] = useState("");
-
-  const coursesQuery = useInstructorAcademyCourses();
+  const [newLessonType, setNewLessonType] = useState<
+    "video" | "article" | "quiz" | "assignment" | "live_session"
+  >("video");
   const createCourseMutation = useInstructorCreateCourse();
   const addSectionMutation = useInstructorAddSection();
   const addLessonMutation = useInstructorAddLesson();
+  const coursesQuery = useInstructorAcademyCourses();
   const courseDetailsQuery = useInstructorCourseDetails(
     typeof selectedCourseId === "number" ? selectedCourseId : undefined,
   );
@@ -428,15 +449,12 @@ function InstructorLearningWorkspace({
       title: courseTitle,
       slug,
       description: courseDescription,
-      coverImageUrl: undefined,
-      previewVideoUrl: null,
-      educatorId,
-      programmeId: null,
-      level: courseLevel.toLowerCase(),
-      priceUsd: coursePriceUsd,
+      level: courseLevel.toLowerCase() as
+        | "beginner"
+        | "intermediate"
+        | "advanced",
+      price: coursePriceUsd,
       isFree: coursePriceUsd === 0,
-      status: "draft",
-      tags: [],
     });
     setCourseTitle("");
     setCourseDescription("");
@@ -461,7 +479,7 @@ function InstructorLearningWorkspace({
     if (!selectedSectionId || !newLessonTitle) return;
     await addLessonMutation.mutateAsync({
       sectionId: selectedSectionId,
-      payload: { title: newLessonTitle },
+      payload: { title: newLessonTitle, type: newLessonType },
     });
     setNewLessonTitle("");
   };
@@ -586,7 +604,13 @@ function InstructorLearningWorkspace({
                             </div>
                             <button
                               type="button"
-                              onClick={() => setSelectedCourseId(typeof course.id === 'number' ? course.id : Number(course.id) || "")}
+                              onClick={() =>
+                                setSelectedCourseId(
+                                  typeof course.id === "number"
+                                    ? course.id
+                                    : Number(course.id) || "",
+                                )
+                              }
                               className="text-sm font-semibold text-[#D52B1E] hover:text-[#b42216]"
                             >
                               Manage
@@ -781,6 +805,30 @@ function InstructorLearningWorkspace({
                       className="mt-2"
                     />
                   </label>
+                  <div className="mt-2">
+                    <label
+                      className="block text-sm font-semibold text-gray-700"
+                      htmlFor="instructor-lesson-type"
+                    >
+                      Lesson type
+                    </label>
+                    <select
+                      id="instructor-lesson-type"
+                      value={newLessonType}
+                      onChange={(event) =>
+                        setNewLessonType(
+                          event.target.value as typeof newLessonType,
+                        )
+                      }
+                      className="mt-2 w-full rounded-3xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm focus:border-[#D52B1E] focus:outline-none"
+                    >
+                      <option value="video">Video</option>
+                      <option value="article">Article</option>
+                      <option value="quiz">Quiz</option>
+                      <option value="assignment">Assignment</option>
+                      <option value="live_session">Live Session</option>
+                    </select>
+                  </div>
                   <Button
                     className="mt-3"
                     onClick={handleAddLesson}
@@ -883,7 +931,9 @@ export function LearningZone() {
     const tab = searchParams.get("tab");
     return tab && allowedTabs.has(tab) ? tab : "my-learning";
   });
-  const [selectedCourseId, setSelectedCourseId] = useState<string | number | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<
+    string | number | null
+  >(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -905,52 +955,34 @@ export function LearningZone() {
     data: dashboard,
     isLoading: dashboardLoading,
     refetch: refetchDashboard,
-  } = useLearningDashboard();
+  } = useAcademyDashboard();
   const {
     data: myCourses = [],
     isLoading: myCoursesLoading,
     refetch: refetchMyCourses,
-  } = useLearningMyCourses();
+  } = useAcademyMyEnrollments();
   const {
     data: upcoming = [],
     isLoading: upcomingLoading,
     refetch: refetchUpcoming,
-  } = useLearningUpcomingActivities();
+  } = useAcademyUpcomingActivities();
   const {
-    data: announcements = [],
-    isLoading: announcementsLoading,
-    refetch: refetchAnnouncements,
-  } = useLearningAnnouncements();
-  const {
-    data: payments,
-    isLoading: paymentsLoading,
-    refetch: refetchPayments,
-  } = useLearningPayments(showPaymentsAndResults);
-  const {
-    data: results,
-    isLoading: resultsLoading,
-    refetch: refetchResults,
-  } = useLearningResults(showPaymentsAndResults);
-  const {
-    data: courseList,
+    data: courseList = [],
     isLoading: coursesLoading,
     refetch: refetchCourses,
-  } = useLearningCourses({
+  } = useAcademyCourses({
     page: 1,
     perPage: 24,
     search: courseSearch || undefined,
   });
 
-  const enrollMutation = useEnrollInLearningCourse();
-  const unenrollMutation = useUnenrollFromLearningCourse();
+  const enrollMutation = useEnrollInAcademyCourse();
 
   const enrolledCourseIds = useMemo(() => {
-    const ids = new Set<number>();
+    const ids = new Set<string | number>();
     for (const item of myCourses) {
-      if (typeof item.currentCourseId === "number")
-        ids.add(item.currentCourseId);
-      const n = Number(item.itemId);
-      if (Number.isFinite(n)) ids.add(n);
+      if (item.courseId) ids.add(item.courseId);
+      if (item.currentCourseId) ids.add(item.currentCourseId);
     }
     return ids;
   }, [myCourses]);
@@ -960,11 +992,29 @@ export function LearningZone() {
     .join(" ")
     .trim();
   const welcomeName = fullName || me?.username || "Learner";
-  const selectedCourse = useMemo(
-    () =>
-      (courseList?.data ?? []).find((course) => course.id === selectedCourseId),
-    [courseList?.data, selectedCourseId],
-  );
+  const selectedCourse = useMemo(() => {
+    if (selectedCourseId === null || selectedCourseId === undefined) {
+      return undefined;
+    }
+
+    const fromList = courseList.find(
+      (course) => String(course.id) === String(selectedCourseId),
+    );
+    if (fromList) return fromList;
+
+    const enrollment = myCourses.find(
+      (item) =>
+        String(item.courseId) === String(selectedCourseId) ||
+        String(item.currentCourseId) === String(selectedCourseId),
+    );
+    if (!enrollment) return undefined;
+
+    return buildCourseStub(
+      selectedCourseId,
+      enrollment.course?.title ??
+        (enrollment.programme as { title?: string } | null)?.title,
+    );
+  }, [courseList, myCourses, selectedCourseId]);
 
   if (me?.role === "instructor") {
     return (
@@ -976,24 +1026,10 @@ export function LearningZone() {
   }
 
   const onRefreshAll = async () => {
-    if (showPaymentsAndResults) {
-      await Promise.all([
-        refetchDashboard(),
-        refetchMyCourses(),
-        refetchUpcoming(),
-        refetchAnnouncements(),
-        refetchCourses(),
-        refetchPayments(),
-        refetchResults(),
-      ]);
-      return;
-    }
-
     await Promise.all([
       refetchDashboard(),
       refetchMyCourses(),
       refetchUpcoming(),
-      refetchAnnouncements(),
       refetchCourses(),
     ]);
   };
@@ -1003,22 +1039,21 @@ export function LearningZone() {
     { id: "courses", label: "Browse Courses", icon: GraduationCap },
   ] as const;
 
-  const hasCourses = (courseList?.data?.length ?? 0) > 0;
-  const hasPaymentHistory = (payments?.paymentHistory?.length ?? 0) > 0;
-  const totalLearners = (courseList?.data ?? []).reduce(
+  const hasCourses = (courseList?.length ?? 0) > 0;
+  const totalLearners = (courseList ?? []).reduce(
     (sum, c) => sum + (c.enrolledCount || 0),
     0,
   );
   const totalLearningHours = Math.round(
-    (courseList?.data ?? []).reduce(
+    (courseList ?? []).reduce(
       (sum, c) => sum + (c.totalDurationMinutes || 0),
       0,
     ) / 60,
   );
   const avgCourseRating =
-    (courseList?.data?.length ?? 0) > 0
-      ? (courseList?.data ?? []).reduce((sum, c) => sum + (c.rating || 0), 0) /
-        (courseList?.data?.length ?? 1)
+    (courseList?.length ?? 0) > 0
+      ? (courseList ?? []).reduce((sum, c) => sum + (c.rating || 0), 0) /
+        (courseList?.length ?? 1)
       : 0;
 
   return (
@@ -1055,12 +1090,14 @@ export function LearningZone() {
                 <span className="h-1 w-1 bg-gray-700 rounded-full" />
                 <span className="flex items-center gap-1.5">
                   <Award className="h-4 w-4 text-gray-600" />{" "}
-                  {dashboard?.stats?.certificatesEarned ?? 0} Certificates
+                  {dashboard?.enrollments?.filter((e) => e.hasCertificate)
+                    .length ?? 0}{" "}
+                  Certificates
                 </span>
                 <span className="h-1 w-1 bg-gray-700 rounded-full" />
                 <span className="flex items-center gap-1.5">
                   <BarChart3 className="h-4 w-4 text-gray-600" />{" "}
-                  {dashboard?.stats?.weeklyProgress ?? 0}% Weekly Progress
+                  {dashboard?.completedCourses ?? 0} courses completed
                 </span>
               </div>
             </div>
@@ -1074,14 +1111,12 @@ export function LearningZone() {
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
                 <p className="text-2xl font-bold text-[#D52B1E]">
-                  {dashboard?.stats?.coursesCompleted ?? 0}
+                  {dashboard?.completedCourses ?? 0}
                 </p>
                 <p className="text-xs text-gray-500">Completed</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-emerald-400">
-                  {dashboard?.stats?.weeklyProgress ?? 0}%
-                </p>
+                <p className="text-2xl font-bold text-emerald-400">0%</p>
                 <p className="text-xs text-gray-500">This Week</p>
               </div>
             </div>
@@ -1106,7 +1141,7 @@ export function LearningZone() {
             <p className="text-sm text-gray-500 mt-0.5">
               {dashboardLoading
                 ? "Loading your progress..."
-                : `${dashboard?.stats?.weeklyProgress ?? 0}% weekly progress | ${dashboard?.stats?.coursesCompleted ?? 0} courses completed`}
+                : `${dashboard?.completedCourses ?? 0} courses completed`}
             </p>
           </div>
           <Button
@@ -1129,21 +1164,23 @@ export function LearningZone() {
         {[
           {
             label: "Courses Completed",
-            value: dashboard?.stats?.coursesCompleted ?? 0,
+            value: dashboard?.completedCourses ?? 0,
             icon: BookOpen,
             color: "#2563eb",
             bg: "#EFF6FF",
           },
           {
             label: "Certificates Earned",
-            value: dashboard?.stats?.certificatesEarned ?? 0,
+            value:
+              dashboard?.enrollments?.filter((e) => e.hasCertificate).length ??
+              0,
             icon: Award,
             color: "#d97706",
             bg: "#FFFBEB",
           },
           {
             label: "Weekly Progress",
-            value: `${dashboard?.stats?.weeklyProgress ?? 0}%`,
+            value: `0%`,
             icon: BarChart3,
             color: "#059669",
             bg: "#ECFDF5",
@@ -1177,47 +1214,7 @@ export function LearningZone() {
         ))}
       </motion.div>
 
-      {/* Continue Learning banner */}
-      {dashboard?.continueLearning && (
-        <motion.div
-          variants={itemVariants}
-          className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300"
-        >
-          <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
-          <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            <div className="h-14 w-14 shrink-0 rounded-xl bg-[#D52B1E]/10 flex items-center justify-center">
-              <PlayCircle className="h-7 w-7 text-[#D52B1E]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-widest mb-0.5">
-                Up Next
-              </p>
-              <h3 className="font-semibold text-gray-900 truncate">
-                {dashboard.continueLearning.courseTitle}
-              </h3>
-              <p className="text-xs text-gray-400 truncate mt-0.5">
-                {dashboard.continueLearning.moduleTitle} &mdash;{" "}
-                {dashboard.continueLearning.lessonTitle}
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                <Progress
-                  value={dashboard.continueLearning.progress}
-                  className="flex-1 h-1.5 bg-gray-100 [&>div]:bg-gradient-to-r [&>div]:from-[#D52B1E] [&>div]:to-orange-400"
-                />
-                <span className="text-xs font-bold text-[#D52B1E] shrink-0">
-                  {dashboard.continueLearning.progress}%
-                </span>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              className="bg-[#D52B1E] hover:bg-[#b82319] text-white rounded-full gap-1.5 shrink-0"
-            >
-              <PlayCircle className="h-3.5 w-3.5" /> Resume
-            </Button>
-          </div>
-        </motion.div>
-      )}
+      {/* Continue Learning banner removed - not available in Academy API */}
 
       {/* Tab chips */}
       <motion.div variants={itemVariants}>
@@ -1281,7 +1278,15 @@ export function LearningZone() {
                       animate="visible"
                     >
                       {myCourses.map((item) => (
-                        <EnrollmentCard key={item.id} item={item} />
+                        <EnrollmentCard
+                          key={item.id}
+                          item={item}
+                          onContinue={() =>
+                            setSelectedCourseId(
+                              item.currentCourseId ?? item.courseId,
+                            )
+                          }
+                        />
                       ))}
                     </motion.div>
                   )}
@@ -1328,30 +1333,13 @@ export function LearningZone() {
                                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                                   {formatActivityType(activity.type)}
                                 </span>
-                                {(activity.dueAt ?? activity.scheduledAt) && (
+                                {(activity.dueDate ?? null) && (
                                   <span className="text-xs bg-red-50 text-[#D52B1E] px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <Clock className="h-2.5 w-2.5" />
-                                    {formatDate(
-                                      activity.dueAt ?? activity.scheduledAt,
-                                    )}
-                                  </span>
-                                )}
-                                {activity.durationMinutes && (
-                                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                                    {durationLabel(activity.durationMinutes)}
+                                    {formatDate(activity.dueDate)}
                                   </span>
                                 )}
                               </div>
-                              {activity.joinUrl && (
-                                <a
-                                  href={activity.joinUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-white bg-[#D52B1E] hover:bg-[#b82319] px-2.5 py-1 rounded-full transition-colors"
-                                >
-                                  <PlayCircle className="h-3 w-3" /> Join
-                                </a>
-                              )}
                             </div>
                           </div>
                         ))}
@@ -1368,49 +1356,9 @@ export function LearningZone() {
                     <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest mb-3 flex items-center gap-2">
                       <Megaphone className="h-4 w-4 text-[#D52B1E]" /> Updates
                     </h2>
-                    {announcementsLoading && (
-                      <div className="space-y-2">
-                        {[1, 2].map((i) => (
-                          <div
-                            key={i}
-                            className="h-20 bg-gray-50 rounded-xl animate-pulse"
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {!announcementsLoading && announcements.length > 0 && (
-                      <div className="space-y-2">
-                        {announcements.map((a) => (
-                          <div
-                            key={a.id}
-                            className="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover:shadow-md transition-all"
-                          >
-                            <div className="absolute left-0 top-0 h-full w-1 bg-[#D52B1E]" />
-                            <div className="flex justify-between items-start mb-1 pl-1">
-                              <p className="text-sm font-semibold text-gray-900 line-clamp-1 pr-2">
-                                {a.title}
-                              </p>
-                              <span className="text-xs text-gray-400 shrink-0">
-                                {formatDate(a.publishedAt)}
-                              </span>
-                            </div>
-                            {a.course?.title && (
-                              <span className="ml-1 mb-1.5 inline-block text-xs bg-[#D52B1E]/10 text-[#D52B1E] px-2 py-0.5 rounded-full font-medium">
-                                {a.course.title}
-                              </span>
-                            )}
-                            <p className="text-xs text-gray-500 leading-relaxed pl-1 line-clamp-2">
-                              {a.message}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {!announcementsLoading && announcements.length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-4">
-                        No announcements
-                      </p>
-                    )}
+                    <p className="text-xs text-gray-400 text-center py-4">
+                      No announcements
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1441,7 +1389,7 @@ export function LearningZone() {
                   </Button>
                 )}
                 <span className="text-xs text-gray-400 shrink-0 self-center">
-                  {courseList?.data?.length ?? 0} courses
+                  {courseList?.length ?? 0} courses
                 </span>
               </div>
 
@@ -1504,7 +1452,7 @@ export function LearningZone() {
                           Programs
                         </p>
                         <p className="text-xl font-bold text-gray-900 mt-1">
-                          {courseList?.data?.length ?? 0}
+                          {courseList?.length ?? 0}
                         </p>
                       </div>
                       <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
@@ -1559,17 +1507,15 @@ export function LearningZone() {
                   initial="hidden"
                   animate="visible"
                 >
-                  {courseList?.data.map((course) => (
+                  {courseList.map((course) => (
                     <CourseCard
                       key={course.id}
                       course={course}
-                      isEnrolled={enrolledCourseIds.has(typeof course.id === 'number' ? course.id : Number(course.id))}
-                      onEnroll={() => enrollMutation.mutate(typeof course.id === 'number' ? course.id : Number(course.id))}
-                      onUnenroll={() => unenrollMutation.mutate(typeof course.id === 'number' ? course.id : Number(course.id))}
+                      isEnrolled={enrolledCourseIds.has(course.id)}
+                      onEnroll={() => enrollMutation.mutate(course.id)}
                       onExplore={() => setSelectedCourseId(course.id)}
-                      mutating={
-                        enrollMutation.isPending || unenrollMutation.isPending
-                      }
+                      onResume={() => setSelectedCourseId(course.id)}
+                      mutating={enrollMutation.isPending}
                     />
                   ))}
                 </motion.div>
@@ -1589,394 +1535,6 @@ export function LearningZone() {
             open={selectedCourse !== undefined && selectedCourse !== null}
             onClose={() => setSelectedCourseId(null)}
           />
-
-          {/* -- Payments --------------------------------- */}
-          {activeTab === "payments" && (
-            <div className="grid gap-5 lg:grid-cols-3">
-              {/* Subscription card */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all overflow-hidden">
-                <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
-                <div className="p-5">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                    Current Plan
-                  </p>
-                  {paymentsLoading && (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <div
-                          key={i}
-                          className="h-8 bg-gray-50 rounded-lg animate-pulse"
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {!paymentsLoading && payments?.activeSubscription && (
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          {payments.activeSubscription.planName}
-                        </h3>
-                        <span
-                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize mt-1.5 inline-block ${
-                            payments.activeSubscription.status === "active"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {payments.activeSubscription.status}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-50 text-sm">
-                        <div>
-                          <p className="text-xs text-gray-400 mb-0.5">Amount</p>
-                          <p className="font-semibold text-gray-900">
-                            {formatMoney(
-                              payments.activeSubscription.amountCents,
-                              payments.activeSubscription.currency,
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400 mb-0.5">Renews</p>
-                          <p className="font-semibold text-gray-900">
-                            {formatDate(
-                              payments.activeSubscription.currentPeriodEnd,
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400 mb-0.5">
-                            Started
-                          </p>
-                          <p className="font-semibold text-gray-900">
-                            {formatDate(
-                              payments.activeSubscription.currentPeriodStart,
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400 mb-0.5">Type</p>
-                          <p className="font-semibold text-gray-900 capitalize">
-                            {payments.activeSubscription.planType}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {!paymentsLoading && !payments?.activeSubscription && (
-                    <div className="py-6 text-center">
-                      <CreditCard className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-                      <p className="text-sm text-gray-500 mb-3">
-                        No active subscription
-                      </p>
-                      <Button
-                        size="sm"
-                        className="bg-[#D52B1E] hover:bg-[#b82319] text-white rounded-full"
-                      >
-                        View Plans
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Transaction history */}
-              <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
-                <div className="p-5">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
-                    Transaction History
-                  </p>
-                  {paymentsLoading && (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <div
-                          key={i}
-                          className="h-14 bg-gray-50 rounded-xl animate-pulse"
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {!paymentsLoading && hasPaymentHistory && (
-                    <div className="space-y-2">
-                      {payments?.paymentHistory.map((payment) => {
-                        let paymentStatusClass = "bg-gray-100 text-gray-600";
-                        if (
-                          payment.status === "completed" ||
-                          payment.status === "successful"
-                        ) {
-                          paymentStatusClass = "bg-emerald-50 text-emerald-700";
-                        } else if (
-                          payment.status === "failed" ||
-                          payment.status === "refunded"
-                        ) {
-                          paymentStatusClass = "bg-red-50 text-red-700";
-                        }
-
-                        return (
-                          <div
-                            key={payment.id}
-                            className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-lg bg-[#D52B1E]/10 flex items-center justify-center shrink-0">
-                                <CreditCard className="h-4 w-4 text-[#D52B1E]" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {payment.itemTitle}
-                                </p>
-                                <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                                  <span>{formatDate(payment.paidAt)}</span>
-                                  <span>&middot;</span>
-                                  <span className="capitalize">
-                                    {payment.paymentMethod}
-                                  </span>
-                                  {payment.cardLast4 && (
-                                    <>
-                                      <span>&middot;</span>
-                                      <span>****{payment.cardLast4}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="font-bold text-gray-900">
-                                {formatMoney(
-                                  payment.amountCents,
-                                  payment.currency,
-                                )}
-                              </span>
-                              <span
-                                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${paymentStatusClass}`}
-                              >
-                                {payment.status}
-                              </span>
-                              {payment.receiptUrl && (
-                                <a
-                                  href={payment.receiptUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Download receipt"
-                                  className="text-gray-400 hover:text-[#D52B1E] transition-colors"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {!paymentsLoading && !hasPaymentHistory && (
-                    <EmptyState
-                      icon={CreditCard}
-                      title="No transactions yet"
-                      description="Your payment history will appear here."
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* -- Results & Certificates ------------------- */}
-          {activeTab === "results" && (
-            <div className="space-y-5">
-              {resultsLoading && (
-                <div className="grid sm:grid-cols-3 gap-4 animate-pulse">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-28 bg-gray-50 rounded-2xl" />
-                  ))}
-                </div>
-              )}
-              {!resultsLoading && results && (
-                <>
-                  {/* Performance overview */}
-                  <motion.div
-                    className="grid sm:grid-cols-3 gap-4"
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    {[
-                      {
-                        label: "Avg. Score",
-                        value: `${results.performanceOverview.averageScore}%`,
-                        icon: Star,
-                        color: "#2563eb",
-                        bg: "#EFF6FF",
-                      },
-                      {
-                        label: "Assessments Done",
-                        value: results.performanceOverview.assessmentsCompleted,
-                        icon: CheckCircle2,
-                        color: "#059669",
-                        bg: "#ECFDF5",
-                      },
-                      {
-                        label: "Certificates",
-                        value: results.performanceOverview.certificatesEarned,
-                        icon: Award,
-                        color: "#d97706",
-                        bg: "#FFFBEB",
-                      },
-                    ].map((s) => (
-                      <motion.div
-                        key={s.label}
-                        variants={itemVariants}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all overflow-hidden"
-                      >
-                        <div
-                          className="h-1 w-full"
-                          style={{ backgroundColor: s.color }}
-                        />
-                        <div className="p-5 flex items-center gap-4">
-                          <div
-                            className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: s.bg, color: s.color }}
-                          >
-                            <s.icon className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-medium">
-                              {s.label}
-                            </p>
-                            <p className="text-2xl font-bold text-gray-900">
-                              {s.value}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-
-                  {/* Certificates */}
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="h-1 w-full bg-gradient-to-r from-[#D52B1E] to-orange-400" />
-                    <div className="p-5">
-                      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
-                        Earned Certificates
-                      </p>
-                      {results.earnedCertificates.length > 0 ? (
-                        <motion.div
-                          className="grid sm:grid-cols-2 gap-3"
-                          variants={containerVariants}
-                          initial="hidden"
-                          animate="visible"
-                        >
-                          {results.earnedCertificates.map((cert) => (
-                            <motion.div
-                              key={cert.id}
-                              variants={itemVariants}
-                              className="group flex items-center justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 shrink-0 rounded-xl bg-amber-50 flex items-center justify-center">
-                                  <Award className="h-5 w-5 text-amber-500" />
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">
-                                      {cert.name}
-                                    </p>
-                                    {cert.isVerified && (
-                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-gray-400 mt-0.5">
-                                    {cert.type} &middot; {formatDate(cert.date)}
-                                  </p>
-                                </div>
-                              </div>
-                              <a
-                                href={cert.downloadUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Download"
-                                className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#D52B1E] hover:bg-red-50 transition-colors"
-                              >
-                                <Download className="h-4 w-4" />
-                              </a>
-                            </motion.div>
-                          ))}
-                        </motion.div>
-                      ) : (
-                        <EmptyState
-                          icon={Award}
-                          title="No certificates yet"
-                          description="Complete programmes to earn your certificates."
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Assessment results */}
-                  {results.assessmentResults.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                      <div className="h-1 w-full bg-gradient-to-r from-blue-500 to-indigo-500" />
-                      <div className="p-5">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
-                          Assessment Results
-                        </p>
-                        <div className="space-y-2">
-                          {results.assessmentResults.map((r) => {
-                            const statusLower = r.status.toLowerCase();
-                            let statusClass = "bg-gray-100 text-gray-600";
-                            if (statusLower === "passed")
-                              statusClass = "bg-emerald-50 text-emerald-700";
-                            else if (statusLower === "failed")
-                              statusClass = "bg-red-50 text-red-700";
-                            else if (statusLower.includes("retake"))
-                              statusClass = "bg-amber-50 text-amber-700";
-                            return (
-                              <div
-                                key={r.id}
-                                className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                                    <TrendingUp className="h-4 w-4 text-blue-500" />
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-semibold text-gray-900">
-                                      {r.name}
-                                    </p>
-                                    <p className="text-xs text-gray-400">
-                                      {formatDate(r.date)}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <p className="text-lg font-bold text-gray-900">
-                                    {r.score}%
-                                  </p>
-                                  <span
-                                    className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusClass}`}
-                                  >
-                                    {r.status}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-              {!resultsLoading && !results && (
-                <EmptyState
-                  icon={BarChart3}
-                  title="No results yet"
-                  description="Complete assessments to see your results here."
-                />
-              )}
-            </div>
-          )}
         </motion.div>
       </AnimatePresence>
     </motion.div>

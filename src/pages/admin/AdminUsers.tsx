@@ -17,6 +17,7 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import {
   useAdminCreateUser,
   type AdminUser,
 } from "@/hooks/useAdmin";
+import { useAdminMakeInstructor } from "@/hooks/useAcademy";
 
 const container = {
   hidden: { opacity: 0 },
@@ -229,6 +231,7 @@ export default function AdminUsers() {
   const updateMutation = useAdminUpdateUser();
   const roleMutation = useAdminUpdateUserRole();
   const moderatorMutation = useAdminToggleModerator();
+  const makeInstructorMutation = useAdminMakeInstructor();
 
   const users = data?.data ?? [];
   const meta = data?.meta;
@@ -546,6 +549,16 @@ export default function AdminUsers() {
                                 {u.isModerator
                                   ? "Remove Moderator"
                                   : "Make Moderator"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  makeInstructorMutation.mutate(u.id);
+                                  setOpenMenu(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700"
+                              >
+                                <GraduationCap className="h-3.5 w-3.5 text-purple-600" />
+                                Make Instructor
                               </button>
                               <hr className="my-1 border-gray-100" />
                               <button
@@ -1019,7 +1032,8 @@ export default function AdminUsers() {
                     dto: {
                       ...editForm,
                       username: editForm.username.trim() || undefined,
-                      lmsStudentId: (editForm.lmsStudentId || "").trim() || null,
+                      lmsStudentId:
+                        (editForm.lmsStudentId || "").trim() || null,
                     },
                   },
                   {
