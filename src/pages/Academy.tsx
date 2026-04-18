@@ -1,12 +1,13 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Award,
   BarChart3,
   BookOpen,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -42,15 +43,19 @@ import { Progress, getProgressGradient } from "@/components/ui/progress";
 import { useMe } from "@/hooks/useAuth";
 import {
   useAcademyCourses,
+  useAcademyCoursesMeta,
   useAcademyMyEnrollments,
+  useAcademyMyEnrollmentsMeta,
   useAcademyDashboard,
   useAcademyUpcomingActivities,
   useEnrollInAcademyCourse,
+  useUnenrollFromAcademyCourse,
   useAcademyCategoryTypes,
   useAcademyQuizTypes,
   useInstructorAcademyCourses,
   useInstructorCreateCourse,
   useInstructorUpdateCourse,
+  useInstructorPublishCourse,
   useInstructorSuspendCourse,
   useInstructorAddSection,
   useInstructorAddLesson,
@@ -85,6 +90,11 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { duration: 0.4 } },
 };
 
+const pageSwapTransition = {
+  duration: 0.24,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
+
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -112,7 +122,8 @@ function formatSecondsAsLabel(seconds?: number | null): string {
   const remainingSeconds = seconds % 60;
 
   if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  if (m > 0) return remainingSeconds > 0 ? `${m}m ${remainingSeconds}s` : `${m}m`;
+  if (m > 0)
+    return remainingSeconds > 0 ? `${m}m ${remainingSeconds}s` : `${m}m`;
   return `${remainingSeconds}s`;
 }
 
@@ -165,6 +176,26 @@ function formatActivityType(type: string): string {
     .join(" ");
 }
 
+function buildPaginationItems(
+  currentPage: number,
+  pageCount: number,
+): Array<number | "ellipsis"> {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1);
+  }
+
+  const pages: Array<number | "ellipsis"> = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(pageCount - 1, currentPage + 1);
+
+  if (start > 2) pages.push("ellipsis");
+  for (let page = start; page <= end; page += 1) pages.push(page);
+  if (end < pageCount - 1) pages.push("ellipsis");
+
+  pages.push(pageCount);
+  return pages;
+}
+
 /* ── Tab chip — matches category chips in Resources/Directory ─────────────── */
 function TabChip({
   label,
@@ -192,6 +223,96 @@ function TabChip({
   );
 }
 
+function CreativePagination({
+  currentPage,
+  pageCount,
+  hasPreviousPage,
+  hasNextPage,
+  itemCount,
+  entityLabel,
+  onPageChange,
+}: Readonly<{
+  currentPage: number;
+  pageCount: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  itemCount?: number;
+  entityLabel: string;
+  onPageChange: (page: number) => void;
+}>) {
+  const safeCurrent = Math.max(
+    1,
+    Math.min(currentPage, Math.max(1, pageCount)),
+  );
+  const safePageCount = Math.max(1, pageCount);
+  const pageItems = buildPaginationItems(safeCurrent, safePageCount);
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gradient-to-r from-white via-[#FFF7F6] to-[#FFF1EE] p-4 shadow-sm">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">
+            Page {safeCurrent} of {safePageCount}
+          </p>
+          <p className="text-xs text-gray-500">
+            {typeof itemCount === "number"
+              ? `${itemCount.toLocaleString()} total ${entityLabel}`
+              : `Browse ${entityLabel} page by page`}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(Math.max(1, safeCurrent - 1))}
+            disabled={!hasPreviousPage}
+            className="h-8 rounded-full border-gray-200 bg-white px-3"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+
+          {pageItems.map((item, index) =>
+            item === "ellipsis" ? (
+              <span
+                key={`ellipsis-${safeCurrent}-${index}`}
+                className="px-1 text-xs text-gray-400"
+              >
+                ...
+              </span>
+            ) : (
+              <button
+                key={item}
+                type="button"
+                onClick={() => onPageChange(item)}
+                className={`h-8 min-w-8 rounded-full px-2 text-xs font-semibold transition-colors ${
+                  item === safeCurrent
+                    ? "bg-[#D52B1E] text-white shadow"
+                    : "bg-white text-gray-600 hover:bg-gray-100"
+                }`}
+                aria-current={item === safeCurrent ? "page" : undefined}
+              >
+                {item}
+              </button>
+            ),
+          )}
+
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => onPageChange(safeCurrent + 1)}
+            disabled={!hasNextPage}
+            className="h-8 rounded-full bg-[#D52B1E] px-3 text-white hover:bg-[#b92418]"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Enrollment card ────────────────────────────────────────────────────────── */
 function EnrollmentCard({
   item,
@@ -215,6 +336,9 @@ function EnrollmentCard({
     bg: "bg-gray-100",
     text: "text-gray-600",
   };
+  const completedLessons =
+    Number(item.completedLessonsCount ?? 0) ||
+    (item.completedLessonIds?.length ?? 0);
 
   return (
     <motion.div
@@ -258,7 +382,8 @@ function EnrollmentCard({
 
         <div className="flex items-center justify-between pt-3 border-t border-gray-50">
           <span className="text-xs text-gray-400">
-            {item.completedLessonIds?.length ?? 0} lessons done
+            {completedLessons} lesson{completedLessons !== 1 ? "s" : ""}{" "}
+            completed
           </span>
           <button
             type="button"
@@ -297,6 +422,7 @@ function CourseCard({
     advanced: "#D52B1E",
   };
   const lc = levelColor[course.level?.toLowerCase() ?? ""] ?? "#6d28d9";
+  const lessonCount = Number(course.lessonCount ?? course.videoCount ?? 0) || 0;
 
   return (
     <motion.div
@@ -358,7 +484,8 @@ function CourseCard({
           {/* Meta */}
           <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
             <span className="flex items-center gap-1">
-              <PlayCircle className="h-3 w-3" /> {course.videoCount} lessons
+              <PlayCircle className="h-3 w-3" /> {lessonCount} lesson
+              {lessonCount !== 1 ? "s" : ""}
             </span>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />{" "}
@@ -528,19 +655,30 @@ function InstructorLearningWorkspace({
   const [showAddQuiz, setShowAddQuiz] = useState(false);
   const [quizForm, setQuizForm] = useState({ title: "", passPercentage: 70 });
   const [showAddQuestion, setShowAddQuestion] = useState(false);
-  const [questionForm, setQuestionForm] = useState({ text: "", type: "mcq", points: 1 });
-  const [addingOptionToQId, setAddingOptionToQId] = useState<string | null>(null);
+  const [questionForm, setQuestionForm] = useState({
+    text: "",
+    type: "mcq",
+    points: 1,
+  });
+  const [addingOptionToQId, setAddingOptionToQId] = useState<string | null>(
+    null,
+  );
   const [optionForm, setOptionForm] = useState({ text: "", isCorrect: false });
   const [viewingLessonId, setViewingLessonId] = useState<string | null>(null);
-  const [inspectingSectionId, setInspectingSectionId] = useState<string | null>(null);
+  const [inspectingSectionId, setInspectingSectionId] = useState<string | null>(
+    null,
+  );
   const [courseSearch, setCourseSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "published" | "draft"
+  >("all");
 
   const categoryTypesQuery = useAcademyCategoryTypes();
   const quizTypesQuery = useAcademyQuizTypes();
-  const coursesQuery = useInstructorAcademyCourses();
+  const coursesQuery = useInstructorAcademyCourses({ page: 1, perPage: 100 });
   const createCourseMutation = useInstructorCreateCourse();
   const updateCourseMutation = useInstructorUpdateCourse();
+  const publishCourseMutation = useInstructorPublishCourse();
   const suspendCourseMutation = useInstructorSuspendCourse();
   const addSectionMutation = useInstructorAddSection();
   const addLessonMutation = useInstructorAddLesson();
@@ -558,11 +696,18 @@ function InstructorLearningWorkspace({
   );
   const courseDetails = courseDetailsQuery.data;
   const sections = courseDetails?.sections ?? [];
-  const quizDetailsQuery = useInstructorQuizDetails(managingQuizId ?? undefined);
-  const quizAttemptsQuery = useInstructorQuizAttempts(managingQuizId ?? undefined);
-  const lessonDetailQuery = useInstructorLessonDetails(viewingLessonId ?? undefined);
-  const sectionDetailQuery = useInstructorSectionDetails(expandedSectionId ?? undefined);
-  const sectionInspectorQuery = useInstructorSectionDetails(inspectingSectionId ?? undefined);
+  const quizDetailsQuery = useInstructorQuizDetails(
+    managingQuizId ?? undefined,
+  );
+  const quizAttemptsQuery = useInstructorQuizAttempts(
+    managingQuizId ?? undefined,
+  );
+  const lessonDetailQuery = useInstructorLessonDetails(
+    viewingLessonId ?? undefined,
+  );
+  const sectionInspectorQuery = useInstructorSectionDetails(
+    inspectingSectionId ?? undefined,
+  );
 
   const courseQuizzes = useMemo(
     () =>
@@ -669,11 +814,19 @@ function InstructorLearningWorkspace({
     await suspendCourseMutation.mutateAsync(selectedCourseId);
   };
 
+  const handlePublishCourse = async () => {
+    if (selectedCourseId === "") return;
+    await publishCourseMutation.mutateAsync(selectedCourseId);
+  };
+
   const handleAddQuiz = async () => {
     if (!quizForm.title.trim() || selectedCourseId === "") return;
     await addQuizMutation.mutateAsync({
       courseId: selectedCourseId,
-      payload: { title: quizForm.title, passPercentage: quizForm.passPercentage },
+      payload: {
+        title: quizForm.title,
+        passPercentage: quizForm.passPercentage,
+      },
     });
     setShowAddQuiz(false);
     setQuizForm({ title: "", passPercentage: 70 });
@@ -683,7 +836,11 @@ function InstructorLearningWorkspace({
     if (!managingQuizId || !questionForm.text.trim()) return;
     await addQuestionMutation.mutateAsync({
       quizId: managingQuizId,
-      payload: { text: questionForm.text.trim(), type: questionForm.type, points: questionForm.points },
+      payload: {
+        text: questionForm.text.trim(),
+        type: questionForm.type,
+        points: questionForm.points,
+      },
     });
     setQuestionForm({ text: "", type: "mcq", points: 1 });
     setShowAddQuestion(false);
@@ -693,7 +850,10 @@ function InstructorLearningWorkspace({
     if (!addingOptionToQId || !optionForm.text.trim()) return;
     await addOptionMutation.mutateAsync({
       questionId: addingOptionToQId,
-      payload: { text: optionForm.text.trim(), isCorrect: optionForm.isCorrect },
+      payload: {
+        text: optionForm.text.trim(),
+        isCorrect: optionForm.isCorrect,
+      },
     });
     setOptionForm({ text: "", isCorrect: false });
     setAddingOptionToQId(null);
@@ -712,16 +872,12 @@ function InstructorLearningWorkspace({
   const publishedCourses = (coursesQuery.data ?? []).filter(
     (c) => c.status === "published",
   ).length;
-  const activeSectionDetail = sectionDetailQuery.data;
   const activeLessonDetail = lessonDetailQuery.data;
   const activeLessonMeta =
     LESSON_TYPE_META[
       (activeLessonDetail?.type as keyof typeof LESSON_TYPE_META) ?? "video"
     ] ?? LESSON_TYPE_META.video;
   const ActiveLessonIcon = activeLessonMeta.icon;
-  const quizQuestionCount =
-    ((quizDetailsQuery.data?.questions as Array<unknown> | undefined)?.length ??
-      0);
 
   const filteredCourses = useMemo(() => {
     const all = coursesQuery.data ?? [];
@@ -758,7 +914,9 @@ function InstructorLearningWorkspace({
                   {isEditingCourse ? "Edit Course" : "Create New Course"}
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {isEditingCourse ? "Update your course details" : "Fill in the details to publish your course"}
+                  {isEditingCourse
+                    ? "Update your course details"
+                    : "Fill in the details to publish your course"}
                 </p>
               </div>
               <button
@@ -936,20 +1094,31 @@ function InstructorLearningWorkspace({
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => void (isEditingCourse ? handleUpdateCourse() : handleCreateCourse())}
+                  onClick={() =>
+                    void (isEditingCourse
+                      ? handleUpdateCourse()
+                      : handleCreateCourse())
+                  }
                   disabled={
-                    !courseForm.title.trim() || createCourseMutation.isPending || updateCourseMutation.isPending
+                    !courseForm.title.trim() ||
+                    createCourseMutation.isPending ||
+                    updateCourseMutation.isPending
                   }
                   className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-2"
                 >
-                  {(createCourseMutation.isPending || updateCourseMutation.isPending) ? (
+                  {createCourseMutation.isPending ||
+                  updateCourseMutation.isPending ? (
                     <>
                       <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
                       {isEditingCourse ? "Updating…" : "Creating…"}
                     </>
                   ) : (
                     <>
-                      {isEditingCourse ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{" "}
+                      {isEditingCourse ? (
+                        <Edit className="h-4 w-4" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}{" "}
                       {isEditingCourse ? "Update Course" : "Create Course"}
                     </>
                   )}
@@ -978,24 +1147,38 @@ function InstructorLearningWorkspace({
           <div className="space-y-6">
             {/* Hero row */}
             <div className="flex items-start gap-4 p-4 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-100">
-              <div className={`shrink-0 h-12 w-12 rounded-2xl flex items-center justify-center ${activeLessonMeta.bg}`}>
-                <ActiveLessonIcon className={`h-6 w-6 ${activeLessonMeta.color}`} />
+              <div
+                className={`shrink-0 h-12 w-12 rounded-2xl flex items-center justify-center ${activeLessonMeta.bg}`}
+              >
+                <ActiveLessonIcon
+                  className={`h-6 w-6 ${activeLessonMeta.color}`}
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${activeLessonMeta.bg} ${activeLessonMeta.color} ${activeLessonMeta.border} capitalize`}>
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full border ${activeLessonMeta.bg} ${activeLessonMeta.color} ${activeLessonMeta.border} capitalize`}
+                  >
                     {activeLessonMeta.label}
                   </span>
                   {activeLessonDetail.isPublished ? (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Published</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      ✓ Published
+                    </span>
                   ) : (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Draft — not visible to students</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                      Draft — not visible to students
+                    </span>
                   )}
                   {activeLessonDetail.isFreePreview && (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Free Preview</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      Free Preview
+                    </span>
                   )}
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 leading-snug">{activeLessonDetail.title}</h2>
+                <h2 className="text-xl font-bold text-gray-900 leading-snug">
+                  {activeLessonDetail.title}
+                </h2>
               </div>
             </div>
 
@@ -1003,35 +1186,50 @@ function InstructorLearningWorkspace({
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
                 <Clock className="h-5 w-5 text-gray-400 mx-auto mb-1" />
-                <p className="text-sm font-bold text-gray-800">{formatSecondsAsLabel(activeLessonDetail.durationSeconds)}</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {formatSecondsAsLabel(activeLessonDetail.durationSeconds)}
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5">Duration</p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
                 <BarChart3 className="h-5 w-5 text-gray-400 mx-auto mb-1" />
-                <p className="text-sm font-bold text-gray-800">Position {(activeLessonDetail.sortOrder ?? 0) + 1}</p>
+                <p className="text-sm font-bold text-gray-800">
+                  Position {(activeLessonDetail.sortOrder ?? 0) + 1}
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5">In this section</p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
                 {activeLessonDetail.isPublished ? (
                   <>
                     <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-                    <p className="text-sm font-bold text-emerald-700">Published</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Visible to students</p>
+                    <p className="text-sm font-bold text-emerald-700">
+                      Published
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Visible to students
+                    </p>
                   </>
                 ) : (
                   <>
                     <XCircle className="h-5 w-5 text-amber-400 mx-auto mb-1" />
                     <p className="text-sm font-bold text-amber-600">Draft</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Hidden from students</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Hidden from students
+                    </p>
                   </>
                 )}
               </div>
             </div>
 
             {/* Content */}
-            {(activeLessonDetail.contentUrl || activeLessonDetail.meetingLink || activeLessonDetail.scheduledAt || activeLessonDetail.contentText) && (
+            {(activeLessonDetail.contentUrl ||
+              activeLessonDetail.meetingLink ||
+              activeLessonDetail.scheduledAt ||
+              activeLessonDetail.contentText) && (
               <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Lesson Content</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                  Lesson Content
+                </p>
                 {activeLessonDetail.contentUrl && (
                   <a
                     href={activeLessonDetail.contentUrl}
@@ -1043,8 +1241,12 @@ function InstructorLearningWorkspace({
                       <PlayCircle className="h-5 w-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-blue-900">Watch Lesson Video</p>
-                      <p className="text-xs text-blue-500 truncate">{activeLessonDetail.contentUrl}</p>
+                      <p className="text-sm font-semibold text-blue-900">
+                        Watch Lesson Video
+                      </p>
+                      <p className="text-xs text-blue-500 truncate">
+                        {activeLessonDetail.contentUrl}
+                      </p>
                     </div>
                     <ExternalLink className="h-4 w-4 text-blue-500 shrink-0 opacity-60 group-hover:opacity-100" />
                   </a>
@@ -1060,8 +1262,12 @@ function InstructorLearningWorkspace({
                       <Video className="h-5 w-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-violet-900">Join Live Session</p>
-                      <p className="text-xs text-violet-500 truncate">{activeLessonDetail.meetingLink}</p>
+                      <p className="text-sm font-semibold text-violet-900">
+                        Join Live Session
+                      </p>
+                      <p className="text-xs text-violet-500 truncate">
+                        {activeLessonDetail.meetingLink}
+                      </p>
                     </div>
                     <ExternalLink className="h-4 w-4 text-violet-500 shrink-0 opacity-60 group-hover:opacity-100" />
                   </a>
@@ -1070,17 +1276,32 @@ function InstructorLearningWorkspace({
                   <div className="flex items-center gap-3 p-3 rounded-xl border border-amber-100 bg-amber-50">
                     <Calendar className="h-5 w-5 text-amber-600 shrink-0" />
                     <div>
-                      <p className="text-xs font-semibold text-amber-800">Session Scheduled for</p>
+                      <p className="text-xs font-semibold text-amber-800">
+                        Session Scheduled for
+                      </p>
                       <p className="text-sm font-bold text-amber-900">
-                        {new Date(activeLessonDetail.scheduledAt).toLocaleString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {new Date(
+                          activeLessonDetail.scheduledAt,
+                        ).toLocaleString(undefined, {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </p>
                     </div>
                   </div>
                 )}
                 {activeLessonDetail.contentText && (
                   <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Written Content</p>
-                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{activeLessonDetail.contentText}</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      Written Content
+                    </p>
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      {activeLessonDetail.contentText}
+                    </p>
                   </div>
                 )}
               </div>
@@ -1089,20 +1310,30 @@ function InstructorLearningWorkspace({
             {/* Section context */}
             {activeLessonDetail.section && (
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Part of Section</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                  Part of Section
+                </p>
                 <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <Layers className="h-4 w-4 text-gray-400 shrink-0" />
-                    <p className="text-sm font-bold text-gray-800">{activeLessonDetail.section.title}</p>
+                    <p className="text-sm font-bold text-gray-800">
+                      {activeLessonDetail.section.title}
+                    </p>
                   </div>
                   {activeLessonDetail.section.description && (
-                    <p className="text-xs text-gray-600 leading-relaxed pl-6">{activeLessonDetail.section.description}</p>
+                    <p className="text-xs text-gray-600 leading-relaxed pl-6">
+                      {activeLessonDetail.section.description}
+                    </p>
                   )}
                   <div className="pl-6">
                     {activeLessonDetail.section.isFreePreview ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Section available as Free Preview</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                        Section available as Free Preview
+                      </span>
                     ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Requires enrollment to access</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        Requires enrollment to access
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1112,47 +1343,91 @@ function InstructorLearningWorkspace({
             {/* Course context */}
             {activeLessonDetail.course && (
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Course</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                  Course
+                </p>
                 <div className="rounded-xl border border-gray-100 overflow-hidden">
                   {activeLessonDetail.course.thumbnailUrl && (
-                    <img src={activeLessonDetail.course.thumbnailUrl} alt={activeLessonDetail.course.title ?? ""} className="w-full h-36 object-cover" />
+                    <img
+                      src={activeLessonDetail.course.thumbnailUrl}
+                      alt={activeLessonDetail.course.title ?? ""}
+                      className="w-full h-36 object-cover"
+                    />
                   )}
                   <div className="p-4 space-y-3">
                     <div>
-                      <p className="text-base font-bold text-gray-900">{activeLessonDetail.course.title}</p>
+                      <p className="text-base font-bold text-gray-900">
+                        {activeLessonDetail.course.title}
+                      </p>
                       {activeLessonDetail.course.subtitle && (
-                        <p className="text-xs text-gray-500 mt-0.5">{activeLessonDetail.course.subtitle}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {activeLessonDetail.course.subtitle}
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       {activeLessonDetail.course.level && (
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${LEVEL_META[activeLessonDetail.course.level as keyof typeof LEVEL_META]?.bg ?? "bg-gray-100"} ${LEVEL_META[activeLessonDetail.course.level as keyof typeof LEVEL_META]?.color ?? "text-gray-600"}`}>
+                        <span
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${LEVEL_META[activeLessonDetail.course.level as keyof typeof LEVEL_META]?.bg ?? "bg-gray-100"} ${LEVEL_META[activeLessonDetail.course.level as keyof typeof LEVEL_META]?.color ?? "text-gray-600"}`}
+                        >
                           {activeLessonDetail.course.level}
                         </span>
                       )}
                       <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-                        {activeLessonDetail.course.isFree ? "Free Course" : `$${activeLessonDetail.course.price} ${activeLessonDetail.course.currency ?? "USD"}`}
+                        {activeLessonDetail.course.isFree
+                          ? "Free Course"
+                          : `$${activeLessonDetail.course.price} ${activeLessonDetail.course.currency ?? "USD"}`}
                       </span>
                       {activeLessonDetail.course.status && (
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${activeLessonDetail.course.status === "published" ? "bg-emerald-50 text-emerald-700" : activeLessonDetail.course.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-700"}`}>
-                          {activeLessonDetail.course.status === "published" ? "✓ Published" : activeLessonDetail.course.status === "draft" ? "In Draft" : activeLessonDetail.course.status}
+                        <span
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${activeLessonDetail.course.status === "published" ? "bg-emerald-50 text-emerald-700" : activeLessonDetail.course.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-700"}`}
+                        >
+                          {activeLessonDetail.course.status === "published"
+                            ? "✓ Published"
+                            : activeLessonDetail.course.status === "draft"
+                              ? "In Draft"
+                              : activeLessonDetail.course.status}
                         </span>
                       )}
                       {activeLessonDetail.course.language && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 uppercase">{activeLessonDetail.course.language}</span>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 uppercase">
+                          {activeLessonDetail.course.language}
+                        </span>
                       )}
                       {activeLessonDetail.course.shariahCompliant && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-900/10 text-emerald-800">Shariah Compliant ✓</span>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-900/10 text-emerald-800">
+                          Shariah Compliant ✓
+                        </span>
                       )}
                       {activeLessonDetail.course.certificateIssued && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">🎓 Certificate Issued</span>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                          🎓 Certificate Issued
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-4 pt-1 border-t border-gray-100 text-xs text-gray-500">
-                      <span><span className="font-bold text-gray-700">{activeLessonDetail.course.totalEnrollments ?? 0}</span> student{(activeLessonDetail.course.totalEnrollments ?? 0) !== 1 ? "s" : ""} enrolled</span>
-                      {activeLessonDetail.course.ratingAvg && parseFloat(activeLessonDetail.course.ratingAvg) > 0 && (
-                        <span><span className="font-bold text-amber-500">★ {parseFloat(activeLessonDetail.course.ratingAvg).toFixed(1)}</span> rating</span>
-                      )}
+                      <span>
+                        <span className="font-bold text-gray-700">
+                          {activeLessonDetail.course.totalEnrollments ?? 0}
+                        </span>{" "}
+                        student
+                        {(activeLessonDetail.course.totalEnrollments ?? 0) !== 1
+                          ? "s"
+                          : ""}{" "}
+                        enrolled
+                      </span>
+                      {activeLessonDetail.course.ratingAvg &&
+                        parseFloat(activeLessonDetail.course.ratingAvg) > 0 && (
+                          <span>
+                            <span className="font-bold text-amber-500">
+                              ★{" "}
+                              {parseFloat(
+                                activeLessonDetail.course.ratingAvg,
+                              ).toFixed(1)}
+                            </span>{" "}
+                            rating
+                          </span>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -1160,7 +1435,9 @@ function InstructorLearningWorkspace({
             )}
           </div>
         ) : (
-          <p className="text-center text-gray-400 py-8">No lesson details available.</p>
+          <p className="text-center text-gray-400 py-8">
+            No lesson details available.
+          </p>
         )}
       </Dialog>
 
@@ -1186,10 +1463,16 @@ function InstructorLearningWorkspace({
                 <Layers className="h-6 w-6 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Course Section</p>
-                <h2 className="text-xl font-bold text-gray-900 leading-snug">{sectionInspectorQuery.data.title}</h2>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
+                  Course Section
+                </p>
+                <h2 className="text-xl font-bold text-gray-900 leading-snug">
+                  {sectionInspectorQuery.data.title}
+                </h2>
                 {sectionInspectorQuery.data.description && (
-                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">{sectionInspectorQuery.data.description}</p>
+                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    {sectionInspectorQuery.data.description}
+                  </p>
                 )}
               </div>
             </div>
@@ -1198,26 +1481,38 @@ function InstructorLearningWorkspace({
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
                 <BarChart3 className="h-5 w-5 text-gray-400 mx-auto mb-1" />
-                <p className="text-sm font-bold text-gray-800">Section {sectionInspectorQuery.data.sortOrder ?? 1}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Position in course</p>
+                <p className="text-sm font-bold text-gray-800">
+                  Section {sectionInspectorQuery.data.sortOrder ?? 1}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Position in course
+                </p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
                 <PlayCircle className="h-5 w-5 text-gray-400 mx-auto mb-1" />
-                <p className="text-lg font-bold text-gray-800">{sectionInspectorQuery.data.lessons?.length ?? 0}</p>
+                <p className="text-lg font-bold text-gray-800">
+                  {sectionInspectorQuery.data.lessons?.length ?? 0}
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5">Lessons</p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
                 {sectionInspectorQuery.data.isFreePreview ? (
                   <>
                     <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-                    <p className="text-sm font-bold text-emerald-700">Free Preview</p>
+                    <p className="text-sm font-bold text-emerald-700">
+                      Free Preview
+                    </p>
                     <p className="text-xs text-gray-500 mt-0.5">Open access</p>
                   </>
                 ) : (
                   <>
                     <XCircle className="h-5 w-5 text-gray-400 mx-auto mb-1" />
-                    <p className="text-sm font-bold text-gray-700">Enrolled Only</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Requires enrollment</p>
+                    <p className="text-sm font-bold text-gray-700">
+                      Enrolled Only
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Requires enrollment
+                    </p>
                   </>
                 )}
               </div>
@@ -1226,27 +1521,54 @@ function InstructorLearningWorkspace({
             {/* Lessons list */}
             {(sectionInspectorQuery.data.lessons?.length ?? 0) > 0 && (
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Lessons in this Section</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                  Lessons in this Section
+                </p>
                 <div className="space-y-2">
                   {sectionInspectorQuery.data.lessons.map((lesson, idx) => {
-                    const lMeta = LESSON_TYPE_META[lesson.type as keyof typeof LESSON_TYPE_META] ?? LESSON_TYPE_META.video;
+                    const lMeta =
+                      LESSON_TYPE_META[
+                        lesson.type as keyof typeof LESSON_TYPE_META
+                      ] ?? LESSON_TYPE_META.video;
                     const LIcon = lMeta.icon;
                     return (
-                      <div key={lesson.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors">
-                        <span className="text-xs font-bold text-gray-300 w-5 text-right shrink-0">{idx + 1}</span>
-                        <div className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center ${lMeta.bg}`}>
+                      <div
+                        key={lesson.id}
+                        className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        <span className="text-xs font-bold text-gray-300 w-5 text-right shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div
+                          className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center ${lMeta.bg}`}
+                        >
                           <LIcon className={`h-4 w-4 ${lMeta.color}`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-800 truncate">{lesson.title}</p>
-                          <p className="text-xs text-gray-400">{lMeta.label}{lesson.durationSeconds ? ` · ${formatSecondsAsLabel(lesson.durationSeconds)}` : ""}</p>
+                          <p className="text-sm font-semibold text-gray-800 truncate">
+                            {lesson.title}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {lMeta.label}
+                            {lesson.durationSeconds
+                              ? ` · ${formatSecondsAsLabel(lesson.durationSeconds)}`
+                              : ""}
+                          </p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {lesson.isFreePreview && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">Preview</span>}
+                          {lesson.isFreePreview && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                              Preview
+                            </span>
+                          )}
                           {lesson.isPublished ? (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Live</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                              Live
+                            </span>
                           ) : (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">Draft</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                              Draft
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1259,41 +1581,87 @@ function InstructorLearningWorkspace({
             {/* Course context */}
             {sectionInspectorQuery.data.course && (
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Part of Course</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                  Part of Course
+                </p>
                 <div className="rounded-xl border border-gray-100 overflow-hidden">
                   {sectionInspectorQuery.data.course.thumbnailUrl && (
-                    <img src={sectionInspectorQuery.data.course.thumbnailUrl} alt={sectionInspectorQuery.data.course.title ?? ""} className="w-full h-32 object-cover" />
+                    <img
+                      src={sectionInspectorQuery.data.course.thumbnailUrl}
+                      alt={sectionInspectorQuery.data.course.title ?? ""}
+                      className="w-full h-32 object-cover"
+                    />
                   )}
                   <div className="p-4 space-y-3">
                     <div>
-                      <p className="text-base font-bold text-gray-900">{sectionInspectorQuery.data.course.title}</p>
+                      <p className="text-base font-bold text-gray-900">
+                        {sectionInspectorQuery.data.course.title}
+                      </p>
                       {sectionInspectorQuery.data.course.subtitle && (
-                        <p className="text-xs text-gray-500 mt-0.5">{sectionInspectorQuery.data.course.subtitle}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {sectionInspectorQuery.data.course.subtitle}
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       {sectionInspectorQuery.data.course.level && (
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${LEVEL_META[sectionInspectorQuery.data.course.level as keyof typeof LEVEL_META]?.bg ?? "bg-gray-100"} ${LEVEL_META[sectionInspectorQuery.data.course.level as keyof typeof LEVEL_META]?.color ?? "text-gray-600"}`}>
+                        <span
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${LEVEL_META[sectionInspectorQuery.data.course.level as keyof typeof LEVEL_META]?.bg ?? "bg-gray-100"} ${LEVEL_META[sectionInspectorQuery.data.course.level as keyof typeof LEVEL_META]?.color ?? "text-gray-600"}`}
+                        >
                           {sectionInspectorQuery.data.course.level}
                         </span>
                       )}
                       <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-                        {sectionInspectorQuery.data.course.isFree ? "Free Course" : `$${sectionInspectorQuery.data.course.price} ${sectionInspectorQuery.data.course.currency ?? "USD"}`}
+                        {sectionInspectorQuery.data.course.isFree
+                          ? "Free Course"
+                          : `$${sectionInspectorQuery.data.course.price} ${sectionInspectorQuery.data.course.currency ?? "USD"}`}
                       </span>
                       {sectionInspectorQuery.data.course.status && (
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${sectionInspectorQuery.data.course.status === "published" ? "bg-emerald-50 text-emerald-700" : sectionInspectorQuery.data.course.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-700"}`}>
-                          {sectionInspectorQuery.data.course.status === "published" ? "✓ Published" : sectionInspectorQuery.data.course.status === "draft" ? "In Draft" : sectionInspectorQuery.data.course.status}
+                        <span
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${sectionInspectorQuery.data.course.status === "published" ? "bg-emerald-50 text-emerald-700" : sectionInspectorQuery.data.course.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-700"}`}
+                        >
+                          {sectionInspectorQuery.data.course.status ===
+                          "published"
+                            ? "✓ Published"
+                            : sectionInspectorQuery.data.course.status ===
+                                "draft"
+                              ? "In Draft"
+                              : sectionInspectorQuery.data.course.status}
                         </span>
                       )}
                       {sectionInspectorQuery.data.course.shariahCompliant && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-900/10 text-emerald-800">Shariah Compliant ✓</span>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-900/10 text-emerald-800">
+                          Shariah Compliant ✓
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-4 pt-1 border-t border-gray-100 text-xs text-gray-500">
-                      <span><span className="font-bold text-gray-700">{sectionInspectorQuery.data.course.totalEnrollments ?? 0}</span> student{(sectionInspectorQuery.data.course.totalEnrollments ?? 0) !== 1 ? "s" : ""} enrolled</span>
-                      {sectionInspectorQuery.data.course.ratingAvg && parseFloat(sectionInspectorQuery.data.course.ratingAvg) > 0 && (
-                        <span><span className="font-bold text-amber-500">★ {parseFloat(sectionInspectorQuery.data.course.ratingAvg).toFixed(1)}</span> rating</span>
-                      )}
+                      <span>
+                        <span className="font-bold text-gray-700">
+                          {sectionInspectorQuery.data.course.totalEnrollments ??
+                            0}
+                        </span>{" "}
+                        student
+                        {(sectionInspectorQuery.data.course.totalEnrollments ??
+                          0) !== 1
+                          ? "s"
+                          : ""}{" "}
+                        enrolled
+                      </span>
+                      {sectionInspectorQuery.data.course.ratingAvg &&
+                        parseFloat(
+                          sectionInspectorQuery.data.course.ratingAvg,
+                        ) > 0 && (
+                          <span>
+                            <span className="font-bold text-amber-500">
+                              ★{" "}
+                              {parseFloat(
+                                sectionInspectorQuery.data.course.ratingAvg,
+                              ).toFixed(1)}
+                            </span>{" "}
+                            rating
+                          </span>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -1301,7 +1669,9 @@ function InstructorLearningWorkspace({
             )}
           </div>
         ) : (
-          <p className="text-center text-gray-400 py-8">No section details available.</p>
+          <p className="text-center text-gray-400 py-8">
+            No section details available.
+          </p>
         )}
       </Dialog>
 
@@ -1398,7 +1768,9 @@ function InstructorLearningWorkspace({
                     const cnt =
                       f === "all"
                         ? (coursesQuery.data?.length ?? 0)
-                        : (coursesQuery.data ?? []).filter((c) => c.status === f).length;
+                        : (coursesQuery.data ?? []).filter(
+                            (c) => c.status === f,
+                          ).length;
                     return (
                       <button
                         key={f}
@@ -1412,7 +1784,9 @@ function InstructorLearningWorkspace({
                         {f}
                         <span
                           className={`text-[10px] px-1.5 py-0 rounded-full leading-5 ${
-                            statusFilter === f ? "bg-white/20 text-white" : "bg-white text-gray-500"
+                            statusFilter === f
+                              ? "bg-white/20 text-white"
+                              : "bg-white text-gray-500"
                           }`}
                         >
                           {cnt}
@@ -1460,19 +1834,24 @@ function InstructorLearningWorkspace({
             ) : filteredCourses.length === 0 ? (
               <div className="rounded-2xl bg-white border border-dashed border-gray-200 p-8 text-center">
                 <Search className="h-8 w-8 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm font-semibold text-gray-500">No matching courses</p>
-                <p className="text-xs text-gray-400 mt-1">Try a different search or filter</p>
+                <p className="text-sm font-semibold text-gray-500">
+                  No matching courses
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Try a different search or filter
+                </p>
               </div>
             ) : (
               <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-440px)] pr-0.5">
                 {filteredCourses.map((course, idx) => {
                   const isSelected = selectedCourseId === course.id;
-                  const levelMeta =
-                    LEVEL_META[course.level as keyof typeof LEVEL_META] ?? {
-                      label: course.level,
-                      color: "text-gray-600",
-                      bg: "bg-gray-100",
-                    };
+                  const levelMeta = LEVEL_META[
+                    course.level as keyof typeof LEVEL_META
+                  ] ?? {
+                    label: course.level,
+                    color: "text-gray-600",
+                    bg: "bg-gray-100",
+                  };
                   const accentColors = [
                     "border-l-blue-400",
                     "border-l-violet-400",
@@ -1481,7 +1860,8 @@ function InstructorLearningWorkspace({
                     "border-l-rose-400",
                   ];
                   const accentColor = accentColors[idx % accentColors.length];
-                  const sectionCount = course.sections?.length ?? course.moduleCount ?? 0;
+                  const sectionCount =
+                    course.sections?.length ?? course.moduleCount ?? 0;
                   const lessonCount = course.videoCount ?? 0;
                   return (
                     <button
@@ -1646,7 +2026,9 @@ function InstructorLearningWorkspace({
                             {courseDetails?.title}
                           </h2>
                           {courseDetails?.subtitle && (
-                            <p className="text-sm text-gray-500 mt-0.5">{courseDetails.subtitle}</p>
+                            <p className="text-sm text-gray-500 mt-0.5">
+                              {courseDetails.subtitle}
+                            </p>
                           )}
                         </div>
                         <span
@@ -1673,18 +2055,31 @@ function InstructorLearningWorkspace({
                     {/* Stats row */}
                     <div className="grid grid-cols-4 gap-2 mb-4">
                       <div className="rounded-xl bg-blue-50 p-2.5 text-center">
-                        <p className="text-base font-bold text-blue-700">{sections.length}</p>
-                        <p className="text-[10px] font-semibold text-blue-500 mt-0.5">Sections</p>
+                        <p className="text-base font-bold text-blue-700">
+                          {sections.length}
+                        </p>
+                        <p className="text-[10px] font-semibold text-blue-500 mt-0.5">
+                          Sections
+                        </p>
                       </div>
                       <div className="rounded-xl bg-purple-50 p-2.5 text-center">
                         <p className="text-base font-bold text-purple-700">
-                          {sections.reduce((t, s) => t + (s.lessons?.length ?? 0), 0)}
+                          {sections.reduce(
+                            (t, s) => t + (s.lessons?.length ?? 0),
+                            0,
+                          )}
                         </p>
-                        <p className="text-[10px] font-semibold text-purple-500 mt-0.5">Lessons</p>
+                        <p className="text-[10px] font-semibold text-purple-500 mt-0.5">
+                          Lessons
+                        </p>
                       </div>
                       <div className="rounded-xl bg-gray-50 p-2.5 text-center">
-                        <p className="text-base font-bold text-gray-700">{courseDetails?.enrolledCount ?? 0}</p>
-                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5">Students</p>
+                        <p className="text-base font-bold text-gray-700">
+                          {courseDetails?.enrolledCount ?? 0}
+                        </p>
+                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5">
+                          Students
+                        </p>
                       </div>
                       <div className="rounded-xl bg-amber-50 p-2.5 text-center">
                         <p className="text-base font-bold text-amber-600">
@@ -1692,7 +2087,9 @@ function InstructorLearningWorkspace({
                             ? courseDetails.rating.toFixed(1)
                             : "—"}
                         </p>
-                        <p className="text-[10px] font-semibold text-amber-400 mt-0.5">Rating</p>
+                        <p className="text-[10px] font-semibold text-amber-400 mt-0.5">
+                          Rating
+                        </p>
                       </div>
                     </div>
 
@@ -1704,7 +2101,9 @@ function InstructorLearningWorkspace({
                         {courseDetails?.level}
                       </span>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
-                        {courseDetails?.isFree ? "Free" : `$${courseDetails?.priceUsd} USD`}
+                        {courseDetails?.isFree
+                          ? "Free"
+                          : `$${courseDetails?.priceUsd} USD`}
                       </span>
                       {courseDetails?.language && (
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 uppercase">
@@ -1724,7 +2123,31 @@ function InstructorLearningWorkspace({
                     </div>
 
                     {/* Course actions */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/90 p-2 shadow-sm">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          courseDetails?.status === "published"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : courseDetails?.status === "suspended"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            courseDetails?.status === "published"
+                              ? "bg-emerald-500"
+                              : courseDetails?.status === "suspended"
+                                ? "bg-red-500"
+                                : "bg-amber-500"
+                          }`}
+                        />
+                        {courseDetails?.status === "published"
+                          ? "Live"
+                          : courseDetails?.status === "suspended"
+                            ? "Suspended"
+                            : "Draft"}
+                      </span>
                       <button
                         onClick={() => {
                           setCourseForm({
@@ -1732,7 +2155,10 @@ function InstructorLearningWorkspace({
                             subtitle: "",
                             description: courseDetails?.description ?? "",
                             categoryId: "",
-                            level: (courseDetails?.level ?? "beginner") as "beginner" | "intermediate" | "advanced",
+                            level: (courseDetails?.level ?? "beginner") as
+                              | "beginner"
+                              | "intermediate"
+                              | "advanced",
                             thumbnailUrl: courseDetails?.coverImageUrl ?? "",
                             price: courseDetails?.priceUsd ?? 0,
                             isFree: courseDetails?.isFree ?? false,
@@ -1740,26 +2166,42 @@ function InstructorLearningWorkspace({
                           setIsEditingCourse(true);
                           setShowCreateCourse(true);
                         }}
-                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm"
                       >
-                        <Edit className="h-3 w-3" /> Edit Course
+                        <Edit className="h-3.5 w-3.5" /> Edit Course
                       </button>
-                      <button
-                        onClick={() => void handleSuspendCourse()}
-                        disabled={suspendCourseMutation.isPending}
-                        className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-                          courseDetails?.status === "suspended"
-                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                        }`}
-                      >
-                        <PauseCircle className="h-3 w-3" />
-                        {suspendCourseMutation.isPending
-                          ? "Processing…"
-                          : courseDetails?.status === "suspended"
-                            ? "Suspended"
+                      {courseDetails?.status !== "published" && (
+                        <button
+                          onClick={() => void handlePublishCourse()}
+                          disabled={
+                            publishCourseMutation.isPending ||
+                            suspendCourseMutation.isPending
+                          }
+                          className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-60"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {publishCourseMutation.isPending
+                            ? "Publishing..."
+                            : courseDetails?.status === "suspended"
+                              ? "Re-publish Course"
+                              : "Publish Course"}
+                        </button>
+                      )}
+                      {courseDetails?.status === "published" && (
+                        <button
+                          onClick={() => void handleSuspendCourse()}
+                          disabled={
+                            suspendCourseMutation.isPending ||
+                            publishCourseMutation.isPending
+                          }
+                          className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm disabled:opacity-60"
+                        >
+                          <PauseCircle className="h-3.5 w-3.5" />
+                          {suspendCourseMutation.isPending
+                            ? "Processing..."
                             : "Suspend Course"}
-                      </button>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1771,35 +2213,48 @@ function InstructorLearningWorkspace({
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Layers className="h-4 w-4 text-white/70" />
-                        <h3 className="text-sm font-bold text-white">Course Curriculum</h3>
+                        <h3 className="text-sm font-bold text-white">
+                          Course Curriculum
+                        </h3>
                       </div>
-                      {sections.length > 0 && (() => {
-                        const totalLessons = sections.reduce((t, s) => t + (s.lessons?.length ?? 0), 0);
-                        const totalSecs = sections.reduce(
-                          (t, s) => t + (s.lessons ?? []).reduce((ls, l) => ls + (l.durationSeconds ?? 0), 0),
-                          0,
-                        );
-                        return (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-white/60 font-medium">
-                              {sections.length} section{sections.length !== 1 ? "s" : ""}
-                            </span>
-                            <span className="text-white/30">·</span>
-                            <span className="text-[11px] text-white/60 font-medium">
-                              {totalLessons} lesson{totalLessons !== 1 ? "s" : ""}
-                            </span>
-                            {totalSecs > 0 && (
-                              <>
-                                <span className="text-white/30">·</span>
-                                <span className="text-[11px] text-white/60 font-medium flex items-center gap-0.5">
-                                  <Clock className="h-2.5 w-2.5" />
-                                  {formatSecondsAsLabel(totalSecs)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })()}
+                      {sections.length > 0 &&
+                        (() => {
+                          const totalLessons = sections.reduce(
+                            (t, s) => t + (s.lessons?.length ?? 0),
+                            0,
+                          );
+                          const totalSecs = sections.reduce(
+                            (t, s) =>
+                              t +
+                              (s.lessons ?? []).reduce(
+                                (ls, l) => ls + (l.durationSeconds ?? 0),
+                                0,
+                              ),
+                            0,
+                          );
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-white/60 font-medium">
+                                {sections.length} section
+                                {sections.length !== 1 ? "s" : ""}
+                              </span>
+                              <span className="text-white/30">·</span>
+                              <span className="text-[11px] text-white/60 font-medium">
+                                {totalLessons} lesson
+                                {totalLessons !== 1 ? "s" : ""}
+                              </span>
+                              {totalSecs > 0 && (
+                                <>
+                                  <span className="text-white/30">·</span>
+                                  <span className="text-[11px] text-white/60 font-medium flex items-center gap-0.5">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {formatSecondsAsLabel(totalSecs)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </div>
                     {!showAddSection && (
                       <button
@@ -1816,9 +2271,12 @@ function InstructorLearningWorkspace({
                       <div className="h-16 w-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-4">
                         <Layers className="h-7 w-7 text-slate-300" />
                       </div>
-                      <p className="text-sm font-semibold text-gray-600">No sections yet</p>
+                      <p className="text-sm font-semibold text-gray-600">
+                        No sections yet
+                      </p>
                       <p className="text-xs text-gray-400 mt-1 mb-5">
-                        Structure your course into sections, then add lessons to each
+                        Structure your course into sections, then add lessons to
+                        each
                       </p>
                       <button
                         onClick={() => setShowAddSection(true)}
@@ -1871,7 +2329,8 @@ function InstructorLearningWorkspace({
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[11px] text-gray-400 font-medium">
-                                {lessonCount} lesson{lessonCount !== 1 ? "s" : ""}
+                                {lessonCount} lesson
+                                {lessonCount !== 1 ? "s" : ""}
                               </span>
                               {sectionDuration > 0 && (
                                 <span className="text-[11px] text-gray-400 font-medium flex items-center gap-0.5">
@@ -1905,7 +2364,9 @@ function InstructorLearningWorkspace({
                             </button>
                             <button
                               className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                              onClick={() => setInspectingSectionId(String(section.id))}
+                              onClick={() =>
+                                setInspectingSectionId(String(section.id))
+                              }
                               title="View section details"
                             >
                               <Info className="h-3.5 w-3.5" />
@@ -1957,33 +2418,51 @@ function InstructorLearningWorkspace({
                                           {lesson.title}
                                         </p>
                                         <div className="flex items-center gap-1.5 mt-0.5">
-                                          <span className={`text-[10px] font-bold px-1.5 py-0 rounded-full leading-5 border ${meta.bg} ${meta.color} ${meta.border}`}>
+                                          <span
+                                            className={`text-[10px] font-bold px-1.5 py-0 rounded-full leading-5 border ${meta.bg} ${meta.color} ${meta.border}`}
+                                          >
                                             {meta.label}
                                           </span>
                                           {lesson.durationSeconds ? (
                                             <span className="text-[10px] text-gray-400 font-medium flex items-center gap-0.5">
                                               <Clock className="h-2.5 w-2.5" />
-                                              {formatSecondsAsLabel(lesson.durationSeconds)}
+                                              {formatSecondsAsLabel(
+                                                lesson.durationSeconds,
+                                              )}
                                             </span>
                                           ) : null}
                                           {lesson.contentUrl && (
                                             <span className="text-[10px] text-blue-500 font-medium flex items-center gap-0.5">
-                                              <ExternalLink className="h-2.5 w-2.5" /> Link
+                                              <ExternalLink className="h-2.5 w-2.5" />{" "}
+                                              Link
                                             </span>
                                           )}
                                           {lesson.isFreePreview && (
-                                            <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-blue-50 text-blue-600 leading-5">Preview</span>
+                                            <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-blue-50 text-blue-600 leading-5">
+                                              Preview
+                                            </span>
                                           )}
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1 shrink-0">
                                         {lesson.isPublished ? (
-                                          <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-emerald-50 text-emerald-700 leading-5">Live</span>
+                                          <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-emerald-50 text-emerald-700 leading-5">
+                                            Live
+                                          </span>
                                         ) : (
-                                          <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-amber-50 text-amber-700 leading-5">Draft</span>
+                                          <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-amber-50 text-amber-700 leading-5">
+                                            Draft
+                                          </span>
                                         )}
                                         <button
-                                          onClick={() => setViewingLessonId(viewingLessonId === String(lesson.id) ? null : String(lesson.id))}
+                                          onClick={() =>
+                                            setViewingLessonId(
+                                              viewingLessonId ===
+                                                String(lesson.id)
+                                                ? null
+                                                : String(lesson.id),
+                                            )
+                                          }
                                           className="h-6 w-6 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-[#D52B1E] transition-colors"
                                           title="View full lesson details"
                                         >
@@ -2245,7 +2724,7 @@ function InstructorLearningWorkspace({
 
                   {/* Add section form */}
                   {showAddSection && (
-                  <div className="px-5 py-4 bg-slate-50/60 border-t border-slate-100">
+                    <div className="px-5 py-4 bg-slate-50/60 border-t border-slate-100">
                       <motion.div
                         initial={{ opacity: 0, y: -6 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -2340,7 +2819,7 @@ function InstructorLearningWorkspace({
                           </Button>
                         </div>
                       </motion.div>
-                  </div>
+                    </div>
                   )}
                 </div>
 
@@ -2349,10 +2828,13 @@ function InstructorLearningWorkspace({
                   <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
                     <div className="flex items-center gap-2">
                       <HelpCircle className="h-4 w-4 text-[#D52B1E]" />
-                      <h3 className="text-sm font-bold text-gray-800">Quiz Management</h3>
+                      <h3 className="text-sm font-bold text-gray-800">
+                        Quiz Management
+                      </h3>
                     </div>
                     <span className="text-xs text-gray-400 font-medium">
-                      {courseQuizzes.length} quiz{courseQuizzes.length !== 1 ? "zes" : ""}
+                      {courseQuizzes.length} quiz
+                      {courseQuizzes.length !== 1 ? "zes" : ""}
                     </span>
                   </div>
 
@@ -2370,249 +2852,466 @@ function InstructorLearningWorkspace({
                       >
                         <option value="">Select a quiz to manage…</option>
                         {courseQuizzes.map((q) => (
-                          <option key={q.id} value={q.id}>{q.label}</option>
+                          <option key={q.id} value={q.id}>
+                            {q.label}
+                          </option>
                         ))}
                       </select>
                     )}
 
                     {/* Selected quiz details */}
-                    {managingQuizId && quizDetailsQuery.data && (() => {
-                      const quiz = quizDetailsQuery.data;
-                      const questions = (quiz.questions ?? []) as Array<{
-                        id?: string; text?: string; type?: string; points?: number;
-                        options?: Array<{ id?: string; text?: string; isCorrect?: boolean }>;
-                      }>;
-                      const attempts = quizAttemptsQuery.data ?? [];
-                      return (
-                        <div className="space-y-3">
-                          {/* Quiz header */}
-                          <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50">
-                            <div>
-                              <p className="text-sm font-bold text-gray-800">{quiz.title}</p>
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                {questions.length} question{questions.length !== 1 ? "s" : ""} · {attempts.length} attempt{attempts.length !== 1 ? "s" : ""}
-                              </p>
+                    {managingQuizId &&
+                      quizDetailsQuery.data &&
+                      (() => {
+                        const quiz = quizDetailsQuery.data;
+                        const questions = (quiz.questions ?? []) as Array<{
+                          id?: string;
+                          text?: string;
+                          type?: string;
+                          points?: number;
+                          options?: Array<{
+                            id?: string;
+                            text?: string;
+                            isCorrect?: boolean;
+                          }>;
+                        }>;
+                        const attempts = quizAttemptsQuery.data ?? [];
+                        return (
+                          <div className="space-y-3">
+                            {/* Quiz header */}
+                            <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50">
+                              <div>
+                                <p className="text-sm font-bold text-gray-800">
+                                  {quiz.title}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {questions.length} question
+                                  {questions.length !== 1 ? "s" : ""} ·{" "}
+                                  {attempts.length} attempt
+                                  {attempts.length !== 1 ? "s" : ""}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    const newTitle = window.prompt(
+                                      "Quiz title:",
+                                      quiz.title,
+                                    );
+                                    if (newTitle && newTitle !== quiz.title)
+                                      void updateQuizMutation.mutateAsync({
+                                        id: managingQuizId,
+                                        payload: { title: newTitle },
+                                      });
+                                  }}
+                                  className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                                  title="Edit quiz"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        "Delete this quiz and all its contents?",
+                                      )
+                                    )
+                                      void deleteQuizMutation
+                                        .mutateAsync(managingQuizId)
+                                        .then(() => setManagingQuizId(null));
+                                  }}
+                                  className="h-7 w-7 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                                  title="Delete quiz"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => {
-                                  const newTitle = window.prompt("Quiz title:", quiz.title);
-                                  if (newTitle && newTitle !== quiz.title)
-                                    void updateQuizMutation.mutateAsync({ id: managingQuizId, payload: { title: newTitle } });
-                                }}
-                                className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                                title="Edit quiz"
-                              >
-                                <Edit className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm("Delete this quiz and all its contents?"))
-                                    void deleteQuizMutation.mutateAsync(managingQuizId).then(() => setManagingQuizId(null));
-                                }}
-                                className="h-7 w-7 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                                title="Delete quiz"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
 
-                          {/* Quiz attempts summary */}
-                          {attempts.length > 0 && (
-                            <div className="rounded-xl border border-gray-100 p-3">
-                              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                <BarChart3 className="h-3 w-3" /> Recent Attempts
-                              </p>
-                              <div className="space-y-1">
-                                {attempts.slice(0, 5).map((att) => (
-                                  <div key={att.id} className="flex items-center justify-between text-xs">
-                                    <span className="text-gray-600">{att.studentId.slice(0, 8)}…</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className={`font-bold ${att.status === "passed" ? "text-emerald-600" : "text-amber-600"}`}>
-                                        {att.score}%
+                            {/* Quiz attempts summary */}
+                            {attempts.length > 0 && (
+                              <div className="rounded-xl border border-gray-100 p-3">
+                                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                  <BarChart3 className="h-3 w-3" /> Recent
+                                  Attempts
+                                </p>
+                                <div className="space-y-1">
+                                  {attempts.slice(0, 5).map((att) => (
+                                    <div
+                                      key={att.id}
+                                      className="flex items-center justify-between text-xs"
+                                    >
+                                      <span className="text-gray-600">
+                                        {att.studentId.slice(0, 8)}…
                                       </span>
-                                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${att.status === "passed" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                                        {att.status}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`font-bold ${att.status === "passed" ? "text-emerald-600" : "text-amber-600"}`}
+                                        >
+                                          {att.score}%
+                                        </span>
+                                        <span
+                                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${att.status === "passed" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+                                        >
+                                          {att.status}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Questions list */}
+                            <div className="space-y-2">
+                              {questions.map((q, qIdx) => (
+                                <div
+                                  key={String(q.id ?? qIdx)}
+                                  className="rounded-xl border border-gray-100 p-3"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-gray-800">
+                                        <span className="font-bold text-gray-400 mr-1.5">
+                                          {qIdx + 1}.
+                                        </span>
+                                        {String(q.text ?? "")}
+                                      </p>
+                                      <p className="text-[11px] text-gray-400 mt-0.5">
+                                        {String(q.type ?? "mcq")} ·{" "}
+                                        {q.points ?? 1} pt
+                                        {(q.points ?? 1) !== 1 ? "s" : ""}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-0.5 shrink-0">
+                                      <button
+                                        onClick={() => {
+                                          const newText = window.prompt(
+                                            "Question text:",
+                                            String(q.text ?? ""),
+                                          );
+                                          if (newText && q.id)
+                                            void updateQuestionMutation.mutateAsync(
+                                              {
+                                                questionId: q.id,
+                                                payload: { text: newText },
+                                              },
+                                            );
+                                        }}
+                                        className="h-6 w-6 flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"
+                                        title="Edit question"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (
+                                            q.id &&
+                                            window.confirm(
+                                              "Delete this question?",
+                                            )
+                                          )
+                                            void deleteQuestionMutation.mutateAsync(
+                                              q.id,
+                                            );
+                                        }}
+                                        className="h-6 w-6 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
+                                        title="Delete question"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setAddingOptionToQId(
+                                            addingOptionToQId === String(q.id)
+                                              ? null
+                                              : String(q.id ?? ""),
+                                          );
+                                          setOptionForm({
+                                            text: "",
+                                            isCorrect: false,
+                                          });
+                                        }}
+                                        className="h-6 w-6 flex items-center justify-center rounded text-emerald-500 hover:bg-emerald-50"
+                                        title="Add option"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </button>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Questions list */}
-                          <div className="space-y-2">
-                            {questions.map((q, qIdx) => (
-                              <div key={String(q.id ?? qIdx)} className="rounded-xl border border-gray-100 p-3">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-gray-800">
-                                      <span className="font-bold text-gray-400 mr-1.5">{qIdx + 1}.</span>
-                                      {String(q.text ?? "")}
-                                    </p>
-                                    <p className="text-[11px] text-gray-400 mt-0.5">
-                                      {String(q.type ?? "mcq")} · {q.points ?? 1} pt{(q.points ?? 1) !== 1 ? "s" : ""}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-0.5 shrink-0">
-                                    <button
-                                      onClick={() => {
-                                        const newText = window.prompt("Question text:", String(q.text ?? ""));
-                                        if (newText && q.id)
-                                          void updateQuestionMutation.mutateAsync({ questionId: q.id, payload: { text: newText } });
-                                      }}
-                                      className="h-6 w-6 flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"
-                                      title="Edit question"
-                                    >
-                                      <Edit className="h-3 w-3" />
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        if (q.id && window.confirm("Delete this question?"))
-                                          void deleteQuestionMutation.mutateAsync(q.id);
-                                      }}
-                                      className="h-6 w-6 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
-                                      title="Delete question"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setAddingOptionToQId(addingOptionToQId === String(q.id) ? null : String(q.id ?? ""));
-                                        setOptionForm({ text: "", isCorrect: false });
-                                      }}
-                                      className="h-6 w-6 flex items-center justify-center rounded text-emerald-500 hover:bg-emerald-50"
-                                      title="Add option"
-                                    >
-                                      <Plus className="h-3 w-3" />
-                                    </button>
-                                  </div>
-                                </div>
-                                {/* Options */}
-                                {(q.options ?? []).length > 0 && (
-                                  <div className="mt-2 space-y-1 pl-4">
-                                    {(q.options ?? []).map((opt, oIdx) => (
-                                      <div key={String(opt.id ?? oIdx)} className="flex items-center justify-between text-xs">
-                                        <span className={`flex items-center gap-1.5 ${opt.isCorrect ? "text-emerald-700 font-semibold" : "text-gray-500"}`}>
-                                          <span className={`h-2 w-2 rounded-full shrink-0 ${opt.isCorrect ? "bg-emerald-500" : "bg-gray-300"}`} />
-                                          {String(opt.text ?? "")}
-                                        </span>
-                                        <div className="flex items-center gap-0.5">
-                                          <button
-                                            onClick={() => {
-                                              const newText = window.prompt("Option text:", String(opt.text ?? ""));
-                                              if (newText && opt.id)
-                                                void updateOptionMutation.mutateAsync({ id: opt.id, payload: { text: newText } });
-                                            }}
-                                            className="h-5 w-5 flex items-center justify-center rounded text-blue-400 hover:bg-blue-50"
+                                  {/* Options */}
+                                  {(q.options ?? []).length > 0 && (
+                                    <div className="mt-2 space-y-1 pl-4">
+                                      {(q.options ?? []).map((opt, oIdx) => (
+                                        <div
+                                          key={String(opt.id ?? oIdx)}
+                                          className="flex items-center justify-between text-xs"
+                                        >
+                                          <span
+                                            className={`flex items-center gap-1.5 ${opt.isCorrect ? "text-emerald-700 font-semibold" : "text-gray-500"}`}
                                           >
-                                            <Edit className="h-2.5 w-2.5" />
-                                          </button>
-                                          <button
-                                            onClick={() => {
-                                              if (opt.id && window.confirm("Delete this option?"))
-                                                void deleteOptionMutation.mutateAsync(opt.id);
-                                            }}
-                                            className="h-5 w-5 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
-                                          >
-                                            <Trash2 className="h-2.5 w-2.5" />
-                                          </button>
+                                            <span
+                                              className={`h-2 w-2 rounded-full shrink-0 ${opt.isCorrect ? "bg-emerald-500" : "bg-gray-300"}`}
+                                            />
+                                            {String(opt.text ?? "")}
+                                          </span>
+                                          <div className="flex items-center gap-0.5">
+                                            <button
+                                              onClick={() => {
+                                                const newText = window.prompt(
+                                                  "Option text:",
+                                                  String(opt.text ?? ""),
+                                                );
+                                                if (newText && opt.id)
+                                                  void updateOptionMutation.mutateAsync(
+                                                    {
+                                                      id: opt.id,
+                                                      payload: {
+                                                        text: newText,
+                                                      },
+                                                    },
+                                                  );
+                                              }}
+                                              className="h-5 w-5 flex items-center justify-center rounded text-blue-400 hover:bg-blue-50"
+                                            >
+                                              <Edit className="h-2.5 w-2.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                if (
+                                                  opt.id &&
+                                                  window.confirm(
+                                                    "Delete this option?",
+                                                  )
+                                                )
+                                                  void deleteOptionMutation.mutateAsync(
+                                                    opt.id,
+                                                  );
+                                              }}
+                                              className="h-5 w-5 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
+                                            >
+                                              <Trash2 className="h-2.5 w-2.5" />
+                                            </button>
+                                          </div>
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {/* Add option inline */}
-                                {addingOptionToQId === String(q.id) && (
-                                  <div className="mt-2 pl-4 flex items-center gap-2">
-                                    <input
-                                      className={`${inputCls} flex-1`}
-                                      value={optionForm.text}
-                                      onChange={(e) => setOptionForm((f) => ({ ...f, text: e.target.value }))}
-                                      placeholder="Option text"
-                                      autoFocus
-                                    />
-                                    <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0">
-                                      <input
-                                        type="checkbox"
-                                        checked={optionForm.isCorrect}
-                                        onChange={(e) => setOptionForm((f) => ({ ...f, isCorrect: e.target.checked }))}
-                                        className="rounded border-gray-300"
-                                      />
-                                      Correct
-                                    </label>
-                                    <Button size="sm" onClick={() => void handleAddOptionToQuestion()} disabled={!optionForm.text.trim() || addOptionMutation.isPending} className="bg-[#D52B1E] hover:bg-[#b82319] text-white text-xs px-2 py-1 h-7">
-                                      Add
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Add question */}
-                          {showAddQuestion ? (
-                            <div className="rounded-xl border border-[#D52B1E]/20 bg-white p-3 space-y-2">
-                              <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-wider">Add Question</p>
-                              <input className={inputCls} value={questionForm.text} onChange={(e) => setQuestionForm((f) => ({ ...f, text: e.target.value }))} placeholder="Question text" autoFocus />
-                              <div className="flex gap-2">
-                                <select className={`${inputCls} flex-1`} value={questionForm.type} onChange={(e) => setQuestionForm((f) => ({ ...f, type: e.target.value }))}>
-                                  {quizTypesQuery.data && quizTypesQuery.data.length > 0 ? (
-                                    quizTypesQuery.data.map((qt) => (
-                                      <option key={String(qt.id)} value={qt.name}>{qt.name}</option>
-                                    ))
-                                  ) : (
-                                    <>
-                                      <option value="mcq">MCQ</option>
-                                      <option value="true_false">True / False</option>
-                                      <option value="short_answer">Short Answer</option>
-                                    </>
+                                      ))}
+                                    </div>
                                   )}
-                                </select>
-                                <input type="number" min={1} className={`${inputCls} w-20`} value={questionForm.points} onChange={(e) => setQuestionForm((f) => ({ ...f, points: Number(e.target.value) || 1 }))} placeholder="Pts" />
-                              </div>
-                              <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="ghost" onClick={() => setShowAddQuestion(false)}>Cancel</Button>
-                                <Button size="sm" onClick={() => void handleAddQuestionToQuiz()} disabled={!questionForm.text.trim() || addQuestionMutation.isPending} className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-1.5">
-                                  <Plus className="h-3 w-3" /> Add
-                                </Button>
-                              </div>
+                                  {/* Add option inline */}
+                                  {addingOptionToQId === String(q.id) && (
+                                    <div className="mt-2 pl-4 flex items-center gap-2">
+                                      <input
+                                        className={`${inputCls} flex-1`}
+                                        value={optionForm.text}
+                                        onChange={(e) =>
+                                          setOptionForm((f) => ({
+                                            ...f,
+                                            text: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Option text"
+                                        autoFocus
+                                      />
+                                      <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0">
+                                        <input
+                                          type="checkbox"
+                                          checked={optionForm.isCorrect}
+                                          onChange={(e) =>
+                                            setOptionForm((f) => ({
+                                              ...f,
+                                              isCorrect: e.target.checked,
+                                            }))
+                                          }
+                                          className="rounded border-gray-300"
+                                        />
+                                        Correct
+                                      </label>
+                                      <Button
+                                        size="sm"
+                                        onClick={() =>
+                                          void handleAddOptionToQuestion()
+                                        }
+                                        disabled={
+                                          !optionForm.text.trim() ||
+                                          addOptionMutation.isPending
+                                        }
+                                        className="bg-[#D52B1E] hover:bg-[#b82319] text-white text-xs px-2 py-1 h-7"
+                                      >
+                                        Add
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                          ) : (
-                            <button onClick={() => setShowAddQuestion(true)} className="text-xs font-semibold text-[#D52B1E] flex items-center gap-1 hover:gap-1.5 transition-all">
-                              <Plus className="h-3 w-3" /> Add question
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
+
+                            {/* Add question */}
+                            {showAddQuestion ? (
+                              <div className="rounded-xl border border-[#D52B1E]/20 bg-white p-3 space-y-2">
+                                <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-wider">
+                                  Add Question
+                                </p>
+                                <input
+                                  className={inputCls}
+                                  value={questionForm.text}
+                                  onChange={(e) =>
+                                    setQuestionForm((f) => ({
+                                      ...f,
+                                      text: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Question text"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <select
+                                    className={`${inputCls} flex-1`}
+                                    value={questionForm.type}
+                                    onChange={(e) =>
+                                      setQuestionForm((f) => ({
+                                        ...f,
+                                        type: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    {quizTypesQuery.data &&
+                                    quizTypesQuery.data.length > 0 ? (
+                                      quizTypesQuery.data.map((qt) => (
+                                        <option
+                                          key={String(qt.id)}
+                                          value={qt.name}
+                                        >
+                                          {qt.name}
+                                        </option>
+                                      ))
+                                    ) : (
+                                      <>
+                                        <option value="mcq">MCQ</option>
+                                        <option value="true_false">
+                                          True / False
+                                        </option>
+                                        <option value="short_answer">
+                                          Short Answer
+                                        </option>
+                                      </>
+                                    )}
+                                  </select>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    className={`${inputCls} w-20`}
+                                    value={questionForm.points}
+                                    onChange={(e) =>
+                                      setQuestionForm((f) => ({
+                                        ...f,
+                                        points: Number(e.target.value) || 1,
+                                      }))
+                                    }
+                                    placeholder="Pts"
+                                  />
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setShowAddQuestion(false)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      void handleAddQuestionToQuiz()
+                                    }
+                                    disabled={
+                                      !questionForm.text.trim() ||
+                                      addQuestionMutation.isPending
+                                    }
+                                    className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-1.5"
+                                  >
+                                    <Plus className="h-3 w-3" /> Add
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setShowAddQuestion(true)}
+                                className="text-xs font-semibold text-[#D52B1E] flex items-center gap-1 hover:gap-1.5 transition-all"
+                              >
+                                <Plus className="h-3 w-3" /> Add question
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {/* Add quiz form */}
                     {showAddQuiz ? (
                       <div className="rounded-xl border border-[#D52B1E]/20 bg-white p-3 space-y-2">
-                        <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-wider">New Quiz</p>
-                        <input className={inputCls} value={quizForm.title} onChange={(e) => setQuizForm((f) => ({ ...f, title: e.target.value }))} placeholder="Quiz title" autoFocus />
+                        <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-wider">
+                          New Quiz
+                        </p>
+                        <input
+                          className={inputCls}
+                          value={quizForm.title}
+                          onChange={(e) =>
+                            setQuizForm((f) => ({
+                              ...f,
+                              title: e.target.value,
+                            }))
+                          }
+                          placeholder="Quiz title"
+                          autoFocus
+                        />
                         <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-500 shrink-0">Pass %</label>
-                          <input type="number" min={0} max={100} className={`${inputCls} w-20`} value={quizForm.passPercentage} onChange={(e) => setQuizForm((f) => ({ ...f, passPercentage: Number(e.target.value) || 70 }))} />
+                          <label className="text-xs text-gray-500 shrink-0">
+                            Pass %
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            className={`${inputCls} w-20`}
+                            value={quizForm.passPercentage}
+                            onChange={(e) =>
+                              setQuizForm((f) => ({
+                                ...f,
+                                passPercentage: Number(e.target.value) || 70,
+                              }))
+                            }
+                          />
                         </div>
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="ghost" onClick={() => setShowAddQuiz(false)}>Cancel</Button>
-                          <Button size="sm" onClick={() => void handleAddQuiz()} disabled={!quizForm.title.trim() || addQuizMutation.isPending} className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setShowAddQuiz(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => void handleAddQuiz()}
+                            disabled={
+                              !quizForm.title.trim() ||
+                              addQuizMutation.isPending
+                            }
+                            className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-1.5"
+                          >
                             <Plus className="h-3 w-3" /> Create Quiz
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <button onClick={() => setShowAddQuiz(true)} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs font-semibold text-gray-400 hover:border-[#D52B1E]/40 hover:text-[#D52B1E] transition-all">
+                      <button
+                        onClick={() => setShowAddQuiz(true)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs font-semibold text-gray-400 hover:border-[#D52B1E]/40 hover:text-[#D52B1E] transition-all"
+                      >
                         <Plus className="h-3.5 w-3.5" /> Add Quiz
                       </button>
                     )}
                   </div>
                 </div>
-
               </div>
             )}
           </div>
@@ -2626,6 +3325,10 @@ function InstructorLearningWorkspace({
 export function Academy() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [courseSearch, setCourseSearch] = useState("");
+  const [coursesPage, setCoursesPage] = useState(1);
+  const [enrollmentsPage, setEnrollmentsPage] = useState(1);
+  const coursesPerPage = 24;
+  const enrollmentsPerPage = 9;
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get("tab");
     return tab === "courses" ? tab : "my-learning";
@@ -2659,7 +3362,14 @@ export function Academy() {
     data: myEnrollments = [],
     isLoading: enrollmentsLoading,
     refetch: refetchEnrollments,
-  } = useAcademyMyEnrollments();
+  } = useAcademyMyEnrollments({
+    page: enrollmentsPage,
+    perPage: enrollmentsPerPage,
+  });
+  const { data: myEnrollmentsMeta } = useAcademyMyEnrollmentsMeta({
+    page: enrollmentsPage,
+    perPage: enrollmentsPerPage,
+  });
   const { data: upcoming = [], refetch: refetchUpcoming } =
     useAcademyUpcomingActivities();
   const {
@@ -2667,12 +3377,18 @@ export function Academy() {
     isLoading: coursesLoading,
     refetch: refetchCourses,
   } = useAcademyCourses({
-    page: 1,
-    perPage: 24,
+    page: coursesPage,
+    perPage: coursesPerPage,
+    search: courseSearch || undefined,
+  });
+  const { data: coursesMeta } = useAcademyCoursesMeta({
+    page: coursesPage,
+    perPage: coursesPerPage,
     search: courseSearch || undefined,
   });
 
   const enrollMutation = useEnrollInAcademyCourse();
+  const unenrollMutation = useUnenrollFromAcademyCourse();
 
   const enrolledCourseIds = useMemo(() => {
     const ids = new Set<string | number>();
@@ -2737,6 +3453,11 @@ export function Academy() {
   ] as const;
 
   const hasCourses = (courseList?.length ?? 0) > 0;
+  const weeklyProgress = Number(dashboard?.weeklyProgress ?? 0) || 0;
+
+  useEffect(() => {
+    setCoursesPage(1);
+  }, [courseSearch]);
 
   if (me?.role === "instructor") {
     return (
@@ -2789,8 +3510,8 @@ export function Academy() {
                 </span>
                 <span className="h-1 w-1 bg-gray-700 rounded-full" />
                 <span className="flex items-center gap-1.5">
-                  <BarChart3 className="h-4 w-4 text-gray-600" /> {0}% Weekly
-                  Progress
+                  <BarChart3 className="h-4 w-4 text-gray-600" />{" "}
+                  {weeklyProgress}% Weekly Progress
                 </span>
               </div>
             </div>
@@ -2809,7 +3530,9 @@ export function Academy() {
                 <p className="text-xs text-gray-500">Completed</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl px-5 py-3 text-center">
-                <p className="text-2xl font-bold text-emerald-400">{0}%</p>
+                <p className="text-2xl font-bold text-emerald-400">
+                  {weeklyProgress}%
+                </p>
                 <p className="text-xs text-gray-500">This Week</p>
               </div>
             </div>
@@ -2834,7 +3557,7 @@ export function Academy() {
             <p className="text-sm text-gray-500 mt-0.5">
               {dashboardLoading
                 ? "Loading your progress..."
-                : `${0}% weekly progress | ${dashboard?.completedCourses ?? 0} courses completed`}
+                : `${weeklyProgress}% weekly progress | ${dashboard?.completedCourses ?? 0} courses completed`}
             </p>
           </div>
           <Button
@@ -2871,7 +3594,7 @@ export function Academy() {
           },
           {
             label: "Weekly Progress",
-            value: `0%`,
+            value: `${weeklyProgress}%`,
             icon: BarChart3,
             color: "#059669",
             bg: "#ECFDF5",
@@ -2942,57 +3665,95 @@ export function Academy() {
               </span>
             </div>
 
-            {(() => {
-              if (enrollmentsLoading) {
-                return (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <div
-                        key={`enrollment-skeleton-${i}`}
-                        className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse"
-                      >
-                        <div className="h-4 bg-gray-200 rounded mb-2" />
-                        <div className="h-3 bg-gray-200 rounded mb-4" />
-                        <div className="h-8 bg-gray-200 rounded" />
-                      </div>
-                    ))}
-                  </div>
-                );
-              } else if (myEnrollments.length === 0) {
-                return (
+            <AnimatePresence mode="wait" initial={false}>
+              {enrollmentsLoading ? (
+                <motion.div
+                  key="my-learning-loading"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={pageSwapTransition}
+                  className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                >
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={`enrollment-skeleton-${i}`}
+                      className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse"
+                    >
+                      <div className="h-4 bg-gray-200 rounded mb-2" />
+                      <div className="h-3 bg-gray-200 rounded mb-4" />
+                      <div className="h-8 bg-gray-200 rounded" />
+                    </div>
+                  ))}
+                </motion.div>
+              ) : myEnrollments.length === 0 ? (
+                <motion.div
+                  key="my-learning-empty"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={pageSwapTransition}
+                >
                   <EmptyState
                     title="No enrollments yet"
                     description="Browse our academy courses and start your learning journey"
                     icon={BookOpen}
                   />
-                );
-              } else {
-                return (
-                  <motion.div
-                    variants={containerVariants}
-                    className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-                  >
-                    {myEnrollments.map((enrollment) => (
-                      <EnrollmentCard
-                        key={enrollment.id}
-                        item={enrollment}
-                        courseTitle={
-                          enrollment.course?.title ??
-                          courseList?.find(
-                            (c) => c.id === enrollment.currentCourseId,
-                          )?.title
-                        }
-                        onContinue={() =>
-                          setSelectedCourseId(
-                            enrollment.currentCourseId ?? enrollment.courseId,
-                          )
-                        }
-                      />
-                    ))}
-                  </motion.div>
-                );
-              }
-            })()}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={`my-learning-page-${myEnrollmentsMeta?.page ?? enrollmentsPage}`}
+                  variants={containerVariants}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={pageSwapTransition}
+                  className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                >
+                  {myEnrollments.map((enrollment) => (
+                    <EnrollmentCard
+                      key={enrollment.id}
+                      item={enrollment}
+                      courseTitle={
+                        enrollment.course?.title ??
+                        courseList?.find(
+                          (c) => c.id === enrollment.currentCourseId,
+                        )?.title
+                      }
+                      onContinue={() =>
+                        setSelectedCourseId(
+                          enrollment.currentCourseId ?? enrollment.courseId,
+                        )
+                      }
+                    />
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence mode="wait" initial={false}>
+              {!enrollmentsLoading && myEnrollments.length > 0 && (
+                <motion.div
+                  key={`my-learning-pagination-${myEnrollmentsMeta?.page ?? enrollmentsPage}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={pageSwapTransition}
+                >
+                  <CreativePagination
+                    currentPage={myEnrollmentsMeta?.page ?? enrollmentsPage}
+                    pageCount={myEnrollmentsMeta?.pageCount ?? enrollmentsPage}
+                    hasPreviousPage={Boolean(
+                      myEnrollmentsMeta?.hasPreviousPage,
+                    )}
+                    hasNextPage={Boolean(myEnrollmentsMeta?.hasNextPage)}
+                    itemCount={myEnrollmentsMeta?.itemCount}
+                    entityLabel="enrollments"
+                    onPageChange={(page) => setEnrollmentsPage(page)}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Upcoming Activities */}
@@ -3055,54 +3816,90 @@ export function Academy() {
           </div>
 
           {/* Course Grid */}
-          {(() => {
-            if (coursesLoading) {
-              return (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={`course-skeleton-${i}`}
-                      className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse"
-                    >
-                      <div className="h-4 bg-gray-200 rounded mb-2" />
-                      <div className="h-3 bg-gray-200 rounded mb-4" />
-                      <div className="h-8 bg-gray-200 rounded" />
-                    </div>
-                  ))}
-                </div>
-              );
-            } else if (hasCourses === false) {
-              return (
+          <AnimatePresence mode="wait" initial={false}>
+            {coursesLoading ? (
+              <motion.div
+                key="courses-loading"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={pageSwapTransition}
+                className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+              >
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={`course-skeleton-${i}`}
+                    className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse"
+                  >
+                    <div className="h-4 bg-gray-200 rounded mb-2" />
+                    <div className="h-3 bg-gray-200 rounded mb-4" />
+                    <div className="h-8 bg-gray-200 rounded" />
+                  </div>
+                ))}
+              </motion.div>
+            ) : hasCourses === false ? (
+              <motion.div
+                key="courses-empty"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={pageSwapTransition}
+              >
                 <EmptyState
                   title="No courses available"
                   description="Check back later for new academy courses"
                   icon={BookOpen}
                 />
-              );
-            } else {
-              return (
-                <motion.div
-                  variants={containerVariants}
-                  className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-                >
-                  {(courseList ?? []).map((course) => (
-                    <CourseCard
-                      key={course.id}
-                      course={course}
-                      isEnrolled={enrolledCourseIds.has(course.id)}
-                      onEnroll={() => enrollMutation.mutate(course.id)}
-                      onUnenroll={() => {
-                        // TODO: Implement unenroll functionality
-                      }}
-                      onExplore={() => setSelectedCourseId(course.id)}
-                      onResume={() => setSelectedCourseId(course.id)}
-                      mutating={enrollMutation.isPending}
-                    />
-                  ))}
-                </motion.div>
-              );
-            }
-          })()}
+              </motion.div>
+            ) : (
+              <motion.div
+                key={`courses-page-${coursesMeta?.page ?? coursesPage}`}
+                variants={containerVariants}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={pageSwapTransition}
+                className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+              >
+                {(courseList ?? []).map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    isEnrolled={enrolledCourseIds.has(course.id)}
+                    onEnroll={() => enrollMutation.mutate(course.id)}
+                    onUnenroll={() => unenrollMutation.mutate(course.id)}
+                    onExplore={() => setSelectedCourseId(course.id)}
+                    onResume={() => setSelectedCourseId(course.id)}
+                    mutating={
+                      enrollMutation.isPending || unenrollMutation.isPending
+                    }
+                  />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence mode="wait" initial={false}>
+            {!coursesLoading && hasCourses && (
+              <motion.div
+                key={`courses-pagination-${coursesMeta?.page ?? coursesPage}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={pageSwapTransition}
+              >
+                <CreativePagination
+                  currentPage={coursesMeta?.page ?? coursesPage}
+                  pageCount={coursesMeta?.pageCount ?? coursesPage}
+                  hasPreviousPage={Boolean(coursesMeta?.hasPreviousPage)}
+                  hasNextPage={Boolean(coursesMeta?.hasNextPage)}
+                  itemCount={coursesMeta?.itemCount}
+                  entityLabel="courses"
+                  onPageChange={(page) => setCoursesPage(page)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
 

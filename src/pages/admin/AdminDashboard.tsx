@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import {
   Users,
   Newspaper,
@@ -28,6 +29,7 @@ import {
   useAdminResearchReports,
   useAdminDatasets,
 } from '@/hooks/useAdmin'
+import { useAdminAcademyDashboard } from '@/hooks/useAcademy'
 
 /* ── helpers ── */
 const container = {
@@ -122,11 +124,35 @@ const TOP_ARTICLES = [
 
 /* ── Main component ─────────────────────────────────────────────────────── */
 export default function AdminDashboard() {
+  const navigate = useNavigate()
   const { data: usersData, isLoading: usersLoading } = useAdminUsers({ perPage: 1 })
   const { data: newsData, isLoading: newsLoading } = useAdminNews({ perPage: 1 })
   const { data: showsData, isLoading: showsLoading } = useAdminShows({ perPage: 1 })
   const { data: researchData, isLoading: researchLoading } = useAdminResearchReports({ perPage: 1 })
   const { data: datasetsData, isLoading: datasetsLoading } = useAdminDatasets({ perPage: 1 })
+  const { data: academyDashboard, isLoading: academyLoading } = useAdminAcademyDashboard()
+
+  const academyCourses = academyDashboard?.courses ?? {
+    total: academyDashboard?.totalCourses ?? 0,
+    active: academyDashboard?.publishedCourses ?? 0,
+    suspended: academyDashboard?.suspendedCourses ?? 0,
+  }
+  const academyEnrollments = academyDashboard?.enrollments ?? {
+    total: academyDashboard?.totalEnrollments ?? 0,
+    active: 0,
+    completed: 0,
+  }
+  const academyInstructors = academyDashboard?.instructors?.total ?? academyDashboard?.totalInstructors ?? 0
+  const academyDraftCourses = Math.max(
+    0,
+    Number(academyDashboard?.draftCourses ?? academyCourses.total - academyCourses.active - academyCourses.suspended),
+  )
+  const enrollmentCompletionRate = academyEnrollments.total > 0
+    ? Math.round((academyEnrollments.completed / academyEnrollments.total) * 100)
+    : 0
+  const instructorLoad = academyInstructors > 0
+    ? (academyEnrollments.total / academyInstructors).toFixed(1)
+    : '0.0'
 
   const stats = [
     { label: 'Total Users', value: usersData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Registered accounts', icon: Users, trend: 12.4, color: '#3b82f6', isLoading: usersLoading },
@@ -134,7 +160,17 @@ export default function AdminDashboard() {
     { label: 'Podcast Shows', value: showsData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Video podcast shows', icon: Mic, trend: 5.3, color: '#8b5cf6', isLoading: showsLoading },
     { label: 'Research Reports', value: researchData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Total reports', icon: FileText, trend: 11.2, color: '#10b981', isLoading: researchLoading },
     { label: 'Datasets', value: datasetsData?.meta?.itemCount?.toLocaleString() ?? '—', sub: 'Available datasets', icon: Database, trend: 7.8, color: '#06b6d4', isLoading: datasetsLoading },
-    { label: 'Active Courses', value: '63', sub: '1,240 enrolled this month', icon: GraduationCap, trend: 19.7, color: '#10b981' },
+    {
+      label: 'Active Courses',
+      value: academyLoading ? '—' : (academyCourses.active ?? 0).toLocaleString(),
+      sub: academyLoading
+        ? 'Loading academy analytics'
+        : `${academyCourses.total?.toLocaleString() ?? 0} total academy courses`,
+      icon: GraduationCap,
+      trend: 19.7,
+      color: '#10b981',
+      isLoading: academyLoading,
+    },
     { label: 'Content Views', value: '2.1M', sub: 'Past 30 days', icon: Eye, trend: -3.2, color: '#06b6d4' },
     { label: 'Certificates Issued', value: '892', sub: 'This quarter', icon: Award, trend: 31.2, color: '#f97316' },
   ]
@@ -155,6 +191,80 @@ export default function AdminDashboard() {
           <StatCard key={s.label} {...s} />
         ))}
       </div>
+
+      {/* Academy analytics */}
+      <motion.div variants={item} className="rounded-2xl border border-gray-200 bg-gradient-to-br from-slate-900 via-slate-800 to-[#2b0f0f] p-5 text-white shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-lg">Academy Analytics</h3>
+            <p className="text-xs text-white/60 mt-0.5">
+              Live course lifecycle, enrollment health, and instructor capacity
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] bg-white/10 px-2.5 py-1 rounded-full border border-white/10">
+              Admin Academy Dashboard API
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/academy?tab=courses')}
+              className="text-[11px] font-semibold bg-[#D52B1E] hover:bg-[#b92418] text-white px-2.5 py-1 rounded-full border border-[#D52B1E]/50"
+            >
+              View Academy
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <p className="text-xs text-white/60 mb-2">Course Lifecycle</p>
+            <p className="text-2xl font-bold">{academyLoading ? '—' : academyCourses.total}</p>
+            <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden flex">
+              <div className="h-full bg-emerald-400" style={{ width: `${academyCourses.total > 0 ? (academyCourses.active / academyCourses.total) * 100 : 0}%` }} />
+              <div className="h-full bg-amber-400" style={{ width: `${academyCourses.total > 0 ? (academyDraftCourses / academyCourses.total) * 100 : 0}%` }} />
+              <div className="h-full bg-red-400" style={{ width: `${academyCourses.total > 0 ? (academyCourses.suspended / academyCourses.total) * 100 : 0}%` }} />
+            </div>
+            <p className="text-[11px] text-white/65 mt-2">
+              Live: {academyCourses.active} · Draft: {academyDraftCourses} · Suspended: {academyCourses.suspended}
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <p className="text-xs text-white/60 mb-2">Enrollment Health</p>
+            <p className="text-2xl font-bold">{academyLoading ? '—' : academyEnrollments.total}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-lg bg-white/5 p-2">
+                <p className="text-white/60">Active</p>
+                <p className="font-bold text-emerald-300">{academyEnrollments.active}</p>
+              </div>
+              <div className="rounded-lg bg-white/5 p-2">
+                <p className="text-white/60">Completed</p>
+                <p className="font-bold text-blue-300">{academyEnrollments.completed}</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-white/65 mt-2">
+              Completion rate: {enrollmentCompletionRate}%
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <p className="text-xs text-white/60 mb-2">Instructor Capacity</p>
+            <p className="text-2xl font-bold">{academyLoading ? '—' : academyInstructors}</p>
+            <p className="text-[11px] text-white/65 mt-3">
+              Avg enrollments per instructor
+            </p>
+            <p className="text-lg font-semibold text-[#FFD6D2]">{instructorLoad}</p>
+            <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+              <motion.div
+                className="h-full bg-[#D52B1E]"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, Number(instructorLoad) * 10)}%` }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+              />
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Charts + activity row */}
       <div className="grid md:grid-cols-3 gap-5">

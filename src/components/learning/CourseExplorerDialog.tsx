@@ -198,19 +198,24 @@ function CurriculumSidebar({
   expandedIds,
   onToggleSection,
   onSelectLesson,
+  onCompleteLesson,
   allLessons,
+  hasFullAccess,
   lockedLessonIds,
   completedLessonIds,
+  completingLessonId,
 }: Readonly<{
   sections: AcademySectionDto[];
   activeLesson: AcademyLessonDto | null;
   expandedIds: Set<string>;
   onToggleSection: (id: string) => void;
   onSelectLesson: (lesson: AcademyLessonDto) => void;
+  onCompleteLesson: (lessonId: string | number) => void;
   allLessons: AcademyLessonDto[];
   hasFullAccess: boolean;
   lockedLessonIds: Set<string>;
   completedLessonIds: Set<string>;
+  completingLessonId: string | null;
 }>) {
   const totalSections = sections.length;
   const totalLessons = allLessons.length;
@@ -288,73 +293,99 @@ function CurriculumSidebar({
                       const LIcon = meta.Icon;
                       const isActive =
                         String(lesson.id) === String(activeLesson?.id);
-                      const isLocked = lockedLessonIds.has(String(lesson.id));
-                      const isCompleted = completedLessonIds.has(String(lesson.id));
+                      const lessonId = String(lesson.id);
+                      const isLocked = lockedLessonIds.has(lessonId);
+                      const isCompleted = completedLessonIds.has(lessonId);
+                      const canMarkComplete =
+                        hasFullAccess && !isLocked && !isCompleted;
+                      const isMarkingComplete = completingLessonId === lessonId;
 
                       return (
-                        <button
-                          key={String(lesson.id)}
-                          type="button"
-                          onClick={() => !isLocked && onSelectLesson(lesson)}
-                          disabled={isLocked}
-                          className={`w-full flex items-start gap-3 pl-10 pr-4 py-2.5 text-left transition-colors ${
+                        <div
+                          key={lessonId}
+                          className={`w-full pl-10 pr-4 py-2.5 transition-colors ${
                             isLocked
-                              ? "opacity-60 cursor-not-allowed"
+                              ? "opacity-60"
                               : isActive
                                 ? "bg-[#D52B1E]/8 border-r-[3px] border-[#D52B1E]"
                                 : "hover:bg-gray-50"
                           }`}
                         >
-                          {isLocked ? (
-                            <div className="shrink-0 h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center mt-0.5">
-                              <Lock className="h-3 w-3 text-gray-400" />
-                            </div>
-                          ) : isCompleted ? (
-                            <div className="shrink-0 h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center mt-0.5">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-                            </div>
-                          ) : isActive ? (
-                            <div className="shrink-0 h-6 w-6 rounded-full bg-[#D52B1E] flex items-center justify-center mt-0.5">
-                              <Play className="h-3 w-3 text-white fill-white" />
-                            </div>
-                          ) : (
-                            <div
-                              className={`shrink-0 h-6 w-6 rounded-full ${meta.bg} flex items-center justify-center mt-0.5`}
+                          <div className="flex items-start gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                !isLocked && onSelectLesson(lesson)
+                              }
+                              disabled={isLocked}
+                              className={`flex-1 min-w-0 flex items-start gap-3 text-left ${isLocked ? "cursor-not-allowed" : ""}`}
                             >
-                              <LIcon className={`h-3 w-3 ${meta.color}`} />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-xs leading-snug line-clamp-2 ${isLocked ? "text-gray-400" : isActive ? "font-semibold text-[#D52B1E]" : "text-gray-700"}`}
-                            >
-                              {lesson.title}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] text-gray-400">
-                                {fmtDuration(lesson.durationSeconds)}
-                              </span>
-                              {isCompleted && (
-                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                                  Completed
-                                </span>
+                              {isLocked ? (
+                                <div className="shrink-0 h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center mt-0.5">
+                                  <Lock className="h-3 w-3 text-gray-400" />
+                                </div>
+                              ) : isCompleted ? (
+                                <div className="shrink-0 h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center mt-0.5">
+                                  <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                                </div>
+                              ) : isActive ? (
+                                <div className="shrink-0 h-6 w-6 rounded-full bg-[#D52B1E] flex items-center justify-center mt-0.5">
+                                  <Play className="h-3 w-3 text-white fill-white" />
+                                </div>
+                              ) : (
+                                <div
+                                  className={`shrink-0 h-6 w-6 rounded-full ${meta.bg} flex items-center justify-center mt-0.5`}
+                                >
+                                  <LIcon className={`h-3 w-3 ${meta.color}`} />
+                                </div>
                               )}
-                              {lesson.isFreePreview && (
-                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                                  Preview
-                                </span>
-                              )}
-                              {isLocked && (
-                                <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                                  Enroll to unlock
-                                </span>
-                              )}
-                            </div>
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className={`text-xs leading-snug line-clamp-2 ${isLocked ? "text-gray-400" : isActive ? "font-semibold text-[#D52B1E]" : "text-gray-700"}`}
+                                >
+                                  {lesson.title}
+                                </p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] text-gray-400">
+                                    {fmtDuration(lesson.durationSeconds)}
+                                  </span>
+                                  {isCompleted && (
+                                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                                      Completed
+                                    </span>
+                                  )}
+                                  {lesson.isFreePreview && (
+                                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                                      Preview
+                                    </span>
+                                  )}
+                                  {isLocked && (
+                                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                                      Enroll to unlock
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+
+                            {canMarkComplete && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => onCompleteLesson(lesson.id)}
+                                disabled={isMarkingComplete}
+                                className="h-7 px-2.5 text-[10px] bg-[#D52B1E] hover:bg-[#b92418] text-white"
+                              >
+                                {isMarkingComplete
+                                  ? "Saving..."
+                                  : "Mark complete"}
+                              </Button>
+                            )}
+                            {isLocked && (
+                              <Lock className="h-3 w-3 text-gray-300 shrink-0 mt-1.5" />
+                            )}
                           </div>
-                          {isLocked && (
-                            <Lock className="h-3 w-3 text-gray-300 shrink-0 mt-1.5" />
-                          )}
-                        </button>
+                        </div>
                       );
                     })}
                   </motion.div>
@@ -537,6 +568,12 @@ export function CourseExplorerDialog({
   const [activeAttemptId, setActiveAttemptId] = useState<
     string | number | undefined
   >(undefined);
+  const [completingLessonId, setCompletingLessonId] = useState<string | null>(
+    null,
+  );
+  const [localCompletedLessonIds, setLocalCompletedLessonIds] = useState<
+    Set<string>
+  >(new Set());
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<string, string>
   >({});
@@ -599,6 +636,8 @@ export function CourseExplorerDialog({
       setActiveLesson(null);
       setExpandedIds(new Set());
       setActiveAttemptId(undefined);
+      setCompletingLessonId(null);
+      setLocalCompletedLessonIds(new Set());
       setSelectedAnswers({});
     }
   }, [open, courseId]);
@@ -621,9 +660,28 @@ export function CourseExplorerDialog({
 
   // Track completed lesson IDs from the progress API
   const completedLessonIdSet = useMemo(() => {
-    const ids = courseWithProgress?.completedLessonIds ?? [];
-    return new Set(ids.map(String));
-  }, [courseWithProgress?.completedLessonIds]);
+    const ids = new Set<string>();
+
+    (courseWithProgress?.completedLessonIds ?? []).forEach((id) => {
+      ids.add(String(id));
+    });
+
+    (courseWithProgress?.sections ?? []).forEach((section) => {
+      (section.lessons ?? []).forEach((lesson) => {
+        if (lesson.isCompleted) ids.add(String(lesson.id));
+      });
+    });
+
+    localCompletedLessonIds.forEach((id) => {
+      ids.add(String(id));
+    });
+
+    return ids;
+  }, [
+    courseWithProgress?.completedLessonIds,
+    courseWithProgress?.sections,
+    localCompletedLessonIds,
+  ]);
 
   // If user is NOT enrolled, only the first lesson is accessible; all others are locked
   const lockedLessonIds = useMemo(() => {
@@ -699,9 +757,18 @@ export function CourseExplorerDialog({
     displayCourse?.educator?.profilePhotoUrl ||
     "";
 
-  const handleCompleteLesson = async () => {
-    if (!activeLesson) return;
-    await completeLessonMutation.mutateAsync(activeLesson.id);
+  const handleCompleteLesson = async (lessonId: string | number) => {
+    const normalizedLessonId = String(lessonId);
+    if (completedLessonIdSet.has(normalizedLessonId)) return;
+    setCompletingLessonId(normalizedLessonId);
+    try {
+      await completeLessonMutation.mutateAsync(lessonId);
+      setLocalCompletedLessonIds(
+        (prev) => new Set([...Array.from(prev), normalizedLessonId]),
+      );
+    } finally {
+      setCompletingLessonId(null);
+    }
   };
 
   const handleStartQuiz = async () => {
@@ -976,60 +1043,39 @@ export function CourseExplorerDialog({
                     </div>
                   )}
 
-                  <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-3">
-                    <h4 className="text-sm font-bold text-gray-800">
-                      Learning Actions
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {activeLesson && completedLessonIdSet.has(String(activeLesson.id)) ? (
-                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
-                          <CheckCircle className="h-4 w-4" /> Completed
-                        </span>
-                      ) : (
+                  {activeQuizId && (
+                    <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-3">
+                      <h4 className="text-sm font-bold text-gray-800">
+                        Quiz Actions
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
                           size="sm"
-                          onClick={handleCompleteLesson}
-                          disabled={completeLessonMutation.isPending}
-                          className="bg-[#D52B1E] hover:bg-[#b92418] text-white"
+                          variant="outline"
+                          onClick={handleStartQuiz}
+                          disabled={startQuizMutation.isPending}
                         >
-                          {completeLessonMutation.isPending
-                            ? "Completing..."
-                            : "Mark Lesson Complete"}
+                          {startQuizMutation.isPending
+                            ? "Starting..."
+                            : "Start Quiz"}
                         </Button>
-                      )}
-                      {activeQuizId && (
-                        <>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={handleStartQuiz}
-                            disabled={startQuizMutation.isPending}
-                          >
-                            {startQuizMutation.isPending
-                              ? "Starting..."
-                              : "Start Quiz"}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={handleSubmitAttempt}
-                            disabled={
-                              !activeAttemptId ||
-                              submitAttemptMutation.isPending ||
-                              !hasRequiredAnswers
-                            }
-                          >
-                            {submitAttemptMutation.isPending
-                              ? "Submitting..."
-                              : "Submit Attempt"}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                    {activeQuizId && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSubmitAttempt}
+                          disabled={
+                            !activeAttemptId ||
+                            submitAttemptMutation.isPending ||
+                            !hasRequiredAnswers
+                          }
+                        >
+                          {submitAttemptMutation.isPending
+                            ? "Submitting..."
+                            : "Submit Attempt"}
+                        </Button>
+                      </div>
                       <div className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2">
                         <p className="text-xs font-semibold text-violet-700">
                           Quiz Details
@@ -1039,8 +1085,6 @@ export function CourseExplorerDialog({
                           {activeQuiz?.questions?.length ?? 0} questions
                         </p>
                       </div>
-                    )}
-                    {activeQuizId && (
                       <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-2">
                         <p className="text-xs font-semibold text-gray-700">
                           Assessment Checklist
@@ -1058,101 +1102,101 @@ export function CourseExplorerDialog({
                           3. Submit attempt
                         </p>
                       </div>
-                    )}
-                    {activeQuizId && quizQuestions.length > 0 && (
-                      <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4">
-                        <h5 className="text-sm font-bold text-gray-800">
-                          Answer Quiz Questions
-                        </h5>
-                        {!activeAttemptId && (
-                          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                            Start the quiz attempt first, then select your
-                            answers.
-                          </p>
-                        )}
-                        {quizQuestions.map((question, index) => {
-                          const selectedValue =
-                            selectedAnswers[question.id] ?? "";
-                          const canAnswer = Boolean(activeAttemptId);
-                          return (
-                            <div
-                              key={question.id}
-                              className="rounded-xl border border-gray-100 p-3 space-y-2"
-                            >
-                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                Question {index + 1}
-                              </p>
-                              <p className="text-sm font-medium text-gray-900">
-                                {question.text}
-                              </p>
+                      {quizQuestions.length > 0 && (
+                        <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4">
+                          <h5 className="text-sm font-bold text-gray-800">
+                            Answer Quiz Questions
+                          </h5>
+                          {!activeAttemptId && (
+                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                              Start the quiz attempt first, then select your
+                              answers.
+                            </p>
+                          )}
+                          {quizQuestions.map((question, index) => {
+                            const selectedValue =
+                              selectedAnswers[question.id] ?? "";
+                            const canAnswer = Boolean(activeAttemptId);
+                            return (
+                              <div
+                                key={question.id}
+                                className="rounded-xl border border-gray-100 p-3 space-y-2"
+                              >
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                  Question {index + 1}
+                                </p>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {question.text}
+                                </p>
 
-                              {question.type === "short_answer" ? (
-                                <textarea
-                                  value={selectedValue}
-                                  onChange={(e) =>
-                                    setSelectedAnswers((prev) => ({
-                                      ...prev,
-                                      [question.id]: e.target.value,
-                                    }))
-                                  }
-                                  disabled={!canAnswer}
-                                  rows={3}
-                                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500"
-                                  placeholder="Type your answer"
-                                />
-                              ) : question.type === "true_false" ? (
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                  {["true", "false"].map((value) => (
-                                    <button
-                                      key={value}
-                                      type="button"
-                                      disabled={!canAnswer}
-                                      onClick={() =>
-                                        setSelectedAnswers((prev) => ({
-                                          ...prev,
-                                          [question.id]: value,
-                                        }))
-                                      }
-                                      className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                                        selectedValue === value
-                                          ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
-                                          : "border-gray-200 hover:border-gray-300"
-                                      }`}
-                                    >
-                                      {value === "true" ? "True" : "False"}
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  {question.options.map((option) => (
-                                    <button
-                                      key={option.id}
-                                      type="button"
-                                      disabled={!canAnswer}
-                                      onClick={() =>
-                                        setSelectedAnswers((prev) => ({
-                                          ...prev,
-                                          [question.id]: option.id,
-                                        }))
-                                      }
-                                      className={`w-full rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                                        selectedValue === option.id
-                                          ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
-                                          : "border-gray-200 hover:border-gray-300"
-                                      }`}
-                                    >
-                                      {option.text}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                                {question.type === "short_answer" ? (
+                                  <textarea
+                                    value={selectedValue}
+                                    onChange={(e) =>
+                                      setSelectedAnswers((prev) => ({
+                                        ...prev,
+                                        [question.id]: e.target.value,
+                                      }))
+                                    }
+                                    disabled={!canAnswer}
+                                    rows={3}
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                                    placeholder="Type your answer"
+                                  />
+                                ) : question.type === "true_false" ? (
+                                  <div className="grid gap-2 sm:grid-cols-2">
+                                    {["true", "false"].map((value) => (
+                                      <button
+                                        key={value}
+                                        type="button"
+                                        disabled={!canAnswer}
+                                        onClick={() =>
+                                          setSelectedAnswers((prev) => ({
+                                            ...prev,
+                                            [question.id]: value,
+                                          }))
+                                        }
+                                        className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
+                                          selectedValue === value
+                                            ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
+                                            : "border-gray-200 hover:border-gray-300"
+                                        }`}
+                                      >
+                                        {value === "true" ? "True" : "False"}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {question.options.map((option) => (
+                                      <button
+                                        key={option.id}
+                                        type="button"
+                                        disabled={!canAnswer}
+                                        onClick={() =>
+                                          setSelectedAnswers((prev) => ({
+                                            ...prev,
+                                            [question.id]: option.id,
+                                          }))
+                                        }
+                                        className={`w-full rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
+                                          selectedValue === option.id
+                                            ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
+                                            : "border-gray-200 hover:border-gray-300"
+                                        }`}
+                                      >
+                                        {option.text}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -1265,10 +1309,12 @@ export function CourseExplorerDialog({
               expandedIds={expandedIds}
               onToggleSection={handleToggleSection}
               onSelectLesson={handleSelectLesson}
+              onCompleteLesson={handleCompleteLesson}
               allLessons={allLessons}
               hasFullAccess={hasFullAccess}
               lockedLessonIds={lockedLessonIds}
               completedLessonIds={completedLessonIdSet}
+              completingLessonId={completingLessonId}
             />
           </div>
         </div>

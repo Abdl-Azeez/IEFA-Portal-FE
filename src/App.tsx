@@ -28,7 +28,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 
 /* ── Page imports ──────────────────────────────────────────────────────── */
 import { Academy } from "@/pages/Academy";
-import { LearningZone } from "@/pages/LearningZone";
 
 /* ── Admin imports ─────────────────────────────────────────────────────── */
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -61,14 +60,6 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="news" element={<News />} />
             <Route path="market-insights" element={<MarketInsights />} />
-            <Route
-              path="learning-zone"
-              element={
-                <ProtectedRoute>
-                  <LearningZone />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="academy"
               element={

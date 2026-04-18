@@ -10,6 +10,7 @@ export interface PageMetaDto {
 export interface EducatorSummaryDto {
   id: string | number;
   name: string;
+  email?: string;
   profilePhotoUrl: string;
   rating: number;
   title?: string;
@@ -303,6 +304,9 @@ export interface AcademyCourseFilters {
   perPage?: number;
   search?: string;
   categoryId?: string;
+  instructorId?: string;
+  status?: "draft" | "review" | "published" | "archived" | "suspended";
+  order?: "ASC" | "DESC";
 }
 
 export interface AcademyCategoryTypeDto {
@@ -368,6 +372,7 @@ export interface AcademyEnrollmentDto {
   expiresAt?: string | null;
   lastActivityAt?: string;
   completedLessonIds?: Array<string | number>;
+  completedLessonsCount?: number;
   progressPercent: number;
   completedAt?: string | null;
   paymentId?: string | null;
@@ -379,8 +384,9 @@ export interface AcademyDashboardEnrollmentDto {
   courseId: string;
   title: string;
   thumbnailUrl: string | null;
-  instructorName: string;
+  instructorName?: string;
   progress: number;
+  completedLessonsCount?: number;
   status: string;
   enrolledAt: string;
   completedAt: string | null;
@@ -390,6 +396,7 @@ export interface AcademyDashboardEnrollmentDto {
 export interface AcademyDashboardDto {
   totalCourses: number;
   completedCourses: number;
+  weeklyProgress: number;
   enrollments: AcademyDashboardEnrollmentDto[];
 }
 
@@ -440,6 +447,7 @@ export interface AcademyLessonDto {
   meetingLink?: string | null;
   scheduledAt?: string | null;
   quizzes?: unknown[];
+  isCompleted?: boolean;
   sectionId?: string | number;
   courseId?: string | number;
   // Legacy compat fields
@@ -542,6 +550,7 @@ export interface AdminCourseEnrollmentDto {
   userEmail?: string;
   courseId: string;
   status: string;
+  completedLessonsCount?: number;
   enrolledAt: string;
   completedAt: string | null;
   progressPercent?: number;
@@ -553,6 +562,36 @@ export interface AdminCourseEnrollmentDto {
     firstName?: string;
     lastName?: string;
   };
+}
+
+export interface AdminAcademyDashboardDto {
+  courses?: {
+    total: number;
+    active: number;
+    suspended: number;
+  };
+  enrollments?: {
+    total: number;
+    active: number;
+    completed: number;
+  };
+  instructors?: {
+    total: number;
+  };
+  totalCourses: number;
+  totalInstructors: number;
+  totalEnrollments: number;
+  publishedCourses: number;
+  draftCourses?: number;
+  suspendedCourses?: number;
+}
+
+export interface AdminAcademyInstructorDto {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  email?: string;
 }
 
 export interface AcademyQuizAttemptDto {
@@ -574,6 +613,11 @@ export interface AcademyInstructorCourseUpdateDto {
   thumbnailUrl?: string;
   price?: number;
   isFree?: boolean;
+}
+
+export interface AdminAcademyCourseUpdateDto
+  extends AcademyInstructorCourseUpdateDto {
+  instructorId?: string;
 }
 
 export interface AcademyQuizDetailsDto {

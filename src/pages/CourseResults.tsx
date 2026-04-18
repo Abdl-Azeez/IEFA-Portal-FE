@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import {
   useAcademyCourses,
+  useAcademyCoursesMeta,
   useAcademyMyEnrollments,
   useEnrollInAcademyCourse,
 } from "@/hooks/useAcademy";
@@ -24,12 +25,20 @@ export default function CourseResults() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const { data: myEnrollments = [] } = useAcademyMyEnrollments();
+  const { data: myEnrollments = [] } = useAcademyMyEnrollments({
+    page: 1,
+    perPage: 100,
+  });
   const {
     data: courses = [],
     isLoading,
     isError,
   } = useAcademyCourses({ page, perPage: 12, search: search || undefined });
+  const { data: coursesMeta } = useAcademyCoursesMeta({
+    page,
+    perPage: 12,
+    search: search || undefined,
+  });
 
   const enrollMutation = useEnrollInAcademyCourse();
 
@@ -46,8 +55,9 @@ export default function CourseResults() {
     () => courses.find((course) => course.id === selectedCourseId),
     [courses, selectedCourseId],
   );
-  const hasNext = courses.length >= 12;
-  const hasPrev = page > 1;
+  const hasNext = coursesMeta?.hasNextPage ?? courses.length >= 12;
+  const hasPrev = coursesMeta?.hasPreviousPage ?? page > 1;
+  const pageCount = coursesMeta?.pageCount ?? page;
 
   let coursesContent: ReactNode;
   if (isLoading) {
@@ -169,7 +179,9 @@ export default function CourseResults() {
           >
             Previous
           </Button>
-          <p className="text-sm text-[#737692]">Page {page}</p>
+          <p className="text-sm text-[#737692]">
+            Page {page} of {pageCount}
+          </p>
           <Button
             onClick={() => setPage((prev) => prev + 1)}
             disabled={!hasNext}

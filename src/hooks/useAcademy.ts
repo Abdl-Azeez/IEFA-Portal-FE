@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import * as academyApi from "@/lib/academyApi";
+import type { PaginatedResult } from "@/lib/academyApi";
 
 const learningToast = (title: string, description: string) =>
   toast({ title, description });
@@ -31,12 +32,33 @@ import type {
   AcademySectionDetailsDto,
   AcademyLessonDetailsDto,
   AdminCourseEnrollmentDto,
+  AdminAcademyDashboardDto,
+  AdminAcademyInstructorDto,
+  AdminAcademyCourseUpdateDto,
+  PageMetaDto,
 } from "@/types/learning";
 
 export const useAcademyCourses = (filters: AcademyCourseFilters = {}) =>
-  useQuery<AcademyCourseDetailsDto[]>({
+  useQuery<
+    PaginatedResult<AcademyCourseDetailsDto[]>,
+    Error,
+    AcademyCourseDetailsDto[]
+  >({
     queryKey: ["academy", "courses", filters],
     queryFn: () => academyApi.getAcademyCourses(filters),
+    select: (result) => result.data,
+    staleTime: 60_000,
+  });
+
+export const useAcademyCoursesMeta = (filters: AcademyCourseFilters = {}) =>
+  useQuery<
+    PaginatedResult<AcademyCourseDetailsDto[]>,
+    Error,
+    PageMetaDto | undefined
+  >({
+    queryKey: ["academy", "courses", filters],
+    queryFn: () => academyApi.getAcademyCourses(filters),
+    select: (result) => result.meta,
     staleTime: 60_000,
   });
 
@@ -81,6 +103,11 @@ export const useEnrollInAcademyCourse = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["academy", "enrollments"] }),
         queryClient.invalidateQueries({ queryKey: ["academy", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["academy", "courses"] }),
+        queryClient.refetchQueries({
+          queryKey: ["academy", "courses"],
+          type: "active",
+        }),
         queryClient.invalidateQueries({
           queryKey: ["academy", "course", courseId],
         }),
@@ -93,10 +120,58 @@ export const useEnrollInAcademyCourse = () => {
   });
 };
 
-export const useAcademyMyEnrollments = () =>
-  useQuery<AcademyEnrollmentDto[]>({
-    queryKey: ["academy", "enrollments"],
-    queryFn: academyApi.getAcademyMyEnrollments,
+export const useUnenrollFromAcademyCourse = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (courseId: string | number) =>
+      academyApi.unenrollFromAcademyCourse(courseId),
+    onSuccess: async (_data, courseId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["academy", "enrollments"] }),
+        queryClient.invalidateQueries({ queryKey: ["academy", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["academy", "courses"] }),
+        queryClient.refetchQueries({
+          queryKey: ["academy", "courses"],
+          type: "active",
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["academy", "course", courseId],
+        }),
+      ]);
+      toast({
+        title: "Unenrolled",
+        description: "You have been unenrolled successfully.",
+      });
+    },
+  });
+};
+
+export const useAcademyMyEnrollments = (
+  filters: Pick<AcademyCourseFilters, "page" | "perPage"> = {},
+) =>
+  useQuery<
+    PaginatedResult<AcademyEnrollmentDto[]>,
+    Error,
+    AcademyEnrollmentDto[]
+  >({
+    queryKey: ["academy", "enrollments", filters],
+    queryFn: () => academyApi.getAcademyMyEnrollments(filters),
+    select: (result) => result.data,
+    staleTime: 30_000,
+  });
+
+export const useAcademyMyEnrollmentsMeta = (
+  filters: Pick<AcademyCourseFilters, "page" | "perPage"> = {},
+) =>
+  useQuery<
+    PaginatedResult<AcademyEnrollmentDto[]>,
+    Error,
+    PageMetaDto | undefined
+  >({
+    queryKey: ["academy", "enrollments", filters],
+    queryFn: () => academyApi.getAcademyMyEnrollments(filters),
+    select: (result) => result.meta,
     staleTime: 30_000,
   });
 
@@ -186,10 +261,31 @@ export const useAcademySection = (sectionId?: string | number) =>
     staleTime: 60_000,
   });
 
-export const useInstructorAcademyCourses = () =>
-  useQuery<AcademyInstructorCourseDto[]>({
-    queryKey: ["instructor", "academy", "courses"],
-    queryFn: academyApi.instructorGetCourses,
+export const useInstructorAcademyCourses = (
+  filters: Pick<AcademyCourseFilters, "page" | "perPage" | "search"> = {},
+) =>
+  useQuery<
+    PaginatedResult<AcademyInstructorCourseDto[]>,
+    Error,
+    AcademyInstructorCourseDto[]
+  >({
+    queryKey: ["instructor", "academy", "courses", filters],
+    queryFn: () => academyApi.instructorGetCourses(filters),
+    select: (result) => result.data,
+    staleTime: 60_000,
+  });
+
+export const useInstructorAcademyCoursesMeta = (
+  filters: Pick<AcademyCourseFilters, "page" | "perPage" | "search"> = {},
+) =>
+  useQuery<
+    PaginatedResult<AcademyInstructorCourseDto[]>,
+    Error,
+    PageMetaDto | undefined
+  >({
+    queryKey: ["instructor", "academy", "courses", filters],
+    queryFn: () => academyApi.instructorGetCourses(filters),
+    select: (result) => result.meta,
     staleTime: 60_000,
   });
 
@@ -454,6 +550,23 @@ export const useInstructorSuspendCourse = () => {
   });
 };
 
+export const useInstructorPublishCourse = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string | number) =>
+      academyApi.instructorPublishCourse(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy", "courses"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy", "course"],
+      });
+      learningToast("Course published", "Course is now visible to students.");
+    },
+  });
+};
+
 export const useInstructorDeleteCourse = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -497,10 +610,58 @@ export const useInstructorLessonDetails = (lessonId?: string | number) =>
 
 // ── Admin Academy Hooks ────────────────────────────────────────────────────
 
-export const useAdminAcademyCourses = () =>
-  useQuery<AcademyInstructorCourseDto[]>({
-    queryKey: ["admin", "academy", "courses"],
-    queryFn: academyApi.adminGetAllCourses,
+export const useAdminAcademyCourses = (
+  filters: Pick<
+    AcademyCourseFilters,
+    "page" | "perPage" | "search" | "categoryId" | "instructorId" | "status" | "order"
+  > = {},
+) =>
+  useQuery<
+    PaginatedResult<AcademyInstructorCourseDto[]>,
+    Error,
+    AcademyInstructorCourseDto[]
+  >({
+    queryKey: ["admin", "academy", "courses", filters],
+    queryFn: () => academyApi.adminGetAllCourses(filters),
+    select: (result) => result.data,
+    staleTime: 60_000,
+  });
+
+export const useAdminAcademyCoursesMeta = (
+  filters: Pick<
+    AcademyCourseFilters,
+    "page" | "perPage" | "search" | "categoryId" | "instructorId" | "status" | "order"
+  > = {},
+) =>
+  useQuery<
+    PaginatedResult<AcademyInstructorCourseDto[]>,
+    Error,
+    PageMetaDto | undefined
+  >({
+    queryKey: ["admin", "academy", "courses", filters],
+    queryFn: () => academyApi.adminGetAllCourses(filters),
+    select: (result) => result.meta,
+    staleTime: 60_000,
+  });
+
+export const useAdminAcademyDashboard = () =>
+  useQuery<AdminAcademyDashboardDto>({
+    queryKey: ["admin", "academy", "dashboard"],
+    queryFn: academyApi.adminGetDashboard,
+    staleTime: 30_000,
+  });
+
+export const useAdminAcademyInstructors = (
+  filters: Pick<AcademyCourseFilters, "page" | "perPage" | "search"> = {},
+) =>
+  useQuery<
+    PaginatedResult<AdminAcademyInstructorDto[]>,
+    Error,
+    AdminAcademyInstructorDto[]
+  >({
+    queryKey: ["admin", "academy", "instructors", filters],
+    queryFn: () => academyApi.adminGetAllInstructors(filters),
+    select: (result) => result.data,
     staleTime: 60_000,
   });
 
@@ -522,12 +683,60 @@ export const useAdminCreateCourse = () => {
   });
 };
 
-export const useAdminCourseEnrollments = (courseId?: string | number) =>
-  useQuery<AdminCourseEnrollmentDto[]>({
-    queryKey: ["admin", "academy", "enrollments", courseId],
+export const useAdminUpdateCourse = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      courseId,
+      payload,
+    }: {
+      courseId: string | number;
+      payload: AdminAcademyCourseUpdateDto;
+    }) => academyApi.adminUpdateCourse(courseId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "academy"] });
+      learningToast("Course updated", "The course has been updated successfully.");
+    },
+  });
+};
+
+export const useAdminCourseEnrollments = (
+  courseId?: string | number,
+  filters: Pick<AcademyCourseFilters, "page" | "perPage"> = {},
+) =>
+  useQuery<
+    PaginatedResult<AdminCourseEnrollmentDto[]>,
+    Error,
+    AdminCourseEnrollmentDto[]
+  >({
+    queryKey: ["admin", "academy", "enrollments", courseId, filters],
     queryFn: () =>
-      academyApi.adminGetCourseEnrollments(courseId as string | number),
+      academyApi.adminGetCourseEnrollments(
+        courseId as string | number,
+        filters,
+      ),
     enabled: courseId !== undefined && courseId !== null && courseId !== "",
+    select: (result) => result.data,
+    staleTime: 30_000,
+  });
+
+export const useAdminCourseEnrollmentsMeta = (
+  courseId?: string | number,
+  filters: Pick<AcademyCourseFilters, "page" | "perPage"> = {},
+) =>
+  useQuery<
+    PaginatedResult<AdminCourseEnrollmentDto[]>,
+    Error,
+    PageMetaDto | undefined
+  >({
+    queryKey: ["admin", "academy", "enrollments", courseId, filters],
+    queryFn: () =>
+      academyApi.adminGetCourseEnrollments(
+        courseId as string | number,
+        filters,
+      ),
+    enabled: courseId !== undefined && courseId !== null && courseId !== "",
+    select: (result) => result.meta,
     staleTime: 30_000,
   });
 
@@ -560,6 +769,18 @@ export const useAdminSuspendCourse = () => {
   });
 };
 
+export const useAdminPublishCourse = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (courseId: string | number) =>
+      academyApi.adminPublishCourse(courseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "academy"] });
+      learningToast("Course published", "The course is now published.");
+    },
+  });
+};
+
 export const useAdminUnsuspendCourse = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -570,6 +791,18 @@ export const useAdminUnsuspendCourse = () => {
         queryKey: ["admin", "academy", "courses"],
       });
       learningToast("Course unsuspended", "The course has been reactivated.");
+    },
+  });
+};
+
+export const useAdminDeleteCourse = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (courseId: string | number) =>
+      academyApi.adminDeleteCourse(courseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "academy"] });
+      learningToast("Course deleted", "The course has been permanently deleted.");
     },
   });
 };

@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   BookOpen,
+  CheckCircle2,
+  ChevronDown,
   Edit,
   Eye,
   FileText,
@@ -10,6 +12,7 @@ import {
   PlayCircle,
   Plus,
   Search,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -25,24 +28,30 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
+import { Dialog } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import {
   useAcademyCategoryTypes,
   useAcademyQuizTypes,
+  useAdminAcademyDashboard,
+  useAdminAcademyInstructors,
   useAdminAcademyCourses,
+  useAdminAcademyCoursesMeta,
   useAdminCourseEnrollments,
+  useAdminCourseEnrollmentsMeta,
   useAdminCreateCourse,
+  useAdminDeleteCourse,
+  useAdminPublishCourse,
   useAdminSuspendCourse,
   useAdminUnsuspendCourse,
-  useInstructorUpdateCourse,
+  useAdminUpdateCourse,
   useInstructorAddQuiz,
   useInstructorAddQuestion,
   useInstructorAddOption,
   useInstructorQuizDetails,
   useInstructorCourseDetails,
 } from "@/hooks/useAcademy";
-import { useAdminUsers } from "@/hooks/useAdmin";
 import type {
   AcademyInstructorCourseDto,
   AcademyInstructorCreateCourseDto,
@@ -56,6 +65,25 @@ const container = {
 const item = { hidden: { y: 12, opacity: 0 }, show: { y: 0, opacity: 1 } };
 
 type Tab = "courses" | "enrollments" | "content";
+
+type CourseColumnKey =
+  | "level"
+  | "instructor"
+  | "category"
+  | "enrolled"
+  | "price"
+  | "lessons"
+  | "status";
+
+const COURSE_COLUMN_OPTIONS: Array<{ key: CourseColumnKey; label: string }> = [
+  { key: "level", label: "Level" },
+  { key: "instructor", label: "Instructor" },
+  { key: "category", label: "Category" },
+  { key: "enrolled", label: "Enrolled" },
+  { key: "price", label: "Price" },
+  { key: "lessons", label: "Lessons" },
+  { key: "status", label: "Status" },
+];
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "courses", label: "All Courses", icon: BookOpen },
@@ -99,6 +127,27 @@ export default function AdminAcademy() {
   const [enrollmentCourseId, setEnrollmentCourseId] = useState("");
   const [addQCourseId, setAddQCourseId] = useState("");
   const [assignInstructorId, setAssignInstructorId] = useState("");
+  const [viewingCourse, setViewingCourse] = useState<
+    AcademyInstructorCourseDto | null
+  >(null);
+  const [courseStatusFilter, setCourseStatusFilter] = useState("");
+  const [courseCategoryFilter, setCourseCategoryFilter] = useState("");
+  const [courseInstructorFilter, setCourseInstructorFilter] = useState("");
+  const [courseOrder, setCourseOrder] = useState<"ASC" | "DESC">("ASC");
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Record<CourseColumnKey, boolean>>({
+    level: true,
+    instructor: false,
+    category: false,
+    enrolled: true,
+    price: true,
+    lessons: false,
+    status: true,
+  });
+  const [coursesPage, setCoursesPage] = useState(1);
+  const [enrollmentsPage, setEnrollmentsPage] = useState(1);
+  const [coursesPerPage, setCoursesPerPage] = useState(10);
+  const enrollmentsPerPage = 20;
 
   // Parse tab from URL
   useEffect(() => {
@@ -117,15 +166,57 @@ export default function AdminAcademy() {
 
   // Academy data hooks
   const { data: allCourses = [], isLoading: coursesLoading } =
-    useAdminAcademyCourses();
+    useAdminAcademyCourses({
+      page: coursesPage,
+      perPage: coursesPerPage,
+      search: searchQuery.trim() || undefined,
+      categoryId: courseCategoryFilter || undefined,
+      instructorId: courseInstructorFilter || undefined,
+      status:
+        (courseStatusFilter as
+          | "draft"
+          | "review"
+          | "published"
+          | "archived"
+          | "suspended") || undefined,
+      order: courseOrder,
+    });
+  const { data: allCoursesMeta } = useAdminAcademyCoursesMeta({
+    page: coursesPage,
+    perPage: coursesPerPage,
+    search: searchQuery.trim() || undefined,
+    categoryId: courseCategoryFilter || undefined,
+    instructorId: courseInstructorFilter || undefined,
+    status:
+      (courseStatusFilter as
+        | "draft"
+        | "review"
+        | "published"
+        | "archived"
+        | "suspended") || undefined,
+    order: courseOrder,
+  });
+  const { data: adminDashboard } = useAdminAcademyDashboard();
   const categoryTypesQuery = useAcademyCategoryTypes();
-  const instructorsQuery = useAdminUsers({ role: "instructor", perPage: 100 });
+  const instructorsQuery = useAdminAcademyInstructors({ page: 1, perPage: 100 });
   const { data: courseEnrollments = [], isLoading: enrollmentsLoading } =
-    useAdminCourseEnrollments(enrollmentCourseId || undefined);
+    useAdminCourseEnrollments(enrollmentCourseId || undefined, {
+      page: enrollmentsPage,
+      perPage: enrollmentsPerPage,
+    });
+  const { data: courseEnrollmentsMeta } = useAdminCourseEnrollmentsMeta(
+    enrollmentCourseId || undefined,
+    {
+      page: enrollmentsPage,
+      perPage: enrollmentsPerPage,
+    },
+  );
   const adminCreateCourseMutation = useAdminCreateCourse();
-  const updateCourseMutation = useInstructorUpdateCourse();
+  const updateCourseMutation = useAdminUpdateCourse();
+  const publishCourseMutation = useAdminPublishCourse();
   const suspendCourseMutation = useAdminSuspendCourse();
   const unsuspendCourseMutation = useAdminUnsuspendCourse();
+  const deleteCourseMutation = useAdminDeleteCourse();
   const addQuizMutation = useInstructorAddQuiz();
   const addQuestionMutation = useInstructorAddQuestion();
   const addOptionMutation = useInstructorAddOption();
@@ -148,17 +239,15 @@ export default function AdminAcademy() {
     [courseForQuizzes.data],
   );
 
-  // Filtered courses based on search
-  const filteredCourses = useMemo(() => {
-    if (!searchQuery.trim()) return allCourses;
-    const query = searchQuery.toLowerCase();
-    return allCourses.filter(
-      (course) =>
-        course.title.toLowerCase().includes(query) ||
-        course.description?.toLowerCase().includes(query) ||
-        course.level?.toLowerCase().includes(query),
-    );
-  }, [allCourses, searchQuery]);
+  const filteredCourses = allCourses;
+
+  useEffect(() => {
+    setCoursesPage(1);
+  }, [searchQuery, courseCategoryFilter, courseInstructorFilter, courseStatusFilter, courseOrder]);
+
+  useEffect(() => {
+    setEnrollmentsPage(1);
+  }, [enrollmentCourseId]);
 
   // Handle course creation
   const handleCreateCourse = async () => {
@@ -202,8 +291,11 @@ export default function AdminAcademy() {
 
     try {
       await updateCourseMutation.mutateAsync({
-        id: editingCourse.id,
-        payload: courseForm as AcademyInstructorCourseUpdateDto,
+        courseId: editingCourse.id,
+        payload: {
+          ...(courseForm as AcademyInstructorCourseUpdateDto),
+          ...(assignInstructorId ? { instructorId: assignInstructorId } : {}),
+        },
       });
 
       setEditingCourse(null);
@@ -243,9 +335,44 @@ export default function AdminAcademy() {
     }
   };
 
+  const handlePublishCourse = async (courseId: string | number) => {
+    try {
+      await publishCourseMutation.mutateAsync(courseId);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to publish course",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string | number) => {
+    const confirmed = window.confirm(
+      "This will permanently delete the course. Continue?",
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteCourseMutation.mutateAsync(courseId);
+      if (editingCourse && String(editingCourse.id) === String(courseId)) {
+        setEditingCourse(null);
+        setCourseForm(emptyAcademyCourse);
+        setAssignInstructorId("");
+      }
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to delete course",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Open edit modal
   const handleEditCourse = (course: AcademyInstructorCourseDto) => {
     setEditingCourse(course);
+    setAssignInstructorId(course.educatorId ? String(course.educatorId) : "");
     setCourseForm({
       title: course.title,
       slug: course.slug || "",
@@ -264,14 +391,21 @@ export default function AdminAcademy() {
 
   // Stats calculations
   const stats = useMemo(() => {
-    const totalCourses = allCourses.length;
-    const publishedCourses = allCourses.filter(
-      (c) => c.status === "published",
-    ).length;
-    const suspendedCourses = allCourses.filter(
-      (c) => c.status === "suspended",
-    ).length;
-    const totalEnrollments = allCourses.reduce(
+    const totalCourses =
+      Number(adminDashboard?.totalCourses ?? allCourses.length) || 0;
+    const publishedCourses =
+      Number(
+        adminDashboard?.publishedCourses ??
+          allCourses.filter((c) => c.status === "published").length,
+      ) || 0;
+    const suspendedCourses =
+      Number(
+        adminDashboard?.suspendedCourses ??
+          allCourses.filter((c) => c.status === "suspended").length,
+      ) || 0;
+    const totalEnrollments =
+      Number(adminDashboard?.totalEnrollments ?? 0) ||
+      allCourses.reduce(
       (sum, c) => sum + ((c as AcademyInstructorCourseDto).enrolledCount || 0),
       0,
     );
@@ -282,7 +416,7 @@ export default function AdminAcademy() {
       suspendedCourses,
       totalEnrollments,
     };
-  }, [allCourses]);
+  }, [allCourses, adminDashboard]);
 
   return (
     <motion.div
@@ -399,6 +533,138 @@ export default function AdminAcademy() {
               </div>
             </div>
 
+            {/* Backend filters */}
+            <div className="grid gap-3 md:grid-cols-6">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Status
+                </label>
+                <Select
+                  value={courseStatusFilter}
+                  onChange={(e) => setCourseStatusFilter(e.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="review">Review</option>
+                  <option value="published">Published</option>
+                  <option value="archived">Archived</option>
+                  <option value="suspended">Suspended</option>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Category
+                </label>
+                <Select
+                  value={courseCategoryFilter}
+                  onChange={(e) => setCourseCategoryFilter(e.target.value)}
+                >
+                  <option value="">All categories</option>
+                  {categoryTypesQuery.data?.map((cat) => (
+                    <option key={String(cat.id)} value={String(cat.id)}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Instructor
+                </label>
+                <Select
+                  value={courseInstructorFilter}
+                  onChange={(e) => setCourseInstructorFilter(e.target.value)}
+                >
+                  <option value="">All instructors</option>
+                  {(instructorsQuery.data ?? []).map((u) => {
+                    const fullName = [u.firstName, u.lastName]
+                      .filter(Boolean)
+                      .join(" ")
+                      .trim();
+                    const label = fullName || u.username || u.email || "Instructor";
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Order
+                </label>
+                <Select
+                  value={courseOrder}
+                  onChange={(e) =>
+                    setCourseOrder((e.target.value as "ASC" | "DESC") || "ASC")
+                  }
+                >
+                  <option value="ASC">ASC</option>
+                  <option value="DESC">DESC</option>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Per page
+                </label>
+                <Select
+                  value={String(coursesPerPage)}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) || 10;
+                    setCoursesPerPage(next);
+                    setCoursesPage(1);
+                  }}
+                >
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </Select>
+              </div>
+
+              <div className="relative">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Columns
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowColumnPicker((v) => !v)}
+                  className="w-full h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 hover:border-gray-300 inline-flex items-center justify-between"
+                >
+                  <span>Choose columns</span>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showColumnPicker ? "rotate-180" : ""}`} />
+                </button>
+                {showColumnPicker && (
+                  <div className="absolute z-20 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg p-2 space-y-1">
+                    {COURSE_COLUMN_OPTIONS.map((option) => (
+                      <label
+                        key={option.key}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-[#D52B1E] focus:ring-[#D52B1E]"
+                          checked={visibleColumns[option.key]}
+                          onChange={(e) =>
+                            setVisibleColumns((prev) => ({
+                              ...prev,
+                              [option.key]: e.target.checked,
+                            }))
+                          }
+                        />
+                        <span className="text-sm text-gray-700">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Courses Table */}
             {coursesLoading ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -430,18 +696,41 @@ export default function AdminAcademy() {
                       <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
                         Course
                       </th>
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Level
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Enrolled
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Price
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        Status
-                      </th>
+                      {visibleColumns.level && (
+                        <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Level
+                        </th>
+                      )}
+                      {visibleColumns.instructor && (
+                        <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Instructor
+                        </th>
+                      )}
+                      {visibleColumns.category && (
+                        <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Category
+                        </th>
+                      )}
+                      {visibleColumns.enrolled && (
+                        <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Enrolled
+                        </th>
+                      )}
+                      {visibleColumns.price && (
+                        <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Price
+                        </th>
+                      )}
+                      {visibleColumns.lessons && (
+                        <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Lessons
+                        </th>
+                      )}
+                      {visibleColumns.status && (
+                        <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Status
+                        </th>
+                      )}
                       <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
                         Actions
                       </th>
@@ -458,30 +747,73 @@ export default function AdminAcademy() {
                             {course.description || "No description"}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap align-top text-sm text-gray-600 capitalize">
-                          {course.level}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap align-top text-sm text-gray-600">
-                          {course.enrolledCount || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap align-top text-sm font-semibold text-gray-900">
-                          {course.isFree ? "Free" : `$${course.priceUsd}`}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap align-top text-sm">
-                          <Badge
-                            variant={
-                              course.status === "published"
-                                ? "default"
-                                : course.status === "suspended"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
-                            {course.status}
-                          </Badge>
-                        </td>
+                        {visibleColumns.level && (
+                          <td className="px-6 py-4 whitespace-nowrap align-top text-sm text-gray-600 capitalize">
+                            {course.level}
+                          </td>
+                        )}
+                        {visibleColumns.instructor && (
+                          <td className="px-6 py-4 align-top text-sm text-gray-600">
+                            <p className="font-medium text-gray-800">
+                              {course.educator?.name || "-"}
+                            </p>
+                            {course.educator?.email && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {course.educator.email}
+                              </p>
+                            )}
+                          </td>
+                        )}
+                        {visibleColumns.category && (
+                          <td className="px-6 py-4 whitespace-nowrap align-top text-sm text-gray-600">
+                            {course.programme?.title || "-"}
+                          </td>
+                        )}
+                        {visibleColumns.enrolled && (
+                          <td className="px-6 py-4 whitespace-nowrap align-top text-sm text-gray-600">
+                            {course.enrolledCount || 0}
+                          </td>
+                        )}
+                        {visibleColumns.price && (
+                          <td className="px-6 py-4 whitespace-nowrap align-top text-sm font-semibold text-gray-900">
+                            {course.isFree ? "Free" : `$${course.priceUsd}`}
+                          </td>
+                        )}
+                        {visibleColumns.lessons && (
+                          <td className="px-6 py-4 whitespace-nowrap align-top text-sm text-gray-600">
+                            {course.lessonCount ?? course.videoCount ?? 0}
+                          </td>
+                        )}
+                        {visibleColumns.status && (
+                          <td className="px-6 py-4 whitespace-nowrap align-top text-sm">
+                            <Badge
+                              variant={
+                                course.status === "published"
+                                  ? "default"
+                                  : course.status === "suspended"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                            >
+                              {course.status}
+                            </Badge>
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap align-top text-sm font-medium text-gray-900">
                           <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="View more"
+                              onClick={() =>
+                                setViewingCourse(
+                                  course as AcademyInstructorCourseDto,
+                                )
+                              }
+                              className="gap-1.5"
+                            >
+                              <Eye className="h-4 w-4" /> View
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
@@ -494,6 +826,24 @@ export default function AdminAcademy() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
+                            {course.status !== "published" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title={
+                                  course.status === "suspended"
+                                    ? "Re-publish"
+                                    : "Publish"
+                                }
+                                onClick={() =>
+                                  void handlePublishCourse(course.id)
+                                }
+                                disabled={publishCourseMutation.isPending}
+                                className="text-emerald-600 hover:text-emerald-700 hover:border-emerald-300"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </Button>
+                            )}
                             {course.status === "suspended" ? (
                               <Button
                                 variant="outline"
@@ -521,12 +871,47 @@ export default function AdminAcademy() {
                                 <PauseCircle className="h-4 w-4" />
                               </Button>
                             )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Delete permanently"
+                              onClick={() => void handleDeleteCourse(course.id)}
+                              disabled={deleteCourseMutation.isPending}
+                              className="text-red-600 hover:text-red-700 hover:border-red-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {!coursesLoading && filteredCourses.length > 0 && (
+              <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center justify-between gap-2 md:gap-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCoursesPage((p) => Math.max(1, p - 1))}
+                    disabled={!allCoursesMeta?.hasPreviousPage}
+                  >
+                    Previous
+                  </Button>
+                  <p className="text-xs text-gray-500">
+                    Page {allCoursesMeta?.page ?? coursesPage} of {allCoursesMeta?.pageCount ?? coursesPage}
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => setCoursesPage((p) => p + 1)}
+                    disabled={!allCoursesMeta?.hasNextPage}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -595,6 +980,9 @@ export default function AdminAcademy() {
                             Progress
                           </th>
                           <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                            Lessons Done
+                          </th>
+                          <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
                             Enrolled
                           </th>
                           <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -659,6 +1047,9 @@ export default function AdminAcademy() {
                                   </span>
                                 </div>
                               </td>
+                              <td className="px-5 py-3 text-gray-600 font-medium">
+                                {Number(enrollment.completedLessonsCount ?? 0)}
+                              </td>
                               <td className="px-5 py-3 text-gray-500">
                                 {enrollment.enrolledAt
                                   ? new Date(
@@ -678,6 +1069,31 @@ export default function AdminAcademy() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {!enrollmentsLoading && (courseEnrollmentsMeta?.pageCount ?? 1) > 1 && (
+                  <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setEnrollmentsPage((p) => Math.max(1, p - 1))
+                      }
+                      disabled={!courseEnrollmentsMeta?.hasPreviousPage}
+                    >
+                      Previous
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      Page {courseEnrollmentsMeta?.page ?? enrollmentsPage} of {courseEnrollmentsMeta?.pageCount ?? enrollmentsPage}
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => setEnrollmentsPage((p) => p + 1)}
+                      disabled={!courseEnrollmentsMeta?.hasNextPage}
+                    >
+                      Next
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -929,6 +1345,81 @@ export default function AdminAcademy() {
         )}
       </motion.div>
 
+      <Dialog
+        open={viewingCourse !== null}
+        onClose={() => setViewingCourse(null)}
+        title={viewingCourse?.title ?? "Course details"}
+        maxWidth="max-w-3xl"
+      >
+        {viewingCourse && (
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Slug</p>
+              <p className="text-sm font-semibold text-gray-800 break-all">{viewingCourse.slug || "-"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Status</p>
+              <p className="text-sm font-semibold text-gray-800 capitalize">{viewingCourse.status || "-"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Category</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.programme?.title || "-"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Instructor</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.educator?.name || "-"}</p>
+              {viewingCourse.educator?.email && (
+                <p className="text-xs text-gray-500 mt-0.5">{viewingCourse.educator.email}</p>
+              )}
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Level</p>
+              <p className="text-sm font-semibold text-gray-800 capitalize">{viewingCourse.level || "-"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Language</p>
+              <p className="text-sm font-semibold text-gray-800 uppercase">{viewingCourse.language || "-"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Price</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.isFree ? "Free" : `$${viewingCourse.priceUsd} USD`}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Enrollments</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.enrolledCount ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Lessons</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.lessonCount ?? viewingCourse.videoCount ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Duration</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.totalDurationMinutes ?? 0} minutes</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Shariah Compliant</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.shariahCompliant ? "Yes" : "No"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Certificate Issued</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.certificateIssued ? "Yes" : "No"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 md:col-span-2">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Description</p>
+              <p className="text-sm text-gray-700 mt-1">{viewingCourse.description || "-"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Published At</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.publishedAt ? new Date(viewingCourse.publishedAt).toLocaleString() : "-"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400">Updated At</p>
+              <p className="text-sm font-semibold text-gray-800">{viewingCourse.updatedAt ? new Date(viewingCourse.updatedAt).toLocaleString() : "-"}</p>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
       {/* Create/Edit Course Modal */}
       {(showCreateModal || editingCourse) &&
         (() => {
@@ -1015,27 +1506,35 @@ export default function AdminAcademy() {
                     />
                   </div>
 
-                  {!editingCourse && (
-                    <div>
-                      <label className={labelCls}>Assign Instructor</label>
-                      <select
-                        className={inputCls}
-                        value={assignInstructorId}
-                        onChange={(e) => setAssignInstructorId(e.target.value)}
-                      >
-                        <option value="">
-                          {instructorsQuery.isLoading
-                            ? "Loading instructors…"
-                            : "— Select an instructor —"}
-                        </option>
-                        {(instructorsQuery.data?.data ?? []).map((u) => (
+                  <div>
+                    <label className={labelCls}>
+                      {editingCourse ? "Change Instructor" : "Assign Instructor"}
+                    </label>
+                    <select
+                      className={inputCls}
+                      value={assignInstructorId}
+                      onChange={(e) => setAssignInstructorId(e.target.value)}
+                    >
+                      <option value="">
+                        {instructorsQuery.isLoading
+                          ? "Loading instructors…"
+                          : "— Select an instructor —"}
+                      </option>
+                      {(instructorsQuery.data ?? []).map((u) => {
+                        const fullName = [u.firstName, u.lastName]
+                          .filter(Boolean)
+                          .join(" ")
+                          .trim();
+                        const label =
+                          fullName || u.username || u.email || "Instructor";
+                        return (
                           <option key={u.id} value={u.id}>
-                            {u.firstName} {u.lastName} ({u.email})
+                            {u.email ? `${label} (${u.email})` : label}
                           </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                        );
+                      })}
+                    </select>
+                  </div>
 
                   <div>
                     <label className={labelCls}>Category</label>
