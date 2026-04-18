@@ -186,6 +186,10 @@ function mapAcademyCourseApiResponse(
     publishedAt: course.publishedAt ?? course.createdAt,
     createdAt: course.createdAt,
     updatedAt: course.updatedAt,
+    subtitle: course.subtitle,
+    language: course.language,
+    shariahCompliant: course.shariahCompliant,
+    certificateIssued: course.certificateIssued,
   };
 }
 
@@ -684,10 +688,37 @@ export async function adminGetAllCourses() {
 }
 
 export async function adminGetCourseEnrollments(courseId: string | number) {
-  const response = await api.get<AdminCourseEnrollmentDto[]>(
-    `/admin/academy/courses/${courseId}/enrollments`,
-  );
-  return response.data ?? [];
+  const response = await api.get<
+    Array<{
+      id: string;
+      userId: string;
+      userName?: string | null;
+      userEmail?: string | null;
+      status: string;
+      completionPercent?: number | string | null;
+      enrolledAt: string;
+      completedAt?: string | null;
+      expiresAt?: string | null;
+      courseId?: string;
+    }>
+  >(`/admin/academy/courses/${courseId}/enrollments`);
+  return (response.data ?? []).map((item) => ({
+    id: item.id,
+    userId: item.userId,
+    courseId: item.courseId ?? String(courseId),
+    status: item.status,
+    enrolledAt: item.enrolledAt,
+    completedAt: item.completedAt ?? null,
+    expiresAt: item.expiresAt ?? null,
+    progressPercent: Number(item.completionPercent ?? 0) || 0,
+    userName: item.userName ?? undefined,
+    userEmail: item.userEmail ?? undefined,
+    user: {
+      id: item.userId,
+      username: item.userName ?? undefined,
+      email: item.userEmail ?? undefined,
+    },
+  })) as AdminCourseEnrollmentDto[];
 }
 
 export async function adminCreateCourse(

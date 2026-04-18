@@ -222,7 +222,7 @@ export const useInstructorAddSection = () => {
     }) => academyApi.instructorAddSection(courseId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["instructor", "academy", "courses"],
+        queryKey: ["instructor", "academy"],
       });
       learningToast("Section added", "Section created successfully.");
     },
@@ -241,7 +241,7 @@ export const useInstructorAddLesson = () => {
     }) => academyApi.instructorAddLesson(sectionId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["instructor", "academy", "courses"],
+        queryKey: ["instructor", "academy"],
       });
       learningToast("Lesson added", "Lesson created successfully.");
     },
@@ -260,7 +260,7 @@ export const useInstructorAddQuiz = () => {
     }) => academyApi.instructorAddQuiz(courseId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["instructor", "academy", "courses"],
+        queryKey: ["instructor", "academy"],
       });
       learningToast("Quiz added", "Quiz created successfully.");
     },
@@ -279,7 +279,7 @@ export const useInstructorUpdateQuiz = () => {
     }) => academyApi.instructorUpdateQuiz(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["instructor", "academy", "courses"],
+        queryKey: ["instructor", "academy"],
       });
       learningToast("Quiz updated", "Quiz updated successfully.");
     },
@@ -293,15 +293,16 @@ export const useInstructorDeleteQuiz = () => {
       academyApi.instructorDeleteQuiz(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["instructor", "academy", "courses"],
+        queryKey: ["instructor", "academy"],
       });
       learningToast("Quiz deleted", "Quiz deleted successfully.");
     },
   });
 };
 
-export const useInstructorAddQuestion = () =>
-  useMutation({
+export const useInstructorAddQuestion = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: async ({
       quizId,
       payload,
@@ -309,12 +310,18 @@ export const useInstructorAddQuestion = () =>
       quizId: string | number;
       payload: Record<string, unknown>;
     }) => academyApi.instructorAddQuestion(quizId, payload),
-    onSuccess: () =>
-      learningToast("Question added", "Question created successfully."),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy"],
+      });
+      learningToast("Question added", "Question created successfully.");
+    },
   });
+};
 
-export const useInstructorUpdateQuestion = () =>
-  useMutation({
+export const useInstructorUpdateQuestion = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: async ({
       questionId,
       payload,
@@ -322,20 +329,32 @@ export const useInstructorUpdateQuestion = () =>
       questionId: string | number;
       payload: AcademyInstructorUpdateQuestionDto;
     }) => academyApi.instructorUpdateQuestion(questionId, payload),
-    onSuccess: () =>
-      learningToast("Question updated", "Question updated successfully."),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy"],
+      });
+      learningToast("Question updated", "Question updated successfully.");
+    },
   });
+};
 
-export const useInstructorDeleteQuestion = () =>
-  useMutation({
+export const useInstructorDeleteQuestion = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: async (questionId: string | number) =>
       academyApi.instructorDeleteQuestion(questionId),
-    onSuccess: () =>
-      learningToast("Question deleted", "Question deleted successfully."),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy"],
+      });
+      learningToast("Question deleted", "Question deleted successfully.");
+    },
   });
+};
 
-export const useInstructorAddOption = () =>
-  useMutation({
+export const useInstructorAddOption = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: async ({
       questionId,
       payload,
@@ -343,12 +362,18 @@ export const useInstructorAddOption = () =>
       questionId: string | number;
       payload: Record<string, unknown>;
     }) => academyApi.instructorAddOption(questionId, payload),
-    onSuccess: () =>
-      learningToast("Option added", "Option created successfully."),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy"],
+      });
+      learningToast("Option added", "Option created successfully.");
+    },
   });
+};
 
-export const useInstructorUpdateOption = () =>
-  useMutation({
+export const useInstructorUpdateOption = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: async ({
       id,
       payload,
@@ -356,17 +381,28 @@ export const useInstructorUpdateOption = () =>
       id: string | number;
       payload: AcademyInstructorUpdateOptionDto;
     }) => academyApi.instructorUpdateOption(id, payload),
-    onSuccess: () =>
-      learningToast("Option updated", "Option updated successfully."),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy"],
+      });
+      learningToast("Option updated", "Option updated successfully.");
+    },
   });
+};
 
-export const useInstructorDeleteOption = () =>
-  useMutation({
+export const useInstructorDeleteOption = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: async (id: string | number) =>
       academyApi.instructorDeleteOption(id),
-    onSuccess: () =>
-      learningToast("Option deleted", "Option deleted successfully."),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["instructor", "academy"],
+      });
+      learningToast("Option deleted", "Option deleted successfully.");
+    },
   });
+};
 
 export const useInstructorQuizAttempts = (quizId?: string | number) =>
   useQuery<AcademyQuizAttemptDto[]>({

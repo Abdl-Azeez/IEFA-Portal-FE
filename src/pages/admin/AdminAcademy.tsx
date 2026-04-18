@@ -613,8 +613,11 @@ export default function AdminAcademy() {
                                 .join(" ") ||
                               enrollment.user.username ||
                               enrollment.user.email ||
-                              enrollment.userId
-                            : enrollment.userId;
+                              enrollment.userName ||
+                              "Unknown user"
+                            : enrollment.userName || "Unknown user";
+                          const email =
+                            enrollment.user?.email || enrollment.userEmail;
                           return (
                             <tr
                               key={enrollment.id}
@@ -624,9 +627,9 @@ export default function AdminAcademy() {
                                 <div className="font-medium text-gray-900">
                                   {name}
                                 </div>
-                                {enrollment.user?.email && (
+                                {email && (
                                   <div className="text-xs text-gray-400">
-                                    {enrollment.user.email}
+                                    {email}
                                   </div>
                                 )}
                               </td>

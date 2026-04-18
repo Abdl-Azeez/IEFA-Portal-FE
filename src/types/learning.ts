@@ -327,6 +327,10 @@ export interface AcademyCourseDetailsDto extends StudentCourseDto {
   topics?: string[];
   sections?: AcademySectionDto[];
   lessonCount?: number;
+  subtitle?: string | null;
+  language?: string | null;
+  shariahCompliant?: boolean;
+  certificateIssued?: boolean;
 }
 
 export interface AcademyCourseWithProgressDto extends AcademyCourseDetailsDto {
@@ -534,6 +538,8 @@ export interface AcademyInstructorUpdateOptionDto {
 export interface AdminCourseEnrollmentDto {
   id: string;
   userId: string;
+  userName?: string;
+  userEmail?: string;
   courseId: string;
   status: string;
   enrolledAt: string;
@@ -572,17 +578,62 @@ export interface AcademyInstructorCourseUpdateDto {
 
 export interface AcademyQuizDetailsDto {
   id: string;
-  courseId: number;
+  courseId: string | number;
   title: string;
+  passPercentage?: number;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   questions: Array<Record<string, unknown>>;
+}
+
+export interface AcademyCourseContextDto {
+  id?: string | number;
+  title?: string;
+  slug?: string;
+  subtitle?: string | null;
+  description?: string | null;
+  level?: string;
+  language?: string;
+  status?: string;
+  thumbnailUrl?: string | null;
+  trailerUrl?: string | null;
+  price?: string;
+  currency?: string;
+  discountPrice?: string | null;
+  isFree?: boolean;
+  durationHours?: number | null;
+  isFeatured?: boolean;
+  shariahCompliant?: boolean;
+  certificateIssued?: boolean;
+  maxStudents?: number | null;
+  ratingAvg?: string;
+  totalEnrollments?: number;
+  publishedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AcademySectionDetailsDto {
   id: string;
+  courseId?: string | number;
   title: string;
+  description?: string | null;
+  sortOrder?: number;
+  isFreePreview?: boolean;
+  course?: AcademyCourseContextDto;
   lessons: AcademyLessonDto[];
 }
 
-export interface AcademyLessonDetailsDto extends AcademyLessonDto {
+export interface AcademyLessonDetailsDto extends Omit<AcademyLessonDto, 'course'> {
   sectionId: string | number;
+  section?: {
+    id?: string | number;
+    courseId?: string | number;
+    title?: string;
+    description?: string | null;
+    sortOrder?: number;
+    isFreePreview?: boolean;
+  };
+  course?: AcademyCourseContextDto;
 }

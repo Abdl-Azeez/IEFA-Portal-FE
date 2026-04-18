@@ -6,15 +6,18 @@ import {
   BarChart3,
   BookOpen,
   Calendar,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ClipboardList,
   Clock,
   Edit,
+  ExternalLink,
   Eye,
   FileText,
   GraduationCap,
   HelpCircle,
+  Info,
   Layers,
   PauseCircle,
   PlayCircle,
@@ -25,8 +28,10 @@ import {
   Trash2,
   Users,
   Video,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { CourseExplorerDialog } from "@/components/learning/CourseExplorerDialog";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
@@ -97,6 +102,18 @@ function durationLabel(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function formatSecondsAsLabel(seconds?: number | null): string {
+  if (!seconds || seconds <= 0) return "---";
+  const totalMinutes = Math.floor(seconds / 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const remainingSeconds = seconds % 60;
+
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  if (m > 0) return remainingSeconds > 0 ? `${m}m ${remainingSeconds}s` : `${m}m`;
+  return `${remainingSeconds}s`;
 }
 
 function stripHtml(html: string): string {
@@ -515,6 +532,9 @@ function InstructorLearningWorkspace({
   const [addingOptionToQId, setAddingOptionToQId] = useState<string | null>(null);
   const [optionForm, setOptionForm] = useState({ text: "", isCorrect: false });
   const [viewingLessonId, setViewingLessonId] = useState<string | null>(null);
+  const [inspectingSectionId, setInspectingSectionId] = useState<string | null>(null);
+  const [courseSearch, setCourseSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
 
   const categoryTypesQuery = useAcademyCategoryTypes();
   const quizTypesQuery = useAcademyQuizTypes();
@@ -542,6 +562,7 @@ function InstructorLearningWorkspace({
   const quizAttemptsQuery = useInstructorQuizAttempts(managingQuizId ?? undefined);
   const lessonDetailQuery = useInstructorLessonDetails(viewingLessonId ?? undefined);
   const sectionDetailQuery = useInstructorSectionDetails(expandedSectionId ?? undefined);
+  const sectionInspectorQuery = useInstructorSectionDetails(inspectingSectionId ?? undefined);
 
   const courseQuizzes = useMemo(
     () =>
@@ -691,6 +712,29 @@ function InstructorLearningWorkspace({
   const publishedCourses = (coursesQuery.data ?? []).filter(
     (c) => c.status === "published",
   ).length;
+  const activeSectionDetail = sectionDetailQuery.data;
+  const activeLessonDetail = lessonDetailQuery.data;
+  const activeLessonMeta =
+    LESSON_TYPE_META[
+      (activeLessonDetail?.type as keyof typeof LESSON_TYPE_META) ?? "video"
+    ] ?? LESSON_TYPE_META.video;
+  const ActiveLessonIcon = activeLessonMeta.icon;
+  const quizQuestionCount =
+    ((quizDetailsQuery.data?.questions as Array<unknown> | undefined)?.length ??
+      0);
+
+  const filteredCourses = useMemo(() => {
+    const all = coursesQuery.data ?? [];
+    const q = courseSearch.trim().toLowerCase();
+    return all.filter((c) => {
+      const matchSearch =
+        !q ||
+        c.title.toLowerCase().includes(q) ||
+        (c.subtitle ?? "").toLowerCase().includes(q);
+      const matchStatus = statusFilter === "all" || c.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [coursesQuery.data, courseSearch, statusFilter]);
 
   return (
     <motion.div
@@ -916,6 +960,351 @@ function InstructorLearningWorkspace({
         </div>
       )}
 
+      {/* ── Lesson Inspector Modal ───────────────────────────────────── */}
+      <Dialog
+        open={viewingLessonId !== null}
+        onClose={() => setViewingLessonId(null)}
+        title="About this Lesson"
+        maxWidth="max-w-2xl"
+      >
+        {lessonDetailQuery.isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center space-y-2">
+              <div className="h-8 w-8 rounded-full border-2 border-[#D52B1E] border-t-transparent animate-spin mx-auto" />
+              <p className="text-sm text-gray-400">Loading lesson details…</p>
+            </div>
+          </div>
+        ) : activeLessonDetail ? (
+          <div className="space-y-6">
+            {/* Hero row */}
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-100">
+              <div className={`shrink-0 h-12 w-12 rounded-2xl flex items-center justify-center ${activeLessonMeta.bg}`}>
+                <ActiveLessonIcon className={`h-6 w-6 ${activeLessonMeta.color}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${activeLessonMeta.bg} ${activeLessonMeta.color} ${activeLessonMeta.border} capitalize`}>
+                    {activeLessonMeta.label}
+                  </span>
+                  {activeLessonDetail.isPublished ? (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Published</span>
+                  ) : (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Draft — not visible to students</span>
+                  )}
+                  {activeLessonDetail.isFreePreview && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Free Preview</span>
+                  )}
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 leading-snug">{activeLessonDetail.title}</h2>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                <Clock className="h-5 w-5 text-gray-400 mx-auto mb-1" />
+                <p className="text-sm font-bold text-gray-800">{formatSecondsAsLabel(activeLessonDetail.durationSeconds)}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Duration</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                <BarChart3 className="h-5 w-5 text-gray-400 mx-auto mb-1" />
+                <p className="text-sm font-bold text-gray-800">Position {(activeLessonDetail.sortOrder ?? 0) + 1}</p>
+                <p className="text-xs text-gray-500 mt-0.5">In this section</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                {activeLessonDetail.isPublished ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
+                    <p className="text-sm font-bold text-emerald-700">Published</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Visible to students</p>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 text-amber-400 mx-auto mb-1" />
+                    <p className="text-sm font-bold text-amber-600">Draft</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Hidden from students</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Content */}
+            {(activeLessonDetail.contentUrl || activeLessonDetail.meetingLink || activeLessonDetail.scheduledAt || activeLessonDetail.contentText) && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Lesson Content</p>
+                {activeLessonDetail.contentUrl && (
+                  <a
+                    href={activeLessonDetail.contentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 p-4 rounded-xl border border-blue-100 bg-blue-50 hover:bg-blue-100 transition-colors group"
+                  >
+                    <div className="shrink-0 h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center">
+                      <PlayCircle className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-blue-900">Watch Lesson Video</p>
+                      <p className="text-xs text-blue-500 truncate">{activeLessonDetail.contentUrl}</p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-blue-500 shrink-0 opacity-60 group-hover:opacity-100" />
+                  </a>
+                )}
+                {activeLessonDetail.meetingLink && (
+                  <a
+                    href={activeLessonDetail.meetingLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 p-4 rounded-xl border border-violet-100 bg-violet-50 hover:bg-violet-100 transition-colors group"
+                  >
+                    <div className="shrink-0 h-10 w-10 rounded-xl bg-violet-600 flex items-center justify-center">
+                      <Video className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-violet-900">Join Live Session</p>
+                      <p className="text-xs text-violet-500 truncate">{activeLessonDetail.meetingLink}</p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-violet-500 shrink-0 opacity-60 group-hover:opacity-100" />
+                  </a>
+                )}
+                {activeLessonDetail.scheduledAt && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl border border-amber-100 bg-amber-50">
+                    <Calendar className="h-5 w-5 text-amber-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-amber-800">Session Scheduled for</p>
+                      <p className="text-sm font-bold text-amber-900">
+                        {new Date(activeLessonDetail.scheduledAt).toLocaleString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {activeLessonDetail.contentText && (
+                  <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Written Content</p>
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{activeLessonDetail.contentText}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Section context */}
+            {activeLessonDetail.section && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Part of Section</p>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-gray-400 shrink-0" />
+                    <p className="text-sm font-bold text-gray-800">{activeLessonDetail.section.title}</p>
+                  </div>
+                  {activeLessonDetail.section.description && (
+                    <p className="text-xs text-gray-600 leading-relaxed pl-6">{activeLessonDetail.section.description}</p>
+                  )}
+                  <div className="pl-6">
+                    {activeLessonDetail.section.isFreePreview ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Section available as Free Preview</span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Requires enrollment to access</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Course context */}
+            {activeLessonDetail.course && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Course</p>
+                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                  {activeLessonDetail.course.thumbnailUrl && (
+                    <img src={activeLessonDetail.course.thumbnailUrl} alt={activeLessonDetail.course.title ?? ""} className="w-full h-36 object-cover" />
+                  )}
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <p className="text-base font-bold text-gray-900">{activeLessonDetail.course.title}</p>
+                      {activeLessonDetail.course.subtitle && (
+                        <p className="text-xs text-gray-500 mt-0.5">{activeLessonDetail.course.subtitle}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {activeLessonDetail.course.level && (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${LEVEL_META[activeLessonDetail.course.level as keyof typeof LEVEL_META]?.bg ?? "bg-gray-100"} ${LEVEL_META[activeLessonDetail.course.level as keyof typeof LEVEL_META]?.color ?? "text-gray-600"}`}>
+                          {activeLessonDetail.course.level}
+                        </span>
+                      )}
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                        {activeLessonDetail.course.isFree ? "Free Course" : `$${activeLessonDetail.course.price} ${activeLessonDetail.course.currency ?? "USD"}`}
+                      </span>
+                      {activeLessonDetail.course.status && (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${activeLessonDetail.course.status === "published" ? "bg-emerald-50 text-emerald-700" : activeLessonDetail.course.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-700"}`}>
+                          {activeLessonDetail.course.status === "published" ? "✓ Published" : activeLessonDetail.course.status === "draft" ? "In Draft" : activeLessonDetail.course.status}
+                        </span>
+                      )}
+                      {activeLessonDetail.course.language && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 uppercase">{activeLessonDetail.course.language}</span>
+                      )}
+                      {activeLessonDetail.course.shariahCompliant && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-900/10 text-emerald-800">Shariah Compliant ✓</span>
+                      )}
+                      {activeLessonDetail.course.certificateIssued && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">🎓 Certificate Issued</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 pt-1 border-t border-gray-100 text-xs text-gray-500">
+                      <span><span className="font-bold text-gray-700">{activeLessonDetail.course.totalEnrollments ?? 0}</span> student{(activeLessonDetail.course.totalEnrollments ?? 0) !== 1 ? "s" : ""} enrolled</span>
+                      {activeLessonDetail.course.ratingAvg && parseFloat(activeLessonDetail.course.ratingAvg) > 0 && (
+                        <span><span className="font-bold text-amber-500">★ {parseFloat(activeLessonDetail.course.ratingAvg).toFixed(1)}</span> rating</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-center text-gray-400 py-8">No lesson details available.</p>
+        )}
+      </Dialog>
+
+      {/* ── Section Inspector Modal ──────────────────────────────────── */}
+      <Dialog
+        open={inspectingSectionId !== null}
+        onClose={() => setInspectingSectionId(null)}
+        title="About this Section"
+        maxWidth="max-w-2xl"
+      >
+        {sectionInspectorQuery.isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center space-y-2">
+              <div className="h-8 w-8 rounded-full border-2 border-[#D52B1E] border-t-transparent animate-spin mx-auto" />
+              <p className="text-sm text-gray-400">Loading section details…</p>
+            </div>
+          </div>
+        ) : sectionInspectorQuery.data ? (
+          <div className="space-y-6">
+            {/* Hero */}
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-white border border-blue-100">
+              <div className="shrink-0 h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center">
+                <Layers className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Course Section</p>
+                <h2 className="text-xl font-bold text-gray-900 leading-snug">{sectionInspectorQuery.data.title}</h2>
+                {sectionInspectorQuery.data.description && (
+                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">{sectionInspectorQuery.data.description}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                <BarChart3 className="h-5 w-5 text-gray-400 mx-auto mb-1" />
+                <p className="text-sm font-bold text-gray-800">Section {sectionInspectorQuery.data.sortOrder ?? 1}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Position in course</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                <PlayCircle className="h-5 w-5 text-gray-400 mx-auto mb-1" />
+                <p className="text-lg font-bold text-gray-800">{sectionInspectorQuery.data.lessons?.length ?? 0}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Lessons</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                {sectionInspectorQuery.data.isFreePreview ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
+                    <p className="text-sm font-bold text-emerald-700">Free Preview</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Open access</p>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 text-gray-400 mx-auto mb-1" />
+                    <p className="text-sm font-bold text-gray-700">Enrolled Only</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Requires enrollment</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Lessons list */}
+            {(sectionInspectorQuery.data.lessons?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Lessons in this Section</p>
+                <div className="space-y-2">
+                  {sectionInspectorQuery.data.lessons.map((lesson, idx) => {
+                    const lMeta = LESSON_TYPE_META[lesson.type as keyof typeof LESSON_TYPE_META] ?? LESSON_TYPE_META.video;
+                    const LIcon = lMeta.icon;
+                    return (
+                      <div key={lesson.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors">
+                        <span className="text-xs font-bold text-gray-300 w-5 text-right shrink-0">{idx + 1}</span>
+                        <div className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center ${lMeta.bg}`}>
+                          <LIcon className={`h-4 w-4 ${lMeta.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{lesson.title}</p>
+                          <p className="text-xs text-gray-400">{lMeta.label}{lesson.durationSeconds ? ` · ${formatSecondsAsLabel(lesson.durationSeconds)}` : ""}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {lesson.isFreePreview && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">Preview</span>}
+                          {lesson.isPublished ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Live</span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">Draft</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Course context */}
+            {sectionInspectorQuery.data.course && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Part of Course</p>
+                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                  {sectionInspectorQuery.data.course.thumbnailUrl && (
+                    <img src={sectionInspectorQuery.data.course.thumbnailUrl} alt={sectionInspectorQuery.data.course.title ?? ""} className="w-full h-32 object-cover" />
+                  )}
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <p className="text-base font-bold text-gray-900">{sectionInspectorQuery.data.course.title}</p>
+                      {sectionInspectorQuery.data.course.subtitle && (
+                        <p className="text-xs text-gray-500 mt-0.5">{sectionInspectorQuery.data.course.subtitle}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {sectionInspectorQuery.data.course.level && (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${LEVEL_META[sectionInspectorQuery.data.course.level as keyof typeof LEVEL_META]?.bg ?? "bg-gray-100"} ${LEVEL_META[sectionInspectorQuery.data.course.level as keyof typeof LEVEL_META]?.color ?? "text-gray-600"}`}>
+                          {sectionInspectorQuery.data.course.level}
+                        </span>
+                      )}
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                        {sectionInspectorQuery.data.course.isFree ? "Free Course" : `$${sectionInspectorQuery.data.course.price} ${sectionInspectorQuery.data.course.currency ?? "USD"}`}
+                      </span>
+                      {sectionInspectorQuery.data.course.status && (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${sectionInspectorQuery.data.course.status === "published" ? "bg-emerald-50 text-emerald-700" : sectionInspectorQuery.data.course.status === "draft" ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-700"}`}>
+                          {sectionInspectorQuery.data.course.status === "published" ? "✓ Published" : sectionInspectorQuery.data.course.status === "draft" ? "In Draft" : sectionInspectorQuery.data.course.status}
+                        </span>
+                      )}
+                      {sectionInspectorQuery.data.course.shariahCompliant && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-900/10 text-emerald-800">Shariah Compliant ✓</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 pt-1 border-t border-gray-100 text-xs text-gray-500">
+                      <span><span className="font-bold text-gray-700">{sectionInspectorQuery.data.course.totalEnrollments ?? 0}</span> student{(sectionInspectorQuery.data.course.totalEnrollments ?? 0) !== 1 ? "s" : ""} enrolled</span>
+                      {sectionInspectorQuery.data.course.ratingAvg && parseFloat(sectionInspectorQuery.data.course.ratingAvg) > 0 && (
+                        <span><span className="font-bold text-amber-500">★ {parseFloat(sectionInspectorQuery.data.course.ratingAvg).toFixed(1)}</span> rating</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-center text-gray-400 py-8">No section details available.</p>
+        )}
+      </Dialog>
+
       {/* ── Hero Header ───────────────────────────────────────────────── */}
       <div className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-[#1c0505] to-gray-900 px-6 py-8 md:px-12 md:py-10">
         <div className="pointer-events-none absolute -top-20 -right-20 h-80 w-80 rounded-full bg-[#D52B1E]/15 blur-3xl" />
@@ -971,7 +1360,8 @@ function InstructorLearningWorkspace({
           className="grid gap-6 lg:grid-cols-3"
         >
           {/* ── Left: Course List ──────────────────────────────────────── */}
-          <div className="lg:col-span-1 space-y-3">
+          <div className="lg:col-span-1 flex flex-col gap-3 min-h-0">
+            {/* Header */}
             <div className="flex items-center justify-between px-1">
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
                 My Courses
@@ -983,19 +1373,74 @@ function InstructorLearningWorkspace({
               )}
             </div>
 
+            {/* Search + filter — only shown when courses exist */}
+            {(coursesQuery.data?.length ?? 0) > 0 && (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <input
+                    value={courseSearch}
+                    onChange={(e) => setCourseSearch(e.target.value)}
+                    placeholder="Search courses…"
+                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#D52B1E] focus:ring-1 focus:ring-[#D52B1E]/20 transition-colors"
+                  />
+                  {courseSearch && (
+                    <button
+                      onClick={() => setCourseSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  {(["all", "published", "draft"] as const).map((f) => {
+                    const cnt =
+                      f === "all"
+                        ? (coursesQuery.data?.length ?? 0)
+                        : (coursesQuery.data ?? []).filter((c) => c.status === f).length;
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => setStatusFilter(f)}
+                        className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg transition-colors capitalize flex items-center justify-center gap-1 ${
+                          statusFilter === f
+                            ? "bg-[#D52B1E] text-white shadow-sm"
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        }`}
+                      >
+                        {f}
+                        <span
+                          className={`text-[10px] px-1.5 py-0 rounded-full leading-5 ${
+                            statusFilter === f ? "bg-white/20 text-white" : "bg-white text-gray-500"
+                          }`}
+                        >
+                          {cnt}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Course list */}
             {coursesQuery.isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="rounded-2xl bg-white border border-gray-100 p-4 animate-pulse"
+                    className="rounded-2xl bg-white border border-gray-100 p-3 animate-pulse flex gap-3"
                   >
-                    <div className="h-4 bg-gray-100 rounded-full w-3/4 mb-2" />
-                    <div className="h-3 bg-gray-100 rounded-full w-1/2" />
+                    <div className="h-[52px] w-[52px] rounded-xl bg-gray-100 shrink-0" />
+                    <div className="flex-1 space-y-2 pt-1">
+                      <div className="h-4 bg-gray-100 rounded-full w-3/4" />
+                      <div className="h-3 bg-gray-100 rounded-full w-1/2" />
+                    </div>
                   </div>
                 ))}
               </div>
-            ) : !coursesQuery.data || coursesQuery.data.length === 0 ? (
+            ) : (coursesQuery.data?.length ?? 0) === 0 ? (
               <div className="rounded-2xl bg-white border border-dashed border-gray-200 p-10 text-center">
                 <div className="h-16 w-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
                   <GraduationCap className="h-8 w-8 text-gray-300" />
@@ -1012,61 +1457,123 @@ function InstructorLearningWorkspace({
                   <Plus className="h-3.5 w-3.5" /> Create Course
                 </Button>
               </div>
+            ) : filteredCourses.length === 0 ? (
+              <div className="rounded-2xl bg-white border border-dashed border-gray-200 p-8 text-center">
+                <Search className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm font-semibold text-gray-500">No matching courses</p>
+                <p className="text-xs text-gray-400 mt-1">Try a different search or filter</p>
+              </div>
             ) : (
-              <div className="space-y-2">
-                {coursesQuery.data.map((course, idx) => {
+              <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-440px)] pr-0.5">
+                {filteredCourses.map((course, idx) => {
                   const isSelected = selectedCourseId === course.id;
-                  const levelMeta = LEVEL_META[
-                    course.level as keyof typeof LEVEL_META
-                  ] ?? {
-                    label: course.level,
-                    color: "text-gray-600",
-                    bg: "bg-gray-100",
-                  };
-                  const levelColors = [
-                    "border-t-blue-400",
-                    "border-t-violet-400",
-                    "border-t-emerald-400",
-                    "border-t-amber-400",
-                    "border-t-rose-400",
+                  const levelMeta =
+                    LEVEL_META[course.level as keyof typeof LEVEL_META] ?? {
+                      label: course.level,
+                      color: "text-gray-600",
+                      bg: "bg-gray-100",
+                    };
+                  const accentColors = [
+                    "border-l-blue-400",
+                    "border-l-violet-400",
+                    "border-l-emerald-400",
+                    "border-l-amber-400",
+                    "border-l-rose-400",
                   ];
-                  const accentColor = levelColors[idx % levelColors.length];
+                  const accentColor = accentColors[idx % accentColors.length];
+                  const sectionCount = course.sections?.length ?? course.moduleCount ?? 0;
+                  const lessonCount = course.videoCount ?? 0;
                   return (
                     <button
                       key={course.id}
                       onClick={() => {
                         setSelectedCourseId(course.id);
                         setExpandedSectionId(null);
+                        setViewingLessonId(null);
+                        setManagingQuizId(null);
                         setShowAddSection(false);
                         setAddingLessonSectionId(null);
                       }}
-                      className={`w-full text-left rounded-2xl border-t-[3px] bg-white border border-gray-100 p-4 hover:shadow-md transition-all duration-200 ${accentColor} ${isSelected ? "ring-2 ring-[#D52B1E]/30 shadow-md" : ""}`}
+                      className={`w-full text-left rounded-[18px] border-l-4 border border-gray-100 transition-all duration-200 ${accentColor} ${
+                        isSelected
+                          ? "ring-2 ring-[#D52B1E]/25 shadow-[0_10px_24px_-14px_rgba(213,43,30,0.4)] bg-gradient-to-br from-white to-red-50/40"
+                          : "bg-white/95 hover:shadow-md hover:border-gray-200"
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug flex-1">
-                          {course.title}
-                        </p>
-                        <span
-                          className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${course.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
-                        >
-                          {course.status ?? "draft"}
-                        </span>
+                      <div className="flex gap-3 p-3.5">
+                        {/* Thumbnail */}
+                        <div className="shrink-0 h-[52px] w-[52px] rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
+                          {course.coverImageUrl ? (
+                            <img
+                              src={course.coverImageUrl}
+                              alt={course.title}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center">
+                              <BookOpen className="h-5 w-5 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1.5 mb-1">
+                            <p className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug flex-1">
+                              {course.title}
+                            </p>
+                            <span
+                              className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full capitalize ${
+                                course.status === "published"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : course.status === "suspended"
+                                    ? "bg-red-50 text-red-600"
+                                    : "bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              {course.status ?? "draft"}
+                            </span>
+                          </div>
+                          {course.subtitle && (
+                            <p className="text-[11px] text-gray-400 line-clamp-1 mb-1.5">
+                              {course.subtitle}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${levelMeta.bg} ${levelMeta.color}`}
+                            >
+                              {levelMeta.label}
+                            </span>
+                            <span className="text-[10px] font-medium text-gray-400">
+                              {sectionCount}S · {lessonCount}L
+                            </span>
+                            {course.enrolledCount > 0 && (
+                              <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                <Users className="h-2.5 w-2.5" />
+                                {course.enrolledCount}
+                              </span>
+                            )}
+                            {course.isFree ? (
+                              <span className="text-[10px] font-semibold text-emerald-600">
+                                Free
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-gray-500">
+                                ${course.priceUsd}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                        <span
-                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${levelMeta.bg} ${levelMeta.color}`}
-                        >
-                          {levelMeta.label}
-                        </span>
-                        <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                          {course.isFree ? "Free" : `$${course.priceUsd}`}
-                        </span>
-                        {isSelected && (
-                          <span className="ml-auto text-[11px] font-bold text-[#D52B1E] flex items-center gap-0.5">
-                            Selected <ChevronRight className="h-3 w-3" />
+                      {isSelected && (
+                        <div className="flex items-center justify-end gap-0.5 px-3.5 pb-2.5 -mt-1">
+                          <span className="text-[11px] font-bold text-[#D52B1E]">
+                            Managing
                           </span>
-                        )}
-                      </div>
+                          <ChevronRight className="h-3 w-3 text-[#D52B1E]" />
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -1101,51 +1608,123 @@ function InstructorLearningWorkspace({
             ) : (
               <div className="space-y-4">
                 {/* Course info card */}
-                <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-[#D52B1E] via-red-400 to-orange-400" />
-                  <div className="p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h2 className="text-xl font-bold text-gray-900 leading-tight">
-                          {courseDetails?.title}
+                <div className="rounded-[24px] overflow-hidden border border-gray-100 shadow-[0_14px_34px_-22px_rgba(213,43,30,0.45)]">
+                  {/* Thumbnail banner */}
+                  {courseDetails?.coverImageUrl ? (
+                    <div className="relative h-36 w-full overflow-hidden">
+                      <img
+                        src={courseDetails.coverImageUrl}
+                        alt={courseDetails.title}
+                        className="h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
+                        <h2 className="text-lg font-bold text-white leading-tight line-clamp-2 flex-1">
+                          {courseDetails.title}
                         </h2>
-                        {courseDetails?.description && (
-                          <p className="text-sm text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
-                            {courseDetails.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="shrink-0 h-14 w-14 rounded-xl bg-gradient-to-br from-[#D52B1E]/15 to-red-50 flex items-center justify-center">
-                        <BookOpen className="h-6 w-6 text-[#D52B1E]" />
+                        <span
+                          className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                            courseDetails.status === "published"
+                              ? "bg-emerald-500/90 text-white"
+                              : courseDetails.status === "suspended"
+                                ? "bg-red-500/90 text-white"
+                                : "bg-amber-400/90 text-gray-900"
+                          }`}
+                        >
+                          {courseDetails.status}
+                        </span>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center gap-2 flex-wrap">
+                  ) : null}
+
+                  <div className="bg-gradient-to-br from-white via-white to-red-50/25 p-5">
+                    {/* Title (only if no thumbnail) */}
+                    {!courseDetails?.coverImageUrl && (
+                      <div className="flex items-start justify-between gap-3 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <h2 className="text-xl font-bold text-gray-900 leading-tight">
+                            {courseDetails?.title}
+                          </h2>
+                          {courseDetails?.subtitle && (
+                            <p className="text-sm text-gray-500 mt-0.5">{courseDetails.subtitle}</p>
+                          )}
+                        </div>
+                        <span
+                          className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full capitalize ${
+                            courseDetails?.status === "published"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : courseDetails?.status === "suspended"
+                                ? "bg-red-50 text-red-600"
+                                : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {courseDetails?.status}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {courseDetails?.description && (
+                      <p className="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed">
+                        {courseDetails.description}
+                      </p>
+                    )}
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-4 gap-2 mb-4">
+                      <div className="rounded-xl bg-blue-50 p-2.5 text-center">
+                        <p className="text-base font-bold text-blue-700">{sections.length}</p>
+                        <p className="text-[10px] font-semibold text-blue-500 mt-0.5">Sections</p>
+                      </div>
+                      <div className="rounded-xl bg-purple-50 p-2.5 text-center">
+                        <p className="text-base font-bold text-purple-700">
+                          {sections.reduce((t, s) => t + (s.lessons?.length ?? 0), 0)}
+                        </p>
+                        <p className="text-[10px] font-semibold text-purple-500 mt-0.5">Lessons</p>
+                      </div>
+                      <div className="rounded-xl bg-gray-50 p-2.5 text-center">
+                        <p className="text-base font-bold text-gray-700">{courseDetails?.enrolledCount ?? 0}</p>
+                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5">Students</p>
+                      </div>
+                      <div className="rounded-xl bg-amber-50 p-2.5 text-center">
+                        <p className="text-base font-bold text-amber-600">
+                          {courseDetails?.rating && courseDetails.rating > 0
+                            ? courseDetails.rating.toFixed(1)
+                            : "—"}
+                        </p>
+                        <p className="text-[10px] font-semibold text-amber-400 mt-0.5">Rating</p>
+                      </div>
+                    </div>
+
+                    {/* Badges */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-4">
                       <span
                         className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${LEVEL_META[courseDetails?.level as keyof typeof LEVEL_META]?.bg ?? "bg-gray-100"} ${LEVEL_META[courseDetails?.level as keyof typeof LEVEL_META]?.color ?? "text-gray-600"}`}
                       >
                         {courseDetails?.level}
                       </span>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
-                        {courseDetails?.isFree
-                          ? "Free"
-                          : `$${courseDetails?.priceUsd}`}
+                        {courseDetails?.isFree ? "Free" : `$${courseDetails?.priceUsd} USD`}
                       </span>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 flex items-center gap-1">
-                        <Layers className="h-3 w-3" /> {sections.length} section
-                        {sections.length !== 1 ? "s" : ""}
-                      </span>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 flex items-center gap-1">
-                        <PlayCircle className="h-3 w-3" />{" "}
-                        {courseDetails?.lessonCount ?? 0} lesson
-                        {(courseDetails?.lessonCount ?? 0) !== 1 ? "s" : ""}
-                      </span>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 flex items-center gap-1">
-                        <Users className="h-3 w-3" />{" "}
-                        {courseDetails?.enrolledCount ?? 0} enrolled
-                      </span>
+                      {courseDetails?.language && (
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 uppercase">
+                          {courseDetails.language}
+                        </span>
+                      )}
+                      {courseDetails?.shariahCompliant && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-900/10 text-emerald-800">
+                          Shariah ✓
+                        </span>
+                      )}
+                      {courseDetails?.certificateIssued && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                          🎓 Certificate
+                        </span>
+                      )}
                     </div>
+
                     {/* Course actions */}
-                    <div className="mt-4 flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
                           setCourseForm({
@@ -1186,37 +1765,77 @@ function InstructorLearningWorkspace({
                 </div>
 
                 {/* Sections & Lessons */}
-                <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-[#D52B1E]" />
-                      <h3 className="text-sm font-bold text-gray-800">
-                        Course Curriculum
-                      </h3>
+                <div className="rounded-[22px] bg-white border border-gray-100 shadow-sm overflow-hidden">
+                  {/* Card header */}
+                  <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-4 flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Layers className="h-4 w-4 text-white/70" />
+                        <h3 className="text-sm font-bold text-white">Course Curriculum</h3>
+                      </div>
+                      {sections.length > 0 && (() => {
+                        const totalLessons = sections.reduce((t, s) => t + (s.lessons?.length ?? 0), 0);
+                        const totalSecs = sections.reduce(
+                          (t, s) => t + (s.lessons ?? []).reduce((ls, l) => ls + (l.durationSeconds ?? 0), 0),
+                          0,
+                        );
+                        return (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-white/60 font-medium">
+                              {sections.length} section{sections.length !== 1 ? "s" : ""}
+                            </span>
+                            <span className="text-white/30">·</span>
+                            <span className="text-[11px] text-white/60 font-medium">
+                              {totalLessons} lesson{totalLessons !== 1 ? "s" : ""}
+                            </span>
+                            {totalSecs > 0 && (
+                              <>
+                                <span className="text-white/30">·</span>
+                                <span className="text-[11px] text-white/60 font-medium flex items-center gap-0.5">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {formatSecondsAsLabel(totalSecs)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
-                    <span className="text-xs text-gray-400 font-medium">
-                      {sections.length} section
-                      {sections.length !== 1 ? "s" : ""}
-                    </span>
+                    {!showAddSection && (
+                      <button
+                        onClick={() => setShowAddSection(true)}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-white bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Section
+                      </button>
+                    )}
                   </div>
 
                   {sections.length === 0 && !showAddSection && (
-                    <div className="py-12 text-center">
-                      <div className="h-14 w-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
-                        <Layers className="h-6 w-6 text-gray-300" />
+                    <div className="py-14 text-center px-6">
+                      <div className="h-16 w-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-4">
+                        <Layers className="h-7 w-7 text-slate-300" />
                       </div>
-                      <p className="text-sm font-semibold text-gray-500">
-                        No sections yet
+                      <p className="text-sm font-semibold text-gray-600">No sections yet</p>
+                      <p className="text-xs text-gray-400 mt-1 mb-5">
+                        Structure your course into sections, then add lessons to each
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Add sections to organize your course content
-                      </p>
+                      <button
+                        onClick={() => setShowAddSection(true)}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[#D52B1E] hover:bg-[#b82319] px-4 py-2 rounded-xl transition-colors"
+                      >
+                        <Plus className="h-4 w-4" /> Add First Section
+                      </button>
                     </div>
                   )}
 
                   {sections.map((section, sIdx) => {
                     const isExpanded = expandedSectionId === section.id;
                     const lessonCount = section.lessons?.length ?? 0;
+                    const sectionDuration = (section.lessons ?? []).reduce(
+                      (t, l) => t + (l.durationSeconds ?? 0),
+                      0,
+                    );
                     return (
                       <div
                         key={section.id}
@@ -1224,28 +1843,48 @@ function InstructorLearningWorkspace({
                       >
                         {/* Section header row */}
                         <div
-                          className={`flex items-center gap-3 px-6 py-4 transition-colors ${isExpanded ? "bg-gray-50/80" : "hover:bg-gray-50/50"}`}
+                          className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${isExpanded ? "bg-blue-50/40" : "hover:bg-gray-50/50"}`}
                         >
                           {/* Number badge */}
                           <div className="shrink-0 h-7 w-7 rounded-lg bg-[#D52B1E]/10 text-[#D52B1E] flex items-center justify-center text-xs font-bold">
                             {sIdx + 1}
                           </div>
 
-                          {/* Title + stats */}
+                          {/* Title + meta */}
                           <button
-                            className="flex-1 min-w-0 text-left flex items-center gap-2"
+                            className="flex-1 min-w-0 text-left"
                             onClick={() =>
                               setExpandedSectionId(
                                 isExpanded ? null : String(section.id),
                               )
                             }
                           >
-                            <span className="text-sm font-bold text-gray-800 truncate">
-                              {section.title}
-                            </span>
-                            <span className="shrink-0 text-xs text-gray-400 font-medium">
-                              {lessonCount} lesson{lessonCount !== 1 ? "s" : ""}
-                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-bold text-gray-800 truncate">
+                                {section.title}
+                              </span>
+                              {section.isFreePreview && (
+                                <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-blue-100 text-blue-700 leading-5">
+                                  Free Preview
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] text-gray-400 font-medium">
+                                {lessonCount} lesson{lessonCount !== 1 ? "s" : ""}
+                              </span>
+                              {sectionDuration > 0 && (
+                                <span className="text-[11px] text-gray-400 font-medium flex items-center gap-0.5">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {formatSecondsAsLabel(sectionDuration)}
+                                </span>
+                              )}
+                              {section.description && (
+                                <span className="text-[11px] text-gray-400 truncate max-w-[160px]">
+                                  {section.description}
+                                </span>
+                              )}
+                            </div>
                           </button>
 
                           {/* Actions */}
@@ -1265,6 +1904,13 @@ function InstructorLearningWorkspace({
                               <Plus className="h-3 w-3" /> Lesson
                             </button>
                             <button
+                              className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                              onClick={() => setInspectingSectionId(String(section.id))}
+                              title="View section details"
+                            >
+                              <Info className="h-3.5 w-3.5" />
+                            </button>
+                            <button
                               className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
                               onClick={() =>
                                 setExpandedSectionId(
@@ -1281,11 +1927,7 @@ function InstructorLearningWorkspace({
 
                         {/* Expanded content */}
                         {isExpanded && (
-                          <div className="bg-gray-50/40 px-6 pb-5 pt-1">
-                            {/* Section description from detail endpoint */}
-                            {sectionDetailQuery.data?.id === section.id && section.description && (
-                              <p className="text-xs text-gray-500 italic mb-3">{section.description}</p>
-                            )}
+                          <div className="bg-blue-50/20 px-5 pb-5 pt-2">
                             {/* Lesson list */}
                             {lessonCount > 0 && (
                               <div className="space-y-1.5 mb-4">
@@ -1298,7 +1940,7 @@ function InstructorLearningWorkspace({
                                   return (
                                     <div
                                       key={lesson.id}
-                                      className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 py-2.5 shadow-sm hover:shadow transition-shadow"
+                                      className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-3.5 py-2.5 shadow-sm hover:shadow transition-shadow"
                                     >
                                       <span className="text-[11px] font-bold text-gray-300 w-4 shrink-0 text-right">
                                         {lIdx + 1}
@@ -1310,21 +1952,44 @@ function InstructorLearningWorkspace({
                                           className={`h-3.5 w-3.5 ${meta.color}`}
                                         />
                                       </div>
-                                      <span className="flex-1 text-sm font-medium text-gray-800 truncate">
-                                        {lesson.title}
-                                      </span>
-                                      <button
-                                        onClick={() => setViewingLessonId(viewingLessonId === String(lesson.id) ? null : String(lesson.id))}
-                                        className="shrink-0 h-6 w-6 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                                        title="View lesson details"
-                                      >
-                                        <Eye className="h-3 w-3" />
-                                      </button>
-                                      <span
-                                        className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full border ${meta.bg} ${meta.color} ${meta.border}`}
-                                      >
-                                        {meta.label}
-                                      </span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800 truncate">
+                                          {lesson.title}
+                                        </p>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          <span className={`text-[10px] font-bold px-1.5 py-0 rounded-full leading-5 border ${meta.bg} ${meta.color} ${meta.border}`}>
+                                            {meta.label}
+                                          </span>
+                                          {lesson.durationSeconds ? (
+                                            <span className="text-[10px] text-gray-400 font-medium flex items-center gap-0.5">
+                                              <Clock className="h-2.5 w-2.5" />
+                                              {formatSecondsAsLabel(lesson.durationSeconds)}
+                                            </span>
+                                          ) : null}
+                                          {lesson.contentUrl && (
+                                            <span className="text-[10px] text-blue-500 font-medium flex items-center gap-0.5">
+                                              <ExternalLink className="h-2.5 w-2.5" /> Link
+                                            </span>
+                                          )}
+                                          {lesson.isFreePreview && (
+                                            <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-blue-50 text-blue-600 leading-5">Preview</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        {lesson.isPublished ? (
+                                          <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-emerald-50 text-emerald-700 leading-5">Live</span>
+                                        ) : (
+                                          <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-amber-50 text-amber-700 leading-5">Draft</span>
+                                        )}
+                                        <button
+                                          onClick={() => setViewingLessonId(viewingLessonId === String(lesson.id) ? null : String(lesson.id))}
+                                          className="h-6 w-6 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-[#D52B1E] transition-colors"
+                                          title="View full lesson details"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -1578,9 +2243,9 @@ function InstructorLearningWorkspace({
                     );
                   })}
 
-                  {/* Add section area */}
-                  <div className="px-6 py-4 bg-gray-50/40 border-t border-gray-100">
-                    {showAddSection ? (
+                  {/* Add section form */}
+                  {showAddSection && (
+                  <div className="px-5 py-4 bg-slate-50/60 border-t border-slate-100">
                       <motion.div
                         initial={{ opacity: 0, y: -6 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1675,19 +2340,12 @@ function InstructorLearningWorkspace({
                           </Button>
                         </div>
                       </motion.div>
-                    ) : (
-                      <button
-                        onClick={() => setShowAddSection(true)}
-                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-200 text-sm font-semibold text-gray-400 hover:border-[#D52B1E]/40 hover:text-[#D52B1E] hover:bg-[#D52B1E]/3 transition-all"
-                      >
-                        <Plus className="h-4 w-4" /> Add Section
-                      </button>
-                    )}
                   </div>
+                  )}
                 </div>
 
                 {/* ── Quiz Management ─────────────────────────────────── */}
-                <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+                <div className="rounded-[22px] bg-white border border-gray-100 shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
                     <div className="flex items-center gap-2">
                       <HelpCircle className="h-4 w-4 text-[#D52B1E]" />
@@ -1955,46 +2613,6 @@ function InstructorLearningWorkspace({
                   </div>
                 </div>
 
-                {/* ── Lesson Detail Viewer ────────────────────────────── */}
-                {viewingLessonId && lessonDetailQuery.data && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden"
-                  >
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
-                      <div className="flex items-center gap-2">
-                        <Eye className="h-4 w-4 text-[#D52B1E]" />
-                        <h3 className="text-sm font-bold text-gray-800">Lesson Details</h3>
-                      </div>
-                      <button
-                        onClick={() => setViewingLessonId(null)}
-                        className="h-6 w-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="px-6 py-4 space-y-2 text-sm">
-                      <p><span className="font-semibold text-gray-600">Title:</span> {lessonDetailQuery.data.title}</p>
-                      <p><span className="font-semibold text-gray-600">Type:</span> {lessonDetailQuery.data.type}</p>
-                      {lessonDetailQuery.data.contentUrl && (
-                        <p><span className="font-semibold text-gray-600">URL:</span> <a href={lessonDetailQuery.data.contentUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">{lessonDetailQuery.data.contentUrl}</a></p>
-                      )}
-                      {lessonDetailQuery.data.contentText && (
-                        <p className="text-gray-600 whitespace-pre-wrap">{lessonDetailQuery.data.contentText}</p>
-                      )}
-                      {lessonDetailQuery.data.durationSeconds != null && (
-                        <p><span className="font-semibold text-gray-600">Duration:</span> {Math.round((lessonDetailQuery.data.durationSeconds ?? 0) / 60)}m</p>
-                      )}
-                      {lessonDetailQuery.data.meetingLink && (
-                        <p><span className="font-semibold text-gray-600">Meeting:</span> <a href={lessonDetailQuery.data.meetingLink} target="_blank" rel="noreferrer" className="text-blue-600 underline">{lessonDetailQuery.data.meetingLink}</a></p>
-                      )}
-                      {lessonDetailQuery.data.scheduledAt && (
-                        <p><span className="font-semibold text-gray-600">Scheduled:</span> {new Date(lessonDetailQuery.data.scheduledAt).toLocaleString()}</p>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
               </div>
             )}
           </div>
