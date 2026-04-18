@@ -33,7 +33,7 @@ import {
   useSubmitAcademyAttempt,
 } from "@/hooks/useAcademy";
 import { useUser } from "@/hooks/useAuth";
-import { Progress } from "@/components/ui/progress";
+import { Progress, getProgressGradient } from "@/components/ui/progress";
 import type {
   AcademyLessonDto,
   AcademySectionDto,
@@ -200,6 +200,7 @@ function CurriculumSidebar({
   onSelectLesson,
   allLessons,
   lockedLessonIds,
+  completedLessonIds,
 }: Readonly<{
   sections: AcademySectionDto[];
   activeLesson: AcademyLessonDto | null;
@@ -209,6 +210,7 @@ function CurriculumSidebar({
   allLessons: AcademyLessonDto[];
   hasFullAccess: boolean;
   lockedLessonIds: Set<string>;
+  completedLessonIds: Set<string>;
 }>) {
   const totalSections = sections.length;
   const totalLessons = allLessons.length;
@@ -287,6 +289,7 @@ function CurriculumSidebar({
                       const isActive =
                         String(lesson.id) === String(activeLesson?.id);
                       const isLocked = lockedLessonIds.has(String(lesson.id));
+                      const isCompleted = completedLessonIds.has(String(lesson.id));
 
                       return (
                         <button
@@ -305,6 +308,10 @@ function CurriculumSidebar({
                           {isLocked ? (
                             <div className="shrink-0 h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center mt-0.5">
                               <Lock className="h-3 w-3 text-gray-400" />
+                            </div>
+                          ) : isCompleted ? (
+                            <div className="shrink-0 h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center mt-0.5">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
                             </div>
                           ) : isActive ? (
                             <div className="shrink-0 h-6 w-6 rounded-full bg-[#D52B1E] flex items-center justify-center mt-0.5">
@@ -327,6 +334,11 @@ function CurriculumSidebar({
                               <span className="text-[10px] text-gray-400">
                                 {fmtDuration(lesson.durationSeconds)}
                               </span>
+                              {isCompleted && (
+                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                                  Completed
+                                </span>
+                              )}
                               {lesson.isFreePreview && (
                                 <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
                                   Preview
@@ -607,6 +619,12 @@ export function CourseExplorerDialog({
   const isEnrolled = Boolean(courseWithProgress?.courseProgress?.enrolledAt);
   const hasFullAccess = isEnrolled;
 
+  // Track completed lesson IDs from the progress API
+  const completedLessonIdSet = useMemo(() => {
+    const ids = courseWithProgress?.completedLessonIds ?? [];
+    return new Set(ids.map(String));
+  }, [courseWithProgress?.completedLessonIds]);
+
   // If user is NOT enrolled, only the first lesson is accessible; all others are locked
   const lockedLessonIds = useMemo(() => {
     if (hasFullAccess) return new Set<string>();
@@ -805,7 +823,8 @@ export function CourseExplorerDialog({
                     </div>
                     <Progress
                       value={Math.max(0, Math.min(100, progressPercent))}
-                      className="h-2 bg-white/15 [&>div]:bg-gradient-to-r [&>div]:from-[#D52B1E] [&>div]:to-orange-400"
+                      className="h-2 bg-white/15"
+                      indicatorStyle={getProgressGradient(progressPercent)}
                     />
                     <p className="text-[11px] text-white/50 mt-2">
                       {completedModules} of {totalModules} modules completed
@@ -962,17 +981,23 @@ export function CourseExplorerDialog({
                       Learning Actions
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleCompleteLesson}
-                        disabled={completeLessonMutation.isPending}
-                        className="bg-[#D52B1E] hover:bg-[#b92418] text-white"
-                      >
-                        {completeLessonMutation.isPending
-                          ? "Completing..."
-                          : "Mark Lesson Complete"}
-                      </Button>
+                      {activeLesson && completedLessonIdSet.has(String(activeLesson.id)) ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
+                          <CheckCircle className="h-4 w-4" /> Completed
+                        </span>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleCompleteLesson}
+                          disabled={completeLessonMutation.isPending}
+                          className="bg-[#D52B1E] hover:bg-[#b92418] text-white"
+                        >
+                          {completeLessonMutation.isPending
+                            ? "Completing..."
+                            : "Mark Lesson Complete"}
+                        </Button>
+                      )}
                       {activeQuizId && (
                         <>
                           <Button
@@ -1243,6 +1268,7 @@ export function CourseExplorerDialog({
               allLessons={allLessons}
               hasFullAccess={hasFullAccess}
               lockedLessonIds={lockedLessonIds}
+              completedLessonIds={completedLessonIdSet}
             />
           </div>
         </div>

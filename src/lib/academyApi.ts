@@ -229,10 +229,12 @@ export async function getAcademyCourseDetailsWithProgress(id: string | number) {
         enrolledAt?: string;
         completedAt?: string | null;
         status?: string;
+        completedLessonIds?: Array<string | number>;
       };
       progressPercent?: number;
       completedModules?: number;
       totalModules?: number;
+      completedLessonIds?: Array<string | number>;
     }
   >(`/academy/courses/${id}/with-progress`);
   const base = mapAcademyCourseApiResponse(
@@ -251,6 +253,10 @@ export async function getAcademyCourseDetailsWithProgress(id: string | number) {
           (base.moduleCount || 0),
       ),
     totalModules: response.data.totalModules ?? base.moduleCount ?? 0,
+    completedLessonIds:
+      response.data.completedLessonIds ??
+      response.data.courseProgress?.completedLessonIds ??
+      [],
     courseProgress: {
       completionPercent:
         response.data.courseProgress?.completionPercent ??
@@ -419,13 +425,15 @@ export async function getAcademyUpcomingActivities() {
       type: session.type ?? "live_session",
       dueDate: session.scheduledAt ?? null,
       courseId: session.courseId,
+      courseTitle: null,
     })),
     ...data.pendingLessons.map((lesson) => ({
       id: lesson.lessonId,
       title: lesson.lessonTitle,
       type: lesson.lessonType,
       dueDate: null,
-      courseId: lesson.courseTitle, // using courseTitle as courseId for now
+      courseId: undefined,
+      courseTitle: lesson.courseTitle,
     })),
   ];
 }

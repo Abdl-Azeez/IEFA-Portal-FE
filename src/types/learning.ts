@@ -333,6 +333,7 @@ export interface AcademyCourseWithProgressDto extends AcademyCourseDetailsDto {
   progressPercent: number;
   completedModules: number;
   totalModules: number;
+  completedLessonIds?: Array<string | number>;
   courseProgress?: {
     completionPercent: number;
     enrolledAt?: string | null;
@@ -394,6 +395,7 @@ export interface AcademyUpcomingActivityDto {
   type: string;
   dueDate?: string | null;
   courseId?: string | number;
+  courseTitle?: string | null;
 }
 
 export interface AcademyUpcomingActivitiesApiDto {

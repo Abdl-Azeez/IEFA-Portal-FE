@@ -22,7 +22,7 @@ import { CourseExplorerDialog } from "@/components/learning/CourseExplorerDialog
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
+import { Progress, getProgressGradient } from "@/components/ui/progress";
 import { useMe } from "@/hooks/useAuth";
 import {
   useAcademyCourses,
@@ -206,7 +206,8 @@ function EnrollmentCard({
           </div>
           <Progress
             value={item.progressPercent}
-            className="h-1.5 bg-gray-100 [&>div]:bg-gradient-to-r [&>div]:from-[#D52B1E] [&>div]:to-orange-400"
+            className="h-1.5 bg-gray-100"
+            indicatorStyle={getProgressGradient(item.progressPercent)}
           />
         </div>
 
@@ -1329,6 +1330,11 @@ export function LearningZone() {
                               <p className="text-sm font-semibold text-gray-900 line-clamp-1">
                                 {activity.title}
                               </p>
+                              {activity.courseTitle && (
+                                <p className="text-xs font-medium text-[#D52B1E] line-clamp-1 mt-0.5">
+                                  {activity.courseTitle}
+                                </p>
+                              )}
                               <div className="flex flex-wrap gap-1.5 mt-1">
                                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                                   {formatActivityType(activity.type)}

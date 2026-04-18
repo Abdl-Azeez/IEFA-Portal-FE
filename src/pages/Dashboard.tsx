@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { useExternalNews, type ExternalNewsArticle } from '@/hooks/useNews'
 import { toast } from '@/hooks/use-toast'
+import { useAcademyDashboard } from '@/hooks/useAcademy'
+import { Progress, getProgressGradient } from '@/components/ui/progress'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -343,11 +345,26 @@ function NewsCard({ news }: NewsCardProps) {
   )
 }
 
+function progressColor(pct: number): string {
+  if (pct >= 75) return '#16a34a'
+  if (pct >= 50) return '#84cc16'
+  if (pct >= 25) return '#f59e0b'
+  return '#D52B1E'
+}
+
 export function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   const { data: externalNews = [], isLoading: externalNewsLoading } = useExternalNews(DASHBOARD_NEWS_QUERY)
+  const { data: academyDashboard } = useAcademyDashboard()
+
+  const combinedProgress = useMemo(() => {
+    const enrollments = academyDashboard?.enrollments ?? []
+    if (enrollments.length === 0) return 0
+    const total = enrollments.reduce((sum, e) => sum + (e.progress ?? 0), 0)
+    return Math.round(total / enrollments.length)
+  }, [academyDashboard])
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -489,19 +506,54 @@ export function Dashboard() {
 
           {/* Progress Bars Section */}
           <motion.div variants={itemVariants}>
-            <div className="flex flex-col sm:flex-row justify-around items-center py-4 sm:py-8 gap-8 sm:gap-4">
-              <CircularProgress
-                percentage={85}
-                label="Current Learning Progress"
-                centerText="85% Completed"
-                id="learning"
-              />
-              <CircularProgress
-                percentage={80}
-                label="Upcoming Release"
-                centerText="80% Remaining"
-                id="release"
-              />
+            <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-8 py-4 sm:py-6">
+              {/* Circular combined progress */}
+              <div className="shrink-0 mx-auto sm:mx-0">
+                <CircularProgress
+                  percentage={combinedProgress}
+                  label="Current Learning Progress"
+                  centerText={`${combinedProgress}% Done`}
+                  id="learning"
+                />
+              </div>
+
+              {/* Per-course breakdown */}
+              <div className="flex-1 min-w-0 w-full space-y-3 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-[#737692]">Top Courses</p>
+                  {(academyDashboard?.enrollments?.length ?? 0) > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/academy')}
+                      className="text-xs font-medium text-[#D52B1E] hover:underline shrink-0"
+                    >
+                      View all {academyDashboard?.enrollments?.length} →
+                    </button>
+                  )}
+                </div>
+                {academyDashboard?.enrollments && academyDashboard.enrollments.length > 0 ? (
+                  [...academyDashboard.enrollments]
+                    .sort((a, b) => b.progress - a.progress)
+                    .slice(0, 3)
+                    .map((enrollment) => (
+                      <div key={enrollment.id} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-[#000000] line-clamp-1 flex-1 min-w-0">{enrollment.title}</p>
+                          <span className="text-xs font-bold shrink-0" style={{ color: progressColor(enrollment.progress) }}>
+                            {enrollment.progress}%
+                          </span>
+                        </div>
+                        <Progress
+                          value={enrollment.progress}
+                          className="h-1.5 bg-gray-100"
+                          indicatorStyle={getProgressGradient(enrollment.progress)}
+                        />
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-xs text-[#737692] py-2">No enrolled courses yet.</p>
+                )}
+              </div>
             </div>
           </motion.div>
         </div>
