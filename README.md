@@ -1,102 +1,135 @@
-# IEFA Portal
+# IEFA Portal — Frontend
 
-A modern React TypeScript application built with Vite, shadcn/ui, and Lucide icons.
+A full-featured Islamic Finance & Economics Association portal built with React 19, TypeScript, and Vite.
 
 ## Tech Stack
 
-- **React 19** - UI library
-- **TypeScript** - Type safety
-- **Vite** - Build tool and dev server
-- **Tailwind CSS** - Utility-first CSS framework
-- **shadcn/ui** - High-quality component library
-- **Lucide React** - Beautiful icon library
+- **React 19** — UI library
+- **TypeScript** — Type safety
+- **Vite** — Build tool and dev server
+- **Tailwind CSS** — Utility-first CSS framework
+- **shadcn/ui** (Radix UI) — Accessible component library
+- **Framer Motion** — Page and UI animations
+- **React Router DOM v7** — Client-side routing
+- **TanStack React Query v5** — Server-state management and data fetching
+- **Axios** — HTTP client
+- **Zustand** — Lightweight client-state management
+- **Tiptap** — Rich-text editor (community discussions)
+- **Recharts & Nivo** — Data visualisation charts
+- **Lucide React** — Icon library
+- **Vitest + Testing Library** — Unit testing
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm or yarn
+- Node.js v18 or higher
+- [pnpm](https://pnpm.io/) (recommended) — `npm install -g pnpm`
 
 ### Installation
 
-1. Install dependencies:
 ```bash
-npm install
+pnpm install
 ```
 
-2. Start the development server:
+### Development server
+
 ```bash
-npm run dev
+pnpm dev
 ```
 
-3. Open your browser and navigate to `http://localhost:5173`
+Open `http://localhost:5173` in your browser.
+
+### Build for production
+
+```bash
+pnpm build
+```
+
+Output is written to `dist/`.
+
+### Preview production build
+
+```bash
+pnpm preview
+```
+
+### Run tests
+
+```bash
+pnpm test          # single run
+pnpm test:watch    # watch mode
+```
 
 ## Project Structure
 
 ```
-IEFA-Portal/
-├── src/
-│   ├── lib/
-│   │   └── utils.ts          # Utility functions (cn helper)
-│   ├── components/
-│   │   └── ui/               # shadcn/ui components (add here)
-│   ├── App.tsx               # Main application component
-│   ├── main.tsx              # Application entry point
-│   └── style.css             # Global styles with Tailwind
-├── components.json            # shadcn/ui configuration
-├── tailwind.config.js        # Tailwind CSS configuration
-├── postcss.config.js         # PostCSS configuration
-├── vite.config.ts            # Vite configuration
-└── tsconfig.json             # TypeScript configuration
+src/
+├── App.tsx                    # Root router and layout wiring
+├── main.tsx                   # Application entry point
+├── style.css                  # Global styles (Tailwind)
+├── components/
+│   ├── ui/                    # shadcn/ui base components
+│   ├── layout/                # MainLayout, Header, Sidebar, Footer
+│   ├── admin/                 # AdminLayout, AdminSidebar, AdminHeader
+│   ├── community/             # Discussion modals and profile popups
+│   ├── learning/              # Course explorer dialog
+│   └── resources/             # Resource cards, filters, preview
+├── pages/
+│   ├── Login, Signup, ForgotPassword, ResetPassword
+│   ├── Questionnaire          # Onboarding flow
+│   ├── Dashboard
+│   ├── News
+│   ├── MarketInsights, GlobalIslamicMarket
+│   ├── Academy, CourseResults
+│   ├── Community
+│   ├── Directory, IFProfessionals
+│   ├── Resources, ResearchReports
+│   ├── Data
+│   ├── Podcast
+│   ├── Notifications, Profile, Settings, Support
+│   ├── tools/                 # ZakatCalculator, HalalStockScreening, HalalCryptoScreening
+│   └── admin/                 # Full admin panel (users, content, settings)
+├── hooks/                     # Feature-level data hooks (useNews, useLearning, …)
+├── lib/                       # API client (axios), service modules, utils
+├── contexts/                  # AuthContext, AdminAuthContext
+├── stores/                    # Zustand stores (auth)
+└── types/                     # Shared TypeScript types
 ```
 
-## Adding shadcn/ui Components
+## Features
 
-To add shadcn/ui components to your project, use the CLI:
+### User-facing
+| Area | Description |
+|---|---|
+| Auth | Login, signup, forgot/reset password, onboarding questionnaire |
+| Dashboard | Personalised overview |
+| News | Islamic finance news feed |
+| Market Insights | Market data and analysis |
+| Global Islamic Market | Regional market explorer |
+| Academy | Courses, learning paths, progress tracking |
+| Community | Threaded discussions with rich-text posting |
+| IF Professionals Directory | Searchable professional directory |
+| Resources | Downloadable documents, glossary, filters |
+| Research Reports | Academic and industry research |
+| Data | Interactive datasets and charts |
+| Podcast | Episode listing and playback |
+| Tools | Zakat Calculator, Halal Stock Screening, Halal Crypto Screening |
 
-```bash
-npx shadcn@latest add [component-name]
-```
+### Admin panel (`/admin`)
+User management, content moderation for News, Podcasts, Learning, Academy, Resources, Data, Community, Directory, and IF Professionals.
 
-For example:
-```bash
-npx shadcn@latest add button
-npx shadcn@latest add card
-npx shadcn@latest add dialog
-```
+## Configuration files
 
-## Using Lucide Icons
-
-Import icons from `lucide-react`:
-
-```tsx
-import { Home, User, Settings } from 'lucide-react'
-
-function MyComponent() {
-  return (
-    <div>
-      <Home className="w-5 h-5" />
-      <User className="w-5 h-5" />
-      <Settings className="w-5 h-5" />
-    </div>
-  )
-}
-```
-
-## Building for Production
-
-```bash
-npm run build
-```
-
-The built files will be in the `dist` directory.
-
-## Preview Production Build
-
-```bash
-npm run preview
-```
+| File | Purpose |
+|---|---|
+| `vite.config.ts` | Vite build configuration |
+| `tsconfig.json` | TypeScript configuration |
+| `tailwind.config.js` | Tailwind CSS configuration |
+| `postcss.config.js` | PostCSS configuration |
+| `components.json` | shadcn/ui CLI configuration |
+| `vitest.config.ts` | Vitest test configuration |
+| `vercel.json` | Vercel deployment configuration |
 
 ## License
 
