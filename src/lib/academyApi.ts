@@ -130,6 +130,7 @@ interface AcademyCourseApiResponse {
       meetingLink: string | null;
       scheduledAt: string | null;
       quizzes: unknown[];
+      lastAttempt?: unknown;
       isCompleted?: boolean;
     }>;
   }>;
@@ -217,6 +218,52 @@ function mapAcademyCourseApiResponse(
           meetingLink: lesson.meetingLink,
           scheduledAt: lesson.scheduledAt,
           quizzes: lesson.quizzes ?? [],
+          quiz: (() => {
+            const firstQuiz = lesson.quizzes?.[0];
+            if (!firstQuiz || typeof firstQuiz !== "object") return null;
+            const q = firstQuiz as Record<string, unknown>;
+            if (q.id === undefined || q.id === null) return null;
+            return {
+              id: q.id as string | number,
+              title: String(q.title ?? ""),
+              passPercentage:
+                q.passPercentage !== undefined
+                  ? Number(q.passPercentage)
+                  : undefined,
+              timeLimitMinutes:
+                q.timeLimitMinutes !== undefined
+                  ? Number(q.timeLimitMinutes) || null
+                  : null,
+              maxAttempts:
+                q.maxAttempts !== undefined
+                  ? Number(q.maxAttempts) || null
+                  : null,
+              isPublished:
+                q.isPublished !== undefined
+                  ? Boolean(q.isPublished)
+                  : undefined,
+              questionCount:
+                q.questionCount !== undefined
+                  ? Number(q.questionCount)
+                  : undefined,
+            };
+          })(),
+          lastAttempt: (() => {
+            const la = (lesson as Record<string, unknown>).lastAttempt;
+            if (!la || typeof la !== "object") return null;
+            const laRec = la as Record<string, unknown>;
+            return {
+              id: laRec.id as string | number,
+              status: laRec.status as "passed" | "failed" | "in_progress",
+              score: laRec.score !== undefined ? Number(laRec.score) : null,
+              attemptNumber:
+                laRec.attemptNumber !== undefined
+                  ? Number(laRec.attemptNumber)
+                  : null,
+              submittedAt: (laRec.submittedAt as string | null) ?? null,
+              startedAt: (laRec.startedAt as string | null) ?? null,
+            };
+          })(),
           isCompleted: Boolean(lesson.isCompleted),
         })),
     })),

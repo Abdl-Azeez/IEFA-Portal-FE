@@ -36,6 +36,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { CourseExplorerDialog } from "@/components/learning/CourseExplorerDialog";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -652,8 +653,25 @@ function InstructorLearningWorkspace({
   const [sectionForm, setSectionForm] = useState(emptySectionForm);
   const [lessonForm, setLessonForm] = useState(emptyLessonForm);
   const [managingQuizId, setManagingQuizId] = useState<string | null>(null);
-  const [showAddQuiz, setShowAddQuiz] = useState(false);
-  const [quizForm, setQuizForm] = useState({ title: "", passPercentage: 70 });
+  const [addingQuizToLessonId, setAddingQuizToLessonId] = useState<
+    string | null
+  >(null);
+  const [addingQuizLessonTitle, setAddingQuizLessonTitle] = useState("");
+  const [quizForm, setQuizForm] = useState({
+    title: "",
+    description: "",
+    passPercentage: 70,
+    timeLimitMinutes: "",
+  });
+  const [showEditQuizSettings, setShowEditQuizSettings] = useState(false);
+  const [editQuizForm, setEditQuizForm] = useState({
+    title: "",
+    description: "",
+    passPercentage: 70,
+    timeLimitMinutes: "",
+    maxAttempts: "",
+    isPublished: false,
+  });
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [questionForm, setQuestionForm] = useState({
     text: "",
@@ -820,16 +838,47 @@ function InstructorLearningWorkspace({
   };
 
   const handleAddQuiz = async () => {
-    if (!quizForm.title.trim() || selectedCourseId === "") return;
+    if (
+      !quizForm.title.trim() ||
+      selectedCourseId === "" ||
+      !addingQuizToLessonId
+    )
+      return;
     await addQuizMutation.mutateAsync({
       courseId: selectedCourseId,
       payload: {
         title: quizForm.title,
+        description: quizForm.description || undefined,
         passPercentage: quizForm.passPercentage,
+        timeLimitMinutes: quizForm.timeLimitMinutes
+          ? Number(quizForm.timeLimitMinutes)
+          : undefined,
+        lessonId: addingQuizToLessonId,
       },
     });
-    setShowAddQuiz(false);
-    setQuizForm({ title: "", passPercentage: 70 });
+    setAddingQuizToLessonId(null);
+    setAddingQuizLessonTitle("");
+    setQuizForm({ title: "", description: "", passPercentage: 70, timeLimitMinutes: "" });
+  };
+
+  const handleUpdateQuizSettings = async () => {
+    if (!managingQuizId) return;
+    await updateQuizMutation.mutateAsync({
+      id: managingQuizId,
+      payload: {
+        title: editQuizForm.title || undefined,
+        description: editQuizForm.description || undefined,
+        passPercentage: editQuizForm.passPercentage || undefined,
+        timeLimitMinutes: editQuizForm.timeLimitMinutes
+          ? Number(editQuizForm.timeLimitMinutes)
+          : undefined,
+        maxAttempts: editQuizForm.maxAttempts
+          ? Number(editQuizForm.maxAttempts)
+          : undefined,
+        isPublished: editQuizForm.isPublished,
+      },
+    });
+    setShowEditQuizSettings(false);
   };
 
   const handleAddQuestionToQuiz = async () => {
@@ -1871,6 +1920,8 @@ function InstructorLearningWorkspace({
                         setExpandedSectionId(null);
                         setViewingLessonId(null);
                         setManagingQuizId(null);
+                        setAddingQuizToLessonId(null);
+                        setShowEditQuizSettings(false);
                         setShowAddSection(false);
                         setAddingLessonSectionId(null);
                       }}
@@ -2454,6 +2505,69 @@ function InstructorLearningWorkspace({
                                             Draft
                                           </span>
                                         )}
+                                        {/* Quiz badge + button */}
+                                        {(lesson.quizId != null ||
+                                          (lesson.quizzes &&
+                                            (
+                                              lesson.quizzes as unknown[]
+                                            ).length > 0)) && (
+                                          <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-violet-50 text-violet-700 leading-5 border border-violet-100">
+                                            Quiz
+                                          </span>
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            const rawQuizId =
+                                              lesson.quizId ??
+                                              (
+                                                lesson.quizzes?.[0] as
+                                                  | Record<string, unknown>
+                                                  | undefined
+                                              )?.id;
+                                            if (rawQuizId != null) {
+                                              setManagingQuizId(
+                                                String(rawQuizId),
+                                              );
+                                              setShowEditQuizSettings(false);
+                                            } else {
+                                              setAddingQuizToLessonId(
+                                                String(lesson.id),
+                                              );
+                                              setAddingQuizLessonTitle(
+                                                lesson.title,
+                                              );
+                                              setQuizForm({
+                                                title: "",
+                                                description: "",
+                                                passPercentage: 70,
+                                                timeLimitMinutes: "",
+                                              });
+                                            }
+                                          }}
+                                          className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border ${
+                                            lesson.quizId != null ||
+                                            (lesson.quizzes &&
+                                              (lesson.quizzes as unknown[])
+                                                .length > 0)
+                                              ? "text-violet-700 bg-violet-50 border-violet-200 hover:bg-violet-100"
+                                              : "text-[#D52B1E] bg-[#D52B1E]/8 border-[#D52B1E]/30 hover:bg-[#D52B1E]/15 shadow-[0_0_0_2px_rgba(213,43,30,0.06)]"
+                                          }`}
+                                          title={
+                                            lesson.quizId != null
+                                              ? "Manage lesson quiz"
+                                              : "Attach quiz to lesson"
+                                          }
+                                        >
+                                          <HelpCircle className="h-3.5 w-3.5" />
+                                          <span>
+                                            {lesson.quizId != null ||
+                                            (lesson.quizzes &&
+                                              (lesson.quizzes as unknown[])
+                                                .length > 0)
+                                              ? "Manage quiz"
+                                              : "Add quiz"}
+                                          </span>
+                                        </button>
                                         <button
                                           onClick={() =>
                                             setViewingLessonId(
@@ -2839,29 +2953,24 @@ function InstructorLearningWorkspace({
                   </div>
 
                   <div className="px-6 py-4 space-y-4">
-                    {/* Quiz selector */}
-                    {courseQuizzes.length > 0 && (
-                      <select
-                        value={managingQuizId ?? ""}
-                        onChange={(e) => {
-                          setManagingQuizId(e.target.value || null);
-                          setShowAddQuestion(false);
-                          setAddingOptionToQId(null);
-                        }}
-                        className={inputCls}
-                      >
-                        <option value="">Select a quiz to manage…</option>
-                        {courseQuizzes.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {q.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    {/* Selected quiz details */}
-                    {managingQuizId &&
-                      quizDetailsQuery.data &&
+                    {!managingQuizId ? (
+                      <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center">
+                        <HelpCircle className="h-8 w-8 text-gray-200 mx-auto mb-3" />
+                        <p className="text-sm font-semibold text-gray-500">
+                          No quiz selected
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
+                          Click the{" "}
+                          <HelpCircle className="inline h-3 w-3 text-violet-400" />{" "}
+                          icon on a lesson row above to attach a quiz or manage
+                          an existing one.
+                        </p>
+                      </div>
+                    ) : quizDetailsQuery.isLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="h-6 w-6 rounded-full border-2 border-[#D52B1E] border-t-transparent animate-spin" />
+                      </div>
+                    ) : quizDetailsQuery.data ? (
                       (() => {
                         const quiz = quizDetailsQuery.data;
                         const questions = (quiz.questions ?? []) as Array<{
@@ -2879,53 +2988,278 @@ function InstructorLearningWorkspace({
                         return (
                           <div className="space-y-3">
                             {/* Quiz header */}
-                            <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50">
-                              <div>
-                                <p className="text-sm font-bold text-gray-800">
-                                  {quiz.title}
-                                </p>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  {questions.length} question
-                                  {questions.length !== 1 ? "s" : ""} ·{" "}
-                                  {attempts.length} attempt
-                                  {attempts.length !== 1 ? "s" : ""}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => {
-                                    const newTitle = window.prompt(
-                                      "Quiz title:",
-                                      quiz.title,
-                                    );
-                                    if (newTitle && newTitle !== quiz.title)
-                                      void updateQuizMutation.mutateAsync({
-                                        id: managingQuizId,
-                                        payload: { title: newTitle },
+                            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-gray-800 truncate">
+                                    {quiz.title}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    <span className="text-[10px] font-semibold text-gray-500">
+                                      {questions.length} question
+                                      {questions.length !== 1 ? "s" : ""}
+                                    </span>
+                                    <span className="text-gray-300">·</span>
+                                    <span className="text-[10px] font-semibold text-gray-500">
+                                      Pass: {quiz.passPercentage ?? 70}%
+                                    </span>
+                                    {quiz.timeLimitMinutes && (
+                                      <>
+                                        <span className="text-gray-300">·</span>
+                                        <span className="text-[10px] font-semibold text-gray-500">
+                                          {quiz.timeLimitMinutes} min
+                                        </span>
+                                      </>
+                                    )}
+                                    {quiz.maxAttempts != null ? (
+                                      <>
+                                        <span className="text-gray-300">·</span>
+                                        <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0 rounded-full leading-5">
+                                          Max {quiz.maxAttempts} attempt
+                                          {quiz.maxAttempts !== 1 ? "s" : ""}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-gray-300">·</span>
+                                        <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0 rounded-full leading-5">
+                                          Unlimited attempts
+                                        </span>
+                                      </>
+                                    )}
+                                    {quiz.isPublished ? (
+                                      <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-emerald-50 text-emerald-700 leading-5">
+                                        Published
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-amber-50 text-amber-700 leading-5">
+                                        Draft
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 ml-2">
+                                  <button
+                                    onClick={() => {
+                                      setShowEditQuizSettings(
+                                        !showEditQuizSettings,
+                                      );
+                                      setEditQuizForm({
+                                        title: quiz.title,
+                                        description: quiz.description ?? "",
+                                        passPercentage: quiz.passPercentage ?? 70,
+                                        timeLimitMinutes: quiz.timeLimitMinutes
+                                          ? String(quiz.timeLimitMinutes)
+                                          : "",
+                                        maxAttempts: quiz.maxAttempts
+                                          ? String(quiz.maxAttempts)
+                                          : "",
+                                        isPublished: quiz.isPublished ?? false,
                                       });
-                                  }}
-                                  className="h-7 w-7 flex items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                                  title="Edit quiz"
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (
-                                      window.confirm(
-                                        "Delete this quiz and all its contents?",
+                                    }}
+                                    className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors ${showEditQuizSettings ? "bg-blue-100 text-blue-700" : "text-blue-600 hover:bg-blue-50"}`}
+                                    title="Edit quiz settings"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          "Delete this quiz and all its contents? Students will no longer be required to complete it.",
+                                        )
                                       )
-                                    )
-                                      void deleteQuizMutation
-                                        .mutateAsync(managingQuizId)
-                                        .then(() => setManagingQuizId(null));
-                                  }}
-                                  className="h-7 w-7 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                                  title="Delete quiz"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                        void deleteQuizMutation
+                                          .mutateAsync(managingQuizId)
+                                          .then(() => {
+                                            setManagingQuizId(null);
+                                            setShowEditQuizSettings(false);
+                                          });
+                                    }}
+                                    className="h-7 w-7 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                                    title="Delete quiz"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setManagingQuizId(null);
+                                      setShowEditQuizSettings(false);
+                                    }}
+                                    className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+                                    title="Close"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
                               </div>
+
+                              {/* Edit settings form */}
+                              {showEditQuizSettings && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -4 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="mt-3 pt-3 border-t border-gray-100 space-y-3"
+                                >
+                                  <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">
+                                    Edit Quiz Settings
+                                  </p>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2">
+                                      <label className={labelCls}>Title</label>
+                                      <input
+                                        className={inputCls}
+                                        value={editQuizForm.title}
+                                        onChange={(e) =>
+                                          setEditQuizForm((f) => ({
+                                            ...f,
+                                            title: e.target.value,
+                                          }))
+                                        }
+                                      />
+                                    </div>
+                                    <div className="col-span-2">
+                                      <label className={labelCls}>
+                                        Description
+                                      </label>
+                                      <textarea
+                                        rows={2}
+                                        className={inputCls}
+                                        value={editQuizForm.description}
+                                        onChange={(e) =>
+                                          setEditQuizForm((f) => ({
+                                            ...f,
+                                            description: e.target.value,
+                                          }))
+                                        }
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className={labelCls}>
+                                        Pass % *
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        className={inputCls}
+                                        value={editQuizForm.passPercentage}
+                                        onChange={(e) =>
+                                          setEditQuizForm((f) => ({
+                                            ...f,
+                                            passPercentage:
+                                              Number(e.target.value) || 70,
+                                          }))
+                                        }
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className={labelCls}>
+                                        Time Limit (min)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        className={inputCls}
+                                        value={editQuizForm.timeLimitMinutes}
+                                        onChange={(e) =>
+                                          setEditQuizForm((f) => ({
+                                            ...f,
+                                            timeLimitMinutes: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="None"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className={labelCls}>
+                                        Max Attempts
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        className={inputCls}
+                                        value={editQuizForm.maxAttempts}
+                                        onChange={(e) =>
+                                          setEditQuizForm((f) => ({
+                                            ...f,
+                                            maxAttempts: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Unlimited"
+                                      />
+                                      <p className="text-[10px] text-gray-400 mt-0.5">
+                                        Leave blank for unlimited. Once passed,
+                                        retake is blocked regardless.
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center pt-4">
+                                      <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() =>
+                                          setEditQuizForm((f) => ({
+                                            ...f,
+                                            isPublished: !f.isPublished,
+                                          }))
+                                        }
+                                        onKeyDown={(e) =>
+                                          (e.key === " " ||
+                                            e.key === "Enter") &&
+                                          setEditQuizForm((f) => ({
+                                            ...f,
+                                            isPublished: !f.isPublished,
+                                          }))
+                                        }
+                                        className="flex items-center gap-2 cursor-pointer select-none"
+                                      >
+                                        <button
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={editQuizForm.isPublished}
+                                          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors ${editQuizForm.isPublished ? "bg-emerald-500" : "bg-gray-200"}`}
+                                        >
+                                          <span
+                                            aria-hidden="true"
+                                            className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${editQuizForm.isPublished ? "translate-x-4" : "translate-x-0"}`}
+                                          />
+                                        </button>
+                                        <span className="text-xs font-medium text-gray-700">
+                                          Published
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end gap-2 pt-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        setShowEditQuizSettings(false)
+                                      }
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        void handleUpdateQuizSettings()
+                                      }
+                                      disabled={updateQuizMutation.isPending}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                                    >
+                                      {updateQuizMutation.isPending ? (
+                                        <>
+                                          <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
+                                          Saving…
+                                        </>
+                                      ) : (
+                                        "Save Settings"
+                                      )}
+                                    </Button>
+                                  </div>
+                                </motion.div>
+                              )}
                             </div>
 
                             {/* Quiz attempts summary */}
@@ -3243,73 +3577,8 @@ function InstructorLearningWorkspace({
                             )}
                           </div>
                         );
-                      })()}
-
-                    {/* Add quiz form */}
-                    {showAddQuiz ? (
-                      <div className="rounded-xl border border-[#D52B1E]/20 bg-white p-3 space-y-2">
-                        <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-wider">
-                          New Quiz
-                        </p>
-                        <input
-                          className={inputCls}
-                          value={quizForm.title}
-                          onChange={(e) =>
-                            setQuizForm((f) => ({
-                              ...f,
-                              title: e.target.value,
-                            }))
-                          }
-                          placeholder="Quiz title"
-                          autoFocus
-                        />
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-500 shrink-0">
-                            Pass %
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            className={`${inputCls} w-20`}
-                            value={quizForm.passPercentage}
-                            onChange={(e) =>
-                              setQuizForm((f) => ({
-                                ...f,
-                                passPercentage: Number(e.target.value) || 70,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setShowAddQuiz(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => void handleAddQuiz()}
-                            disabled={
-                              !quizForm.title.trim() ||
-                              addQuizMutation.isPending
-                            }
-                            className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-1.5"
-                          >
-                            <Plus className="h-3 w-3" /> Create Quiz
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowAddQuiz(true)}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-xs font-semibold text-gray-400 hover:border-[#D52B1E]/40 hover:text-[#D52B1E] transition-all"
-                      >
-                        <Plus className="h-3.5 w-3.5" /> Add Quiz
-                      </button>
-                    )}
+                      })()
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -3317,6 +3586,136 @@ function InstructorLearningWorkspace({
           </div>
         </motion.div>
       </div>
+
+      {/* ── Add Quiz to Lesson Dialog ─────────────────────────────── */}
+      {addingQuizToLessonId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200"
+          >
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">
+                  Attach Quiz to Lesson
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[280px]">
+                  {addingQuizLessonTitle || "Selected lesson"}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setAddingQuizToLessonId(null);
+                  setAddingQuizLessonTitle("");
+                }}
+                className="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className={labelCls}>Quiz Title *</label>
+                <input
+                  className={inputCls}
+                  value={quizForm.title}
+                  onChange={(e) =>
+                    setQuizForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                  placeholder="e.g. Module 1 Assessment"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Description</label>
+                <div className="mt-1.5">
+                  <RichTextEditor
+                    value={quizForm.description}
+                    onChange={(value) =>
+                      setQuizForm((f) => ({ ...f, description: value }))
+                    }
+                    placeholder="Add quiz instructions, required topics, marking guidance, and any references. You can use headings, bullets, numbering, links, and emphasis."
+                    minHeight="240px"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Supports rich formatting: headings, bullet/numbered lists,
+                  bold/italic, links, and separators.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Pass % *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className={inputCls}
+                    value={quizForm.passPercentage}
+                    onChange={(e) =>
+                      setQuizForm((f) => ({
+                        ...f,
+                        passPercentage: Number(e.target.value) || 70,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Time Limit (min)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className={inputCls}
+                    value={quizForm.timeLimitMinutes}
+                    onChange={(e) =>
+                      setQuizForm((f) => ({
+                        ...f,
+                        timeLimitMinutes: e.target.value,
+                      }))
+                    }
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400">
+                The quiz will be attached to this lesson. Students must pass the
+                quiz to complete the lesson. By default, attempts are unlimited;
+                once passed, retake is blocked.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddingQuizToLessonId(null);
+                  setAddingQuizLessonTitle("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleAddQuiz()}
+                disabled={
+                  !quizForm.title.trim() || addQuizMutation.isPending
+                }
+                className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-2"
+              >
+                {addQuizMutation.isPending ? (
+                  <>
+                    <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
+                    Creating…
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" /> Create Quiz
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }

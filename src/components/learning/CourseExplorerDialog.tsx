@@ -20,6 +20,7 @@ import {
   Volume2,
   VolumeX,
   CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog } from "@/components/ui/dialog";
@@ -204,6 +205,7 @@ function CurriculumSidebar({
   lockedLessonIds,
   completedLessonIds,
   completingLessonId,
+  activeLessonPassedQuiz,
 }: Readonly<{
   sections: AcademySectionDto[];
   activeLesson: AcademyLessonDto | null;
@@ -216,6 +218,8 @@ function CurriculumSidebar({
   lockedLessonIds: Set<string>;
   completedLessonIds: Set<string>;
   completingLessonId: string | null;
+  /** Whether the currently-active lesson's quiz has been passed (may be optimistic) */
+  activeLessonPassedQuiz: boolean;
 }>) {
   const totalSections = sections.length;
   const totalLessons = allLessons.length;
@@ -296,8 +300,22 @@ function CurriculumSidebar({
                       const lessonId = String(lesson.id);
                       const isLocked = lockedLessonIds.has(lessonId);
                       const isCompleted = completedLessonIds.has(lessonId);
+                      const lessonHasQuiz = Boolean(
+                        lesson.quiz?.id ?? lesson.quizId,
+                      );
+                      // For the active lesson, prefer the optimistic pass result so the
+                      // "Mark complete" button appears immediately after quiz submission.
+                      const isActiveLesson =
+                        String(lesson.id) === String(activeLesson?.id);
+                      const quizPassed = isActiveLesson
+                        ? activeLessonPassedQuiz ||
+                          lesson.lastAttempt?.status === "passed"
+                        : lesson.lastAttempt?.status === "passed";
                       const canMarkComplete =
-                        hasFullAccess && !isLocked && !isCompleted;
+                        hasFullAccess &&
+                        !isLocked &&
+                        !isCompleted &&
+                        (!lessonHasQuiz || quizPassed);
                       const isMarkingComplete = completingLessonId === lessonId;
 
                       return (
@@ -357,6 +375,11 @@ function CurriculumSidebar({
                                   {lesson.isFreePreview && (
                                     <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
                                       Preview
+                                    </span>
+                                  )}
+                                  {lessonHasQuiz && !quizPassed && !isCompleted && (
+                                    <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full">
+                                      Quiz required
                                     </span>
                                   )}
                                   {isLocked && (
@@ -577,6 +600,11 @@ export function CourseExplorerDialog({
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<string, string>
   >({});
+  /** Optimistic last-attempt result captured after a quiz submission */
+  const [latestAttemptResult, setLatestAttemptResult] = useState<{
+    status: "passed" | "failed";
+    score: number;
+  } | null>(null);
 
   const { data: courseDetails, isLoading } = useAcademyCourseDetails(
     open ? courseId : undefined,
@@ -639,12 +667,15 @@ export function CourseExplorerDialog({
       setCompletingLessonId(null);
       setLocalCompletedLessonIds(new Set());
       setSelectedAnswers({});
+      setLatestAttemptResult(null);
     }
   }, [open, courseId]);
 
   useEffect(() => {
     setSelectedAnswers({});
-  }, [activeQuizId]);
+    setLatestAttemptResult(null);
+    setActiveAttemptId(undefined);
+  }, [activeLesson?.id]);
 
   const activeMeta = getLessonMeta(activeLesson?.type);
   const ActiveIcon = activeMeta.Icon;
@@ -760,6 +791,12 @@ export function CourseExplorerDialog({
   const handleCompleteLesson = async (lessonId: string | number) => {
     const normalizedLessonId = String(lessonId);
     if (completedLessonIdSet.has(normalizedLessonId)) return;
+    // If lesson has an attached quiz, require it to be passed before completing
+    const lesson = allLessons.find((l) => String(l.id) === normalizedLessonId);
+    const lessonHasQuiz = Boolean(lesson?.quiz?.id ?? lesson?.quizId);
+    const effectiveLastAttempt =
+      latestAttemptResult ?? lesson?.lastAttempt ?? null;
+    if (lessonHasQuiz && effectiveLastAttempt?.status !== "passed") return;
     setCompletingLessonId(normalizedLessonId);
     try {
       await completeLessonMutation.mutateAsync(lessonId);
@@ -810,12 +847,21 @@ export function CourseExplorerDialog({
       })
       .filter((entry) => entry !== null);
 
-    await submitAttemptMutation.mutateAsync({
+    const result = await submitAttemptMutation.mutateAsync({
       attemptId: activeAttemptId,
       payload: { answers },
     });
     setActiveAttemptId(undefined);
     setSelectedAnswers({});
+    // Capture the result for optimistic display
+    const res = result as Record<string, unknown> | null | undefined;
+    const status =
+      (res?.status as string) ?? (res?.data as Record<string, unknown> | undefined)?.status;
+    const score =
+      res?.score ?? (res?.data as Record<string, unknown> | undefined)?.score;
+    if (status === "passed" || status === "failed") {
+      setLatestAttemptResult({ status, score: Number(score) || 0 });
+    }
   };
 
   const answeredQuestions = quizQuestions.filter((q) => {
@@ -824,6 +870,24 @@ export function CourseExplorerDialog({
   }).length;
   const hasRequiredAnswers =
     quizQuestions.length === 0 || answeredQuestions === quizQuestions.length;
+
+  /** Effective last attempt — prefer optimistic capture, fall back to server data */
+  const effectiveLastAttempt =
+    latestAttemptResult ?? activeLesson?.lastAttempt ?? null;
+  const lessonHasQuiz = Boolean(activeLesson?.quiz?.id ?? activeLesson?.quizId);
+  const quizPassed = effectiveLastAttempt?.status === "passed";
+  /** Can start a new quiz attempt only if quiz not yet passed and no active attempt */
+  const canStartQuiz = lessonHasQuiz && !quizPassed && !activeAttemptId;
+
+  /** Whether the active lesson is already marked complete */
+  const isActiveLessonCompleted = activeLesson
+    ? completedLessonIdSet.has(String(activeLesson.id))
+    : false;
+  /** Whether the user can mark the active lesson complete right now */
+  const canMarkActiveLesson =
+    hasFullAccess && !isActiveLessonCompleted && (!lessonHasQuiz || quizPassed);
+  const isMarkingActiveLesson =
+    completingLessonId === (activeLesson ? String(activeLesson.id) : null);
 
   return (
     <Dialog
@@ -1045,78 +1109,108 @@ export function CourseExplorerDialog({
 
                   {activeQuizId && (
                     <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-3">
-                      <h4 className="text-sm font-bold text-gray-800">
-                        Quiz Actions
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleStartQuiz}
-                          disabled={startQuizMutation.isPending}
-                        >
-                          {startQuizMutation.isPending
-                            ? "Starting..."
-                            : "Start Quiz"}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleSubmitAttempt}
-                          disabled={
-                            !activeAttemptId ||
-                            submitAttemptMutation.isPending ||
-                            !hasRequiredAnswers
-                          }
-                        >
-                          {submitAttemptMutation.isPending
-                            ? "Submitting..."
-                            : "Submit Attempt"}
-                        </Button>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-gray-800">
+                          {activeQuiz?.title ?? "Lesson Quiz"}
+                        </h4>
+                        <span className="text-xs text-gray-400">
+                          {activeQuiz?.questions?.length ?? 0} questions ·{" "}
+                          Pass {activeQuiz?.passPercentage ?? 70}%
+                        </span>
                       </div>
-                      <div className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2">
-                        <p className="text-xs font-semibold text-violet-700">
-                          Quiz Details
+
+                      {/* Last attempt / pass banner */}
+                      {quizPassed ? (
+                        <div className="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+                          <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                          <div>
+                            <p className="text-sm font-bold text-emerald-700">
+                              Quiz Passed!
+                            </p>
+                            <p className="text-xs text-emerald-600 mt-0.5">
+                              Score: {effectiveLastAttempt?.score ?? 0}% — you
+                              can now mark this lesson as complete.
+                            </p>
+                          </div>
+                        </div>
+                      ) : effectiveLastAttempt ? (
+                        <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5 flex items-center gap-2">
+                          <XCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                          <p className="text-xs text-amber-700 font-medium">
+                            Last attempt:{" "}
+                            <span className="font-bold">
+                              {effectiveLastAttempt.score}%
+                            </span>{" "}
+                            — Failed. Retake below.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {/* Quiz gate notice */}
+                      {!quizPassed && (
+                        <div className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2.5 flex items-start gap-2">
+                          <HelpCircle className="h-4 w-4 text-violet-500 shrink-0 mt-0.5" />
+                          <p className="text-xs text-violet-700 font-medium">
+                            Complete and pass this quiz to unlock lesson
+                            completion.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      {!quizPassed && (
+                        <div className="flex flex-wrap gap-2">
+                          {!activeAttemptId && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleStartQuiz()}
+                              disabled={
+                                !canStartQuiz || startQuizMutation.isPending
+                              }
+                            >
+                              {startQuizMutation.isPending
+                                ? "Starting…"
+                                : "Start Quiz"}
+                            </Button>
+                          )}
+                          {activeAttemptId && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleSubmitAttempt()}
+                              disabled={
+                                submitAttemptMutation.isPending ||
+                                !hasRequiredAnswers
+                              }
+                            >
+                              {submitAttemptMutation.isPending
+                                ? "Submitting…"
+                                : "Submit Attempt"}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Progress when attempt is in progress */}
+                      {activeAttemptId && (
+                        <p className="text-xs text-gray-500">
+                          Answered {answeredQuestions}/{quizQuestions.length}{" "}
+                          questions
                         </p>
-                        <p className="text-xs text-violet-600 mt-0.5">
-                          {activeQuiz?.title ?? "Quiz"} ·{" "}
-                          {activeQuiz?.questions?.length ?? 0} questions
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-2">
-                        <p className="text-xs font-semibold text-gray-700">
-                          Assessment Checklist
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {activeAttemptId
-                            ? "1. Attempt started"
-                            : "1. Start quiz attempt"}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          2. Answer all questions ({answeredQuestions}/
-                          {quizQuestions.length})
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          3. Submit attempt
-                        </p>
-                      </div>
-                      {quizQuestions.length > 0 && (
+                      )}
+
+                      {/* Questions — only shown during an active attempt */}
+                      {quizQuestions.length > 0 && activeAttemptId && (
                         <div className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4">
                           <h5 className="text-sm font-bold text-gray-800">
                             Answer Quiz Questions
                           </h5>
-                          {!activeAttemptId && (
-                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                              Start the quiz attempt first, then select your
-                              answers.
-                            </p>
-                          )}
                           {quizQuestions.map((question, index) => {
                             const selectedValue =
                               selectedAnswers[question.id] ?? "";
-                            const canAnswer = Boolean(activeAttemptId);
                             return (
                               <div
                                 key={question.id}
@@ -1138,9 +1232,8 @@ export function CourseExplorerDialog({
                                         [question.id]: e.target.value,
                                       }))
                                     }
-                                    disabled={!canAnswer}
                                     rows={3}
-                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                                     placeholder="Type your answer"
                                   />
                                 ) : question.type === "true_false" ? (
@@ -1149,14 +1242,13 @@ export function CourseExplorerDialog({
                                       <button
                                         key={value}
                                         type="button"
-                                        disabled={!canAnswer}
                                         onClick={() =>
                                           setSelectedAnswers((prev) => ({
                                             ...prev,
                                             [question.id]: value,
                                           }))
                                         }
-                                        className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
+                                        className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
                                           selectedValue === value
                                             ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
                                             : "border-gray-200 hover:border-gray-300"
@@ -1172,14 +1264,13 @@ export function CourseExplorerDialog({
                                       <button
                                         key={option.id}
                                         type="button"
-                                        disabled={!canAnswer}
                                         onClick={() =>
                                           setSelectedAnswers((prev) => ({
                                             ...prev,
                                             [question.id]: option.id,
                                           }))
                                         }
-                                        className={`w-full rounded-lg border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:bg-gray-100 ${
+                                        className={`w-full rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
                                           selectedValue === option.id
                                             ? "border-[#D52B1E] bg-[#D52B1E]/5 text-[#D52B1E]"
                                             : "border-gray-200 hover:border-gray-300"
@@ -1197,6 +1288,52 @@ export function CourseExplorerDialog({
                       )}
                     </div>
                   )}
+
+                  {/* Mark lesson complete — shown in main panel so the button is
+                      available immediately after passing a quiz (optimistic state) */}
+                  {hasFullAccess && (
+                    <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3">
+                      <p className="text-sm text-gray-600">
+                        {isActiveLessonCompleted ? (
+                          <span className="flex items-center gap-1.5 font-semibold text-emerald-700">
+                            <CheckCircle className="h-4 w-4" /> Lesson completed
+                          </span>
+                        ) : lessonHasQuiz && !quizPassed ? (
+                          <span className="text-gray-400 text-xs">
+                            Pass the quiz above to unlock completion.
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            Ready to mark as complete?
+                          </span>
+                        )}
+                      </p>
+                      {canMarkActiveLesson && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() =>
+                            void handleCompleteLesson(activeLesson!.id)
+                          }
+                          disabled={isMarkingActiveLesson}
+                          className="bg-[#D52B1E] hover:bg-[#b92418] text-white gap-1.5"
+                        >
+                          {isMarkingActiveLesson ? (
+                            <>
+                              <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
+                              Saving…
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-3.5 w-3.5" /> Mark
+                              complete
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -1315,6 +1452,7 @@ export function CourseExplorerDialog({
               lockedLessonIds={lockedLessonIds}
               completedLessonIds={completedLessonIdSet}
               completingLessonId={completingLessonId}
+              activeLessonPassedQuiz={quizPassed}
             />
           </div>
         </div>

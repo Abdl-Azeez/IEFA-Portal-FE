@@ -425,11 +425,34 @@ export interface AcademyUpcomingActivitiesApiDto {
   }>;
 }
 
+export interface AcademyLessonQuizSummaryDto {
+  id: string | number;
+  title: string;
+  passPercentage?: number;
+  timeLimitMinutes?: number | null;
+  maxAttempts?: number | null;
+  isPublished?: boolean;
+  questionCount?: number;
+}
+
+export interface AcademyQuizLastAttemptDto {
+  id: string | number;
+  status: "passed" | "failed" | "in_progress";
+  score?: number | null;
+  attemptNumber?: number | null;
+  submittedAt?: string | null;
+  startedAt?: string | null;
+}
+
 export interface AcademyQuizDto {
   id: string;
   courseId: number;
   title: string;
   description?: string;
+  passPercentage?: number;
+  timeLimitMinutes?: number | null;
+  maxAttempts?: number | null;
+  isPublished?: boolean;
   questions: Array<Record<string, unknown>>;
 }
 
@@ -447,6 +470,10 @@ export interface AcademyLessonDto {
   meetingLink?: string | null;
   scheduledAt?: string | null;
   quizzes?: unknown[];
+  /** Attached quiz summary (always present when lesson has a quiz) */
+  quiz?: AcademyLessonQuizSummaryDto | null;
+  /** Last quiz attempt for the current user on this lesson's quiz */
+  lastAttempt?: AcademyQuizLastAttemptDto | null;
   isCompleted?: boolean;
   sectionId?: string | number;
   courseId?: string | number;
@@ -517,7 +544,8 @@ export interface AcademyInstructorCreateQuizDto {
   description?: string;
   passPercentage: number;
   timeLimitMinutes?: number;
-  lessonId?: string;
+  /** Required – the lesson this quiz is attached to */
+  lessonId: string;
 }
 
 export interface AcademyInstructorUpdateQuizDto {
@@ -615,16 +643,19 @@ export interface AcademyInstructorCourseUpdateDto {
   isFree?: boolean;
 }
 
-export interface AdminAcademyCourseUpdateDto
-  extends AcademyInstructorCourseUpdateDto {
+export interface AdminAcademyCourseUpdateDto extends AcademyInstructorCourseUpdateDto {
   instructorId?: string;
 }
 
 export interface AcademyQuizDetailsDto {
   id: string;
   courseId: string | number;
+  lessonId?: string | number | null;
   title: string;
   passPercentage?: number;
+  timeLimitMinutes?: number | null;
+  maxAttempts?: number | null;
+  isPublished?: boolean;
   description?: string | null;
   createdAt?: string;
   updatedAt?: string;

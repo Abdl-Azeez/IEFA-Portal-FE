@@ -1142,6 +1142,7 @@ export default function AdminAcademy() {
                           payload: {
                             title: quizTitleInput.trim(),
                             passPercentage: 70,
+                            lessonId: "",
                           },
                         });
                         setQuizTitleInput("");
