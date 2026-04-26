@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Award,
   BookOpen,
@@ -71,6 +71,11 @@ function fmtPrice(priceUsd?: number, isFree?: boolean): string {
   }).format(priceUsd);
 }
 
+function getLessonViewRequirementSeconds(seconds?: number | null): number {
+  if (!seconds || seconds <= 0) return 0;
+  return Math.ceil(seconds * 0.65);
+}
+
 // -- Lesson type metadata --
 
 const LESSON_TYPE = {
@@ -117,14 +122,67 @@ function getLessonMeta(type?: string) {
 
 // -- Video Player --
 
+/**
+ * YouTube embed that fires onEligible after a fixed engagement duration.
+ * We cannot access YouTube playback time cross-origin, so we use a capped
+ * timer (max 90 s) as a lightweight engagement proxy.
+ */
+function YouTubeEmbed({
+  videoId,
+  title,
+  onEligible,
+  engagementSeconds,
+}: Readonly<{
+  videoId: string;
+  title: string;
+  onEligible?: () => void;
+  engagementSeconds: number;
+}>) {
+  const calledRef = useRef(false);
+
+  useEffect(() => {
+    calledRef.current = false;
+    const id = globalThis.window.setTimeout(() => {
+      if (!calledRef.current) {
+        calledRef.current = true;
+        onEligible?.();
+      }
+    }, engagementSeconds * 1000);
+    return () => globalThis.window.clearTimeout(id);
+  }, [videoId, engagementSeconds, onEligible]);
+
+  return (
+    <div className="aspect-video w-full overflow-hidden bg-black">
+      <iframe
+        className="h-full w-full"
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=0`}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
 function VideoPlayer({
   src,
   title,
-}: Readonly<{ src: string | null | undefined; title: string }>) {
+  onEligible,
+  thresholdSeconds,
+}: Readonly<{
+  src: string | null | undefined;
+  title: string;
+  /** Called once when the view/playback threshold is reached */
+  onEligible?: () => void;
+  /** Seconds of actual playback (HTML5) or engagement (YouTube) required */
+  thresholdSeconds?: number;
+}>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(false);
+  const eligibleCalledRef = useRef(false);
 
   useEffect(() => {
+    eligibleCalledRef.current = false;
     if (videoRef.current) {
       videoRef.current.load();
     }
@@ -149,18 +207,29 @@ function VideoPlayer({
     /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
   );
   if (ytMatch) {
+    // YouTube: cap engagement timer at 90 s since we can't read playback time
+    const ytEngagement = Math.min(thresholdSeconds ?? 90, 90);
     return (
-      <div className="aspect-video w-full overflow-hidden bg-black">
-        <iframe
-          className="h-full w-full"
-          src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=0`}
-          title={title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
+      <YouTubeEmbed
+        videoId={ytMatch[1]}
+        title={title}
+        onEligible={onEligible}
+        engagementSeconds={ytEngagement}
+      />
     );
   }
+
+  const handleTimeUpdate = () => {
+    if (
+      !eligibleCalledRef.current &&
+      thresholdSeconds !== undefined &&
+      videoRef.current &&
+      videoRef.current.currentTime >= thresholdSeconds
+    ) {
+      eligibleCalledRef.current = true;
+      onEligible?.();
+    }
+  };
 
   return (
     <div className="group relative aspect-video w-full overflow-hidden bg-black">
@@ -171,6 +240,7 @@ function VideoPlayer({
         className="h-full w-full"
         muted={muted}
         preload="metadata"
+        onTimeUpdate={handleTimeUpdate}
       >
         <source src={src} />
         Your browser does not support HTML5 video.
@@ -206,6 +276,7 @@ function CurriculumSidebar({
   completedLessonIds,
   completingLessonId,
   activeLessonPassedQuiz,
+  unlockedLessonIds,
 }: Readonly<{
   sections: AcademySectionDto[];
   activeLesson: AcademyLessonDto | null;
@@ -220,6 +291,8 @@ function CurriculumSidebar({
   completingLessonId: string | null;
   /** Whether the currently-active lesson's quiz has been passed (may be optimistic) */
   activeLessonPassedQuiz: boolean;
+  /** Lessons whose view threshold has been satisfied in this session */
+  unlockedLessonIds: Set<string>;
 }>) {
   const totalSections = sections.length;
   const totalLessons = allLessons.length;
@@ -300,6 +373,10 @@ function CurriculumSidebar({
                       const lessonId = String(lesson.id);
                       const isLocked = lockedLessonIds.has(lessonId);
                       const isCompleted = completedLessonIds.has(lessonId);
+                      const hasMetViewThreshold =
+                        getLessonViewRequirementSeconds(
+                          lesson.durationSeconds,
+                        ) <= 0 || unlockedLessonIds.has(lessonId);
                       const lessonHasQuiz = Boolean(
                         lesson.quiz?.id ?? lesson.quizId,
                       );
@@ -315,6 +392,7 @@ function CurriculumSidebar({
                         hasFullAccess &&
                         !isLocked &&
                         !isCompleted &&
+                        hasMetViewThreshold &&
                         (!lessonHasQuiz || quizPassed);
                       const isMarkingComplete = completingLessonId === lessonId;
 
@@ -377,11 +455,20 @@ function CurriculumSidebar({
                                       Preview
                                     </span>
                                   )}
-                                  {lessonHasQuiz && !quizPassed && !isCompleted && (
-                                    <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full">
-                                      Quiz required
-                                    </span>
-                                  )}
+                                  {lessonHasQuiz &&
+                                    !quizPassed &&
+                                    !isCompleted && (
+                                      <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full">
+                                        Quiz required
+                                      </span>
+                                    )}
+                                  {!isCompleted &&
+                                    !hasMetViewThreshold &&
+                                    !isLocked && (
+                                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                                        Keep watching
+                                      </span>
+                                    )}
                                   {isLocked && (
                                     <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
                                       Enroll to unlock
@@ -597,6 +684,9 @@ export function CourseExplorerDialog({
   const [localCompletedLessonIds, setLocalCompletedLessonIds] = useState<
     Set<string>
   >(new Set());
+  const [unlockedLessonIds, setUnlockedLessonIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<string, string>
   >({});
@@ -618,10 +708,10 @@ export function CourseExplorerDialog({
 
   const sortedSections: AcademySectionDto[] = useMemo(
     () =>
-      [...(courseDetails?.sections ?? [])].sort(
+      [...(courseWithProgress?.sections ?? courseDetails?.sections ?? [])].sort(
         (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
       ),
-    [courseDetails?.sections],
+    [courseWithProgress?.sections, courseDetails?.sections],
   );
 
   const allLessons: AcademyLessonDto[] = useMemo(
@@ -651,7 +741,14 @@ export function CourseExplorerDialog({
 
   useEffect(() => {
     if (allLessons.length === 0) return;
-    setActiveLesson((prev) => prev ?? allLessons[0] ?? null);
+    setActiveLesson((prev) => {
+      if (!prev) return allLessons[0] ?? null;
+      return (
+        allLessons.find((lesson) => String(lesson.id) === String(prev.id)) ??
+        allLessons[0] ??
+        null
+      );
+    });
     setExpandedIds((prev) => {
       if (prev.size > 0) return prev;
       const first = sortedSections[0];
@@ -666,6 +763,7 @@ export function CourseExplorerDialog({
       setActiveAttemptId(undefined);
       setCompletingLessonId(null);
       setLocalCompletedLessonIds(new Set());
+      setUnlockedLessonIds(new Set());
       setSelectedAnswers({});
       setLatestAttemptResult(null);
     }
@@ -677,10 +775,29 @@ export function CourseExplorerDialog({
     setActiveAttemptId(undefined);
   }, [activeLesson?.id]);
 
+  /** Called by VideoPlayer when the playback/engagement threshold is reached */
+  const handleLessonEligible = useCallback(() => {
+    if (activeLesson) {
+      setUnlockedLessonIds(
+        (prev) => new Set([...prev, String(activeLesson.id)]),
+      );
+    }
+  }, [activeLesson]);
+
+  // Non-video lessons (article, assignment, live_session) are immediately eligible
+  useEffect(() => {
+    if (!activeLesson) return;
+    if (activeLesson.type !== "video") {
+      setUnlockedLessonIds(
+        (prev) => new Set([...prev, String(activeLesson.id)]),
+      );
+    }
+  }, [activeLesson?.id, activeLesson?.type]);
+
   const activeMeta = getLessonMeta(activeLesson?.type);
   const ActiveIcon = activeMeta.Icon;
 
-  const displayCourse = courseDetails ?? course;
+  const displayCourse = courseWithProgress ?? courseDetails ?? course;
   const progressPercent =
     courseWithProgress?.progressPercent ?? displayCourse?.progressPercent ?? 0;
   const completedModules = courseWithProgress?.completedModules ?? 0;
@@ -793,6 +910,10 @@ export function CourseExplorerDialog({
     if (completedLessonIdSet.has(normalizedLessonId)) return;
     // If lesson has an attached quiz, require it to be passed before completing
     const lesson = allLessons.find((l) => String(l.id) === normalizedLessonId);
+    const lessonViewSatisfied =
+      getLessonViewRequirementSeconds(lesson?.durationSeconds) <= 0 ||
+      unlockedLessonIds.has(normalizedLessonId);
+    if (!lessonViewSatisfied) return;
     const lessonHasQuiz = Boolean(lesson?.quiz?.id ?? lesson?.quizId);
     const effectiveLastAttempt =
       latestAttemptResult ?? lesson?.lastAttempt ?? null;
@@ -856,7 +977,8 @@ export function CourseExplorerDialog({
     // Capture the result for optimistic display
     const res = result as Record<string, unknown> | null | undefined;
     const status =
-      (res?.status as string) ?? (res?.data as Record<string, unknown> | undefined)?.status;
+      (res?.status as string) ??
+      (res?.data as Record<string, unknown> | undefined)?.status;
     const score =
       res?.score ?? (res?.data as Record<string, unknown> | undefined)?.score;
     if (status === "passed" || status === "failed") {
@@ -876,8 +998,20 @@ export function CourseExplorerDialog({
     latestAttemptResult ?? activeLesson?.lastAttempt ?? null;
   const lessonHasQuiz = Boolean(activeLesson?.quiz?.id ?? activeLesson?.quizId);
   const quizPassed = effectiveLastAttempt?.status === "passed";
+  const activeLessonId = activeLesson ? String(activeLesson.id) : null;
+  const activeLessonViewRequirementSeconds = getLessonViewRequirementSeconds(
+    activeLesson?.durationSeconds,
+  );
+  const hasMetActiveLessonViewThreshold =
+    !activeLessonId ||
+    activeLessonViewRequirementSeconds <= 0 ||
+    unlockedLessonIds.has(activeLessonId);
   /** Can start a new quiz attempt only if quiz not yet passed and no active attempt */
-  const canStartQuiz = lessonHasQuiz && !quizPassed && !activeAttemptId;
+  const canStartQuiz =
+    lessonHasQuiz &&
+    !quizPassed &&
+    !activeAttemptId &&
+    hasMetActiveLessonViewThreshold;
 
   /** Whether the active lesson is already marked complete */
   const isActiveLessonCompleted = activeLesson
@@ -885,7 +1019,10 @@ export function CourseExplorerDialog({
     : false;
   /** Whether the user can mark the active lesson complete right now */
   const canMarkActiveLesson =
-    hasFullAccess && !isActiveLessonCompleted && (!lessonHasQuiz || quizPassed);
+    hasFullAccess &&
+    !isActiveLessonCompleted &&
+    hasMetActiveLessonViewThreshold &&
+    (!lessonHasQuiz || quizPassed);
   const isMarkingActiveLesson =
     completingLessonId === (activeLesson ? String(activeLesson.id) : null);
 
@@ -982,6 +1119,10 @@ export function CourseExplorerDialog({
               <VideoPlayer
                 src={activeLesson?.contentUrl}
                 title={activeLesson?.title ?? ""}
+                onEligible={handleLessonEligible}
+                thresholdSeconds={Math.ceil(
+                  (activeLesson?.durationSeconds ?? 120) * 0.65,
+                )}
               />
             </div>
 
@@ -1114,8 +1255,8 @@ export function CourseExplorerDialog({
                           {activeQuiz?.title ?? "Lesson Quiz"}
                         </h4>
                         <span className="text-xs text-gray-400">
-                          {activeQuiz?.questions?.length ?? 0} questions ·{" "}
-                          Pass {activeQuiz?.passPercentage ?? 70}%
+                          {activeQuiz?.questions?.length ?? 0} questions · Pass{" "}
+                          {activeQuiz?.passPercentage ?? 70}%
                         </span>
                       </div>
 
@@ -1160,21 +1301,6 @@ export function CourseExplorerDialog({
                       {/* Actions */}
                       {!quizPassed && (
                         <div className="flex flex-wrap gap-2">
-                          {!activeAttemptId && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void handleStartQuiz()}
-                              disabled={
-                                !canStartQuiz || startQuizMutation.isPending
-                              }
-                            >
-                              {startQuizMutation.isPending
-                                ? "Starting…"
-                                : "Start Quiz"}
-                            </Button>
-                          )}
                           {activeAttemptId && (
                             <Button
                               type="button"
@@ -1298,9 +1424,15 @@ export function CourseExplorerDialog({
                           <span className="flex items-center gap-1.5 font-semibold text-emerald-700">
                             <CheckCircle className="h-4 w-4" /> Lesson completed
                           </span>
+                        ) : !hasMetActiveLessonViewThreshold ? (
+                          <span className="text-xs text-amber-700">
+                            Watch at least 65% of this lesson to unlock the next
+                            step.
+                          </span>
                         ) : lessonHasQuiz && !quizPassed ? (
-                          <span className="text-gray-400 text-xs">
-                            Pass the quiz above to unlock completion.
+                          <span className="text-gray-600 text-xs">
+                            You have viewed enough of this lesson. Take the quiz
+                            to continue.
                           </span>
                         ) : (
                           <span className="text-xs text-gray-500">
@@ -1308,6 +1440,25 @@ export function CourseExplorerDialog({
                           </span>
                         )}
                       </p>
+                      {hasMetActiveLessonViewThreshold &&
+                        lessonHasQuiz &&
+                        !quizPassed &&
+                        !activeAttemptId && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleStartQuiz()}
+                            disabled={
+                              !canStartQuiz || startQuizMutation.isPending
+                            }
+                            className="border-violet-200 text-violet-700 hover:bg-violet-50"
+                          >
+                            {startQuizMutation.isPending
+                              ? "Starting…"
+                              : "Take quiz"}
+                          </Button>
+                        )}
                       {canMarkActiveLesson && (
                         <Button
                           type="button"
@@ -1333,7 +1484,6 @@ export function CourseExplorerDialog({
                       )}
                     </div>
                   )}
-
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -1453,6 +1603,7 @@ export function CourseExplorerDialog({
               completedLessonIds={completedLessonIdSet}
               completingLessonId={completingLessonId}
               activeLessonPassedQuiz={quizPassed}
+              unlockedLessonIds={unlockedLessonIds}
             />
           </div>
         </div>

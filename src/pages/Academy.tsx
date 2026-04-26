@@ -52,7 +52,6 @@ import {
   useEnrollInAcademyCourse,
   useUnenrollFromAcademyCourse,
   useAcademyCategoryTypes,
-  useAcademyQuizTypes,
   useInstructorAcademyCourses,
   useInstructorCreateCourse,
   useInstructorUpdateCourse,
@@ -682,6 +681,18 @@ function InstructorLearningWorkspace({
     null,
   );
   const [optionForm, setOptionForm] = useState({ text: "", isCorrect: false });
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
+    null,
+  );
+  const [editingQuestionText, setEditingQuestionText] = useState("");
+  const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
+  const [editingOptionText, setEditingOptionText] = useState("");
+  const [confirmDeleteQuestionId, setConfirmDeleteQuestionId] = useState<
+    string | null
+  >(null);
+  const [confirmDeleteOptionId, setConfirmDeleteOptionId] = useState<
+    string | null
+  >(null);
   const [viewingLessonId, setViewingLessonId] = useState<string | null>(null);
   const [inspectingSectionId, setInspectingSectionId] = useState<string | null>(
     null,
@@ -692,7 +703,6 @@ function InstructorLearningWorkspace({
   >("all");
 
   const categoryTypesQuery = useAcademyCategoryTypes();
-  const quizTypesQuery = useAcademyQuizTypes();
   const coursesQuery = useInstructorAcademyCourses({ page: 1, perPage: 100 });
   const createCourseMutation = useInstructorCreateCourse();
   const updateCourseMutation = useInstructorUpdateCourse();
@@ -731,9 +741,18 @@ function InstructorLearningWorkspace({
     () =>
       (sections ?? []).flatMap((s) =>
         (s.lessons ?? [])
-          .filter((l) => l.quizId != null)
+          .filter(
+            (l) =>
+              l.quizId != null ||
+              (Array.isArray(l.quizzes) && (l.quizzes as unknown[]).length > 0),
+          )
           .map((l) => ({
-            id: String(l.quizId as string | number),
+            id: String(
+              l.quizId ??
+                (l.quizzes as Array<Record<string, unknown>> | undefined)?.[0]
+                  ?.id ??
+                "",
+            ),
             label: l.title,
           })),
       ),
@@ -858,7 +877,12 @@ function InstructorLearningWorkspace({
     });
     setAddingQuizToLessonId(null);
     setAddingQuizLessonTitle("");
-    setQuizForm({ title: "", description: "", passPercentage: 70, timeLimitMinutes: "" });
+    setQuizForm({
+      title: "",
+      description: "",
+      passPercentage: 70,
+      timeLimitMinutes: "",
+    });
   };
 
   const handleUpdateQuizSettings = async () => {
@@ -2508,9 +2532,8 @@ function InstructorLearningWorkspace({
                                         {/* Quiz badge + button */}
                                         {(lesson.quizId != null ||
                                           (lesson.quizzes &&
-                                            (
-                                              lesson.quizzes as unknown[]
-                                            ).length > 0)) && (
+                                            (lesson.quizzes as unknown[])
+                                              .length > 0)) && (
                                           <span className="text-[10px] font-bold px-1.5 py-0 rounded-full bg-violet-50 text-violet-700 leading-5 border border-violet-100">
                                             Quiz
                                           </span>
@@ -2976,11 +2999,13 @@ function InstructorLearningWorkspace({
                         const questions = (quiz.questions ?? []) as Array<{
                           id?: string;
                           text?: string;
+                          questionText?: string;
                           type?: string;
                           points?: number;
                           options?: Array<{
                             id?: string;
                             text?: string;
+                            optionText?: string;
                             isCorrect?: boolean;
                           }>;
                         }>;
@@ -3039,6 +3064,21 @@ function InstructorLearningWorkspace({
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 ml-2">
+                                  {!quiz.isPublished && (
+                                    <button
+                                      onClick={() =>
+                                        void updateQuizMutation.mutateAsync({
+                                          id: managingQuizId,
+                                          payload: { isPublished: true },
+                                        })
+                                      }
+                                      disabled={updateQuizMutation.isPending}
+                                      className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[10px] font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition-colors disabled:opacity-60"
+                                      title="Publish this quiz"
+                                    >
+                                      Publish
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => {
                                       setShowEditQuizSettings(
@@ -3047,7 +3087,8 @@ function InstructorLearningWorkspace({
                                       setEditQuizForm({
                                         title: quiz.title,
                                         description: quiz.description ?? "",
-                                        passPercentage: quiz.passPercentage ?? 70,
+                                        passPercentage:
+                                          quiz.passPercentage ?? 70,
                                         timeLimitMinutes: quiz.timeLimitMinutes
                                           ? String(quiz.timeLimitMinutes)
                                           : "",
@@ -3216,7 +3257,9 @@ function InstructorLearningWorkspace({
                                         <button
                                           type="button"
                                           role="switch"
-                                          aria-checked={editQuizForm.isPublished}
+                                          aria-checked={
+                                            editQuizForm.isPublished
+                                          }
                                           className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors ${editQuizForm.isPublished ? "bg-emerald-500" : "bg-gray-200"}`}
                                         >
                                           <span
@@ -3276,7 +3319,9 @@ function InstructorLearningWorkspace({
                                       className="flex items-center justify-between text-xs"
                                     >
                                       <span className="text-gray-600">
-                                        {att.studentId.slice(0, 8)}…
+                                        {att.studentId
+                                          ? att.studentId.slice(0, 8) + "…"
+                                          : "Student"}
                                       </span>
                                       <div className="flex items-center gap-2">
                                         <span
@@ -3301,178 +3346,406 @@ function InstructorLearningWorkspace({
                               {questions.map((q, qIdx) => (
                                 <div
                                   key={String(q.id ?? qIdx)}
-                                  className="rounded-xl border border-gray-100 p-3"
+                                  className="rounded-xl border border-gray-100 p-3 space-y-2"
                                 >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm text-gray-800">
-                                        <span className="font-bold text-gray-400 mr-1.5">
-                                          {qIdx + 1}.
-                                        </span>
-                                        {String(q.text ?? "")}
-                                      </p>
-                                      <p className="text-[11px] text-gray-400 mt-0.5">
-                                        {String(q.type ?? "mcq")} ·{" "}
-                                        {q.points ?? 1} pt
-                                        {(q.points ?? 1) !== 1 ? "s" : ""}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-0.5 shrink-0">
-                                      <button
-                                        onClick={() => {
-                                          const newText = window.prompt(
-                                            "Question text:",
-                                            String(q.text ?? ""),
-                                          );
-                                          if (newText && q.id)
-                                            void updateQuestionMutation.mutateAsync(
-                                              {
-                                                questionId: q.id,
-                                                payload: { text: newText },
-                                              },
-                                            );
-                                        }}
-                                        className="h-6 w-6 flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"
-                                        title="Edit question"
-                                      >
-                                        <Edit className="h-3 w-3" />
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          if (
-                                            q.id &&
-                                            window.confirm(
-                                              "Delete this question?",
+                                  {editingQuestionId === String(q.id) ? (
+                                    <div className="space-y-2">
+                                      <label className={labelCls}>
+                                        Question text
+                                      </label>
+                                      <div className="flex gap-2">
+                                        <input
+                                          className={`${inputCls} flex-1`}
+                                          value={editingQuestionText}
+                                          onChange={(e) =>
+                                            setEditingQuestionText(
+                                              e.target.value,
                                             )
-                                          )
-                                            void deleteQuestionMutation.mutateAsync(
-                                              q.id,
-                                            );
-                                        }}
-                                        className="h-6 w-6 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
-                                        title="Delete question"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setAddingOptionToQId(
-                                            addingOptionToQId === String(q.id)
-                                              ? null
-                                              : String(q.id ?? ""),
-                                          );
-                                          setOptionForm({
-                                            text: "",
-                                            isCorrect: false,
-                                          });
-                                        }}
-                                        className="h-6 w-6 flex items-center justify-center rounded text-emerald-500 hover:bg-emerald-50"
-                                        title="Add option"
-                                      >
-                                        <Plus className="h-3 w-3" />
-                                      </button>
+                                          }
+                                          autoFocus
+                                          onKeyDown={(e) => {
+                                            if (
+                                              e.key === "Enter" &&
+                                              editingQuestionText.trim() &&
+                                              q.id
+                                            )
+                                              void updateQuestionMutation
+                                                .mutateAsync({
+                                                  questionId: q.id,
+                                                  payload: {
+                                                    text: editingQuestionText,
+                                                  },
+                                                })
+                                                .then(() =>
+                                                  setEditingQuestionId(null),
+                                                );
+                                            if (e.key === "Escape")
+                                              setEditingQuestionId(null);
+                                          }}
+                                        />
+                                        <Button
+                                          size="sm"
+                                          onClick={() => {
+                                            if (
+                                              editingQuestionText.trim() &&
+                                              q.id
+                                            )
+                                              void updateQuestionMutation
+                                                .mutateAsync({
+                                                  questionId: q.id,
+                                                  payload: {
+                                                    text: editingQuestionText,
+                                                  },
+                                                })
+                                                .then(() =>
+                                                  setEditingQuestionId(null),
+                                                );
+                                          }}
+                                          disabled={
+                                            !editingQuestionText.trim() ||
+                                            updateQuestionMutation.isPending
+                                          }
+                                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                                        >
+                                          {updateQuestionMutation.isPending
+                                            ? "Saving…"
+                                            : "Save"}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            setEditingQuestionId(null)
+                                          }
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
                                     </div>
-                                  </div>
+                                  ) : (
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-800">
+                                          <span className="font-bold text-gray-400 mr-1.5">
+                                            {qIdx + 1}.
+                                          </span>
+                                          {String(
+                                            q.questionText ?? q.text ?? "",
+                                          )}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                          {String(q.type ?? "mcq")} ·{" "}
+                                          {q.points ?? 1} pt
+                                          {(q.points ?? 1) !== 1 ? "s" : ""}
+                                        </p>
+                                      </div>
+                                      {confirmDeleteQuestionId ===
+                                      String(q.id) ? (
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <span className="text-xs text-red-600 font-medium">
+                                            Delete this question?
+                                          </span>
+                                          <Button
+                                            size="sm"
+                                            onClick={() => {
+                                              if (q.id)
+                                                void deleteQuestionMutation
+                                                  .mutateAsync(q.id)
+                                                  .then(() =>
+                                                    setConfirmDeleteQuestionId(
+                                                      null,
+                                                    ),
+                                                  );
+                                            }}
+                                            disabled={
+                                              deleteQuestionMutation.isPending
+                                            }
+                                            className="h-6 px-2 text-xs bg-red-500 hover:bg-red-600 text-white"
+                                          >
+                                            {deleteQuestionMutation.isPending
+                                              ? "…"
+                                              : "Delete"}
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                              setConfirmDeleteQuestionId(null)
+                                            }
+                                            className="h-6 px-2 text-xs"
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                          <button
+                                            onClick={() => {
+                                              setEditingQuestionId(
+                                                String(q.id),
+                                              );
+                                              setEditingQuestionText(
+                                                String(
+                                                  q.questionText ??
+                                                    q.text ??
+                                                    "",
+                                                ),
+                                              );
+                                            }}
+                                            className="h-6 w-6 flex items-center justify-center rounded text-blue-500 hover:bg-blue-50"
+                                            title="Edit question"
+                                          >
+                                            <Edit className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              setConfirmDeleteQuestionId(
+                                                String(q.id),
+                                              )
+                                            }
+                                            className="h-6 w-6 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
+                                            title="Delete question"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setAddingOptionToQId(
+                                                addingOptionToQId ===
+                                                  String(q.id)
+                                                  ? null
+                                                  : String(q.id ?? ""),
+                                              );
+                                              setOptionForm({
+                                                text: "",
+                                                isCorrect: false,
+                                              });
+                                            }}
+                                            className="h-6 w-6 flex items-center justify-center rounded text-emerald-500 hover:bg-emerald-50"
+                                            title="Add option"
+                                          >
+                                            <Plus className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                   {/* Options */}
                                   {(q.options ?? []).length > 0 && (
-                                    <div className="mt-2 space-y-1 pl-4">
+                                    <div className="space-y-1 pl-4 border-l-2 border-gray-100">
                                       {(q.options ?? []).map((opt, oIdx) => (
-                                        <div
-                                          key={String(opt.id ?? oIdx)}
-                                          className="flex items-center justify-between text-xs"
-                                        >
-                                          <span
-                                            className={`flex items-center gap-1.5 ${opt.isCorrect ? "text-emerald-700 font-semibold" : "text-gray-500"}`}
-                                          >
-                                            <span
-                                              className={`h-2 w-2 rounded-full shrink-0 ${opt.isCorrect ? "bg-emerald-500" : "bg-gray-300"}`}
-                                            />
-                                            {String(opt.text ?? "")}
-                                          </span>
-                                          <div className="flex items-center gap-0.5">
-                                            <button
-                                              onClick={() => {
-                                                const newText = window.prompt(
-                                                  "Option text:",
-                                                  String(opt.text ?? ""),
-                                                );
-                                                if (newText && opt.id)
-                                                  void updateOptionMutation.mutateAsync(
-                                                    {
-                                                      id: opt.id,
-                                                      payload: {
-                                                        text: newText,
-                                                      },
-                                                    },
-                                                  );
-                                              }}
-                                              className="h-5 w-5 flex items-center justify-center rounded text-blue-400 hover:bg-blue-50"
-                                            >
-                                              <Edit className="h-2.5 w-2.5" />
-                                            </button>
-                                            <button
-                                              onClick={() => {
-                                                if (
-                                                  opt.id &&
-                                                  window.confirm(
-                                                    "Delete this option?",
+                                        <div key={String(opt.id ?? oIdx)}>
+                                          {editingOptionId ===
+                                          String(opt.id) ? (
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-100"
+                                                value={editingOptionText}
+                                                onChange={(e) =>
+                                                  setEditingOptionText(
+                                                    e.target.value,
                                                   )
-                                                )
-                                                  void deleteOptionMutation.mutateAsync(
-                                                    opt.id,
-                                                  );
-                                              }}
-                                              className="h-5 w-5 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
-                                            >
-                                              <Trash2 className="h-2.5 w-2.5" />
-                                            </button>
-                                          </div>
+                                                }
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                  if (
+                                                    e.key === "Enter" &&
+                                                    editingOptionText.trim() &&
+                                                    opt.id
+                                                  )
+                                                    void updateOptionMutation
+                                                      .mutateAsync({
+                                                        id: opt.id,
+                                                        payload: {
+                                                          text: editingOptionText,
+                                                        },
+                                                      })
+                                                      .then(() =>
+                                                        setEditingOptionId(
+                                                          null,
+                                                        ),
+                                                      );
+                                                  if (e.key === "Escape")
+                                                    setEditingOptionId(null);
+                                                }}
+                                              />
+                                              <button
+                                                onClick={() => {
+                                                  if (
+                                                    editingOptionText.trim() &&
+                                                    opt.id
+                                                  )
+                                                    void updateOptionMutation
+                                                      .mutateAsync({
+                                                        id: opt.id,
+                                                        payload: {
+                                                          text: editingOptionText,
+                                                        },
+                                                      })
+                                                      .then(() =>
+                                                        setEditingOptionId(
+                                                          null,
+                                                        ),
+                                                      );
+                                                }}
+                                                disabled={
+                                                  !editingOptionText.trim() ||
+                                                  updateOptionMutation.isPending
+                                                }
+                                                className="text-[10px] font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded px-1.5 py-0.5 disabled:opacity-50"
+                                              >
+                                                Save
+                                              </button>
+                                              <button
+                                                onClick={() =>
+                                                  setEditingOptionId(null)
+                                                }
+                                                className="text-[10px] font-semibold text-gray-500 hover:text-gray-700 rounded px-1.5 py-0.5 border border-gray-200"
+                                              >
+                                                Cancel
+                                              </button>
+                                            </div>
+                                          ) : confirmDeleteOptionId ===
+                                            String(opt.id) ? (
+                                            <div className="flex items-center gap-2 text-xs">
+                                              <span className="text-red-600 font-medium flex-1 truncate">
+                                                Delete "
+                                                {String(
+                                                  opt.optionText ??
+                                                    opt.text ??
+                                                    "",
+                                                )}
+                                                "?
+                                              </span>
+                                              <button
+                                                onClick={() => {
+                                                  if (opt.id)
+                                                    void deleteOptionMutation
+                                                      .mutateAsync(opt.id)
+                                                      .then(() =>
+                                                        setConfirmDeleteOptionId(
+                                                          null,
+                                                        ),
+                                                      );
+                                                }}
+                                                disabled={
+                                                  deleteOptionMutation.isPending
+                                                }
+                                                className="text-[10px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded px-1.5 py-0.5 disabled:opacity-50"
+                                              >
+                                                {deleteOptionMutation.isPending
+                                                  ? "…"
+                                                  : "Delete"}
+                                              </button>
+                                              <button
+                                                onClick={() =>
+                                                  setConfirmDeleteOptionId(null)
+                                                }
+                                                className="text-[10px] font-semibold text-gray-500 hover:text-gray-700 rounded px-1.5 py-0.5 border border-gray-200"
+                                              >
+                                                Cancel
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center justify-between text-xs">
+                                              <span
+                                                className={`flex items-center gap-1.5 ${opt.isCorrect ? "text-emerald-700 font-semibold" : "text-gray-500"}`}
+                                              >
+                                                <span
+                                                  className={`h-2 w-2 rounded-full shrink-0 ${opt.isCorrect ? "bg-emerald-500" : "bg-gray-300"}`}
+                                                />
+                                                {String(
+                                                  opt.optionText ??
+                                                    opt.text ??
+                                                    "",
+                                                )}
+                                              </span>
+                                              <div className="flex items-center gap-0.5">
+                                                <button
+                                                  onClick={() => {
+                                                    setEditingOptionId(
+                                                      String(opt.id),
+                                                    );
+                                                    setEditingOptionText(
+                                                      String(
+                                                        opt.optionText ??
+                                                          opt.text ??
+                                                          "",
+                                                      ),
+                                                    );
+                                                  }}
+                                                  className="h-5 w-5 flex items-center justify-center rounded text-blue-400 hover:bg-blue-50"
+                                                  title="Edit option"
+                                                >
+                                                  <Edit className="h-2.5 w-2.5" />
+                                                </button>
+                                                <button
+                                                  onClick={() =>
+                                                    setConfirmDeleteOptionId(
+                                                      String(opt.id),
+                                                    )
+                                                  }
+                                                  className="h-5 w-5 flex items-center justify-center rounded text-red-400 hover:bg-red-50"
+                                                  title="Delete option"
+                                                >
+                                                  <Trash2 className="h-2.5 w-2.5" />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
                                   )}
                                   {/* Add option inline */}
                                   {addingOptionToQId === String(q.id) && (
-                                    <div className="mt-2 pl-4 flex items-center gap-2">
-                                      <input
-                                        className={`${inputCls} flex-1`}
-                                        value={optionForm.text}
-                                        onChange={(e) =>
-                                          setOptionForm((f) => ({
-                                            ...f,
-                                            text: e.target.value,
-                                          }))
-                                        }
-                                        placeholder="Option text"
-                                        autoFocus
-                                      />
-                                      <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0">
+                                    <div className="space-y-1.5 border-t border-gray-100 pt-2">
+                                      <label className={labelCls}>
+                                        New option
+                                      </label>
+                                      <div className="flex items-center gap-2">
                                         <input
-                                          type="checkbox"
-                                          checked={optionForm.isCorrect}
+                                          className={`${inputCls} flex-1`}
+                                          value={optionForm.text}
                                           onChange={(e) =>
                                             setOptionForm((f) => ({
                                               ...f,
-                                              isCorrect: e.target.checked,
+                                              text: e.target.value,
                                             }))
                                           }
-                                          className="rounded border-gray-300"
+                                          placeholder="Option text"
+                                          autoFocus
                                         />
-                                        Correct
-                                      </label>
-                                      <Button
-                                        size="sm"
-                                        onClick={() =>
-                                          void handleAddOptionToQuestion()
-                                        }
-                                        disabled={
-                                          !optionForm.text.trim() ||
-                                          addOptionMutation.isPending
-                                        }
-                                        className="bg-[#D52B1E] hover:bg-[#b82319] text-white text-xs px-2 py-1 h-7"
-                                      >
-                                        Add
-                                      </Button>
+                                        <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0">
+                                          <input
+                                            type="checkbox"
+                                            checked={optionForm.isCorrect}
+                                            onChange={(e) =>
+                                              setOptionForm((f) => ({
+                                                ...f,
+                                                isCorrect: e.target.checked,
+                                              }))
+                                            }
+                                            className="rounded border-gray-300"
+                                          />
+                                          Correct answer
+                                        </label>
+                                        <Button
+                                          size="sm"
+                                          onClick={() =>
+                                            void handleAddOptionToQuestion()
+                                          }
+                                          disabled={
+                                            !optionForm.text.trim() ||
+                                            addOptionMutation.isPending
+                                          }
+                                          className="bg-[#D52B1E] hover:bg-[#b82319] text-white text-xs px-2 py-1 h-7"
+                                        >
+                                          {addOptionMutation.isPending
+                                            ? "Adding…"
+                                            : "Add"}
+                                        </Button>
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -3481,70 +3754,71 @@ function InstructorLearningWorkspace({
 
                             {/* Add question */}
                             {showAddQuestion ? (
-                              <div className="rounded-xl border border-[#D52B1E]/20 bg-white p-3 space-y-2">
+                              <div className="rounded-xl border border-[#D52B1E]/25 bg-[#D52B1E]/[0.03] p-4 space-y-3">
                                 <p className="text-xs font-bold text-[#D52B1E] uppercase tracking-wider">
-                                  Add Question
+                                  New Question
                                 </p>
-                                <input
-                                  className={inputCls}
-                                  value={questionForm.text}
-                                  onChange={(e) =>
-                                    setQuestionForm((f) => ({
-                                      ...f,
-                                      text: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Question text"
-                                  autoFocus
-                                />
-                                <div className="flex gap-2">
-                                  <select
-                                    className={`${inputCls} flex-1`}
-                                    value={questionForm.type}
-                                    onChange={(e) =>
-                                      setQuestionForm((f) => ({
-                                        ...f,
-                                        type: e.target.value,
-                                      }))
-                                    }
-                                  >
-                                    {quizTypesQuery.data &&
-                                    quizTypesQuery.data.length > 0 ? (
-                                      quizTypesQuery.data.map((qt) => (
-                                        <option
-                                          key={String(qt.id)}
-                                          value={qt.name}
-                                        >
-                                          {qt.name}
-                                        </option>
-                                      ))
-                                    ) : (
-                                      <>
-                                        <option value="mcq">MCQ</option>
-                                        <option value="true_false">
-                                          True / False
-                                        </option>
-                                        <option value="short_answer">
-                                          Short Answer
-                                        </option>
-                                      </>
-                                    )}
-                                  </select>
+                                <div>
+                                  <label className={labelCls}>
+                                    Question text *
+                                  </label>
                                   <input
-                                    type="number"
-                                    min={1}
-                                    className={`${inputCls} w-20`}
-                                    value={questionForm.points}
+                                    className={inputCls}
+                                    value={questionForm.text}
                                     onChange={(e) =>
                                       setQuestionForm((f) => ({
                                         ...f,
-                                        points: Number(e.target.value) || 1,
+                                        text: e.target.value,
                                       }))
                                     }
-                                    placeholder="Pts"
+                                    placeholder="e.g. What is the definition of Murabaha?"
+                                    autoFocus
                                   />
                                 </div>
-                                <div className="flex justify-end gap-2">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className={labelCls}>
+                                      Question type *
+                                    </label>
+                                    <select
+                                      className={inputCls}
+                                      value={questionForm.type}
+                                      onChange={(e) =>
+                                        setQuestionForm((f) => ({
+                                          ...f,
+                                          type: e.target.value,
+                                        }))
+                                      }
+                                    >
+                                      <option value="mcq">
+                                        Multiple Choice (MCQ)
+                                      </option>
+                                      <option value="true_false">
+                                        True / False
+                                      </option>
+                                      <option value="short_answer">
+                                        Short Answer
+                                      </option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className={labelCls}>Points</label>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      className={inputCls}
+                                      value={questionForm.points}
+                                      onChange={(e) =>
+                                        setQuestionForm((f) => ({
+                                          ...f,
+                                          points: Number(e.target.value) || 1,
+                                        }))
+                                      }
+                                      placeholder="1"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-2 pt-1">
                                   <Button
                                     size="sm"
                                     variant="ghost"
@@ -3563,16 +3837,27 @@ function InstructorLearningWorkspace({
                                     }
                                     className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-1.5"
                                   >
-                                    <Plus className="h-3 w-3" /> Add
+                                    {addQuestionMutation.isPending ? (
+                                      <>
+                                        <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
+                                        Adding…
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="h-3 w-3" /> Add
+                                        Question
+                                      </>
+                                    )}
                                   </Button>
                                 </div>
                               </div>
                             ) : (
                               <button
+                                type="button"
                                 onClick={() => setShowAddQuestion(true)}
-                                className="text-xs font-semibold text-[#D52B1E] flex items-center gap-1 hover:gap-1.5 transition-all"
+                                className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#D52B1E]/30 px-4 py-3 text-sm font-semibold text-[#D52B1E] hover:bg-[#D52B1E]/5 hover:border-[#D52B1E]/50 transition-colors"
                               >
-                                <Plus className="h-3 w-3" /> Add question
+                                <Plus className="h-4 w-4" /> Add Question
                               </button>
                             )}
                           </div>
@@ -3696,9 +3981,7 @@ function InstructorLearningWorkspace({
               </Button>
               <Button
                 onClick={() => void handleAddQuiz()}
-                disabled={
-                  !quizForm.title.trim() || addQuizMutation.isPending
-                }
+                disabled={!quizForm.title.trim() || addQuizMutation.isPending}
                 className="bg-[#D52B1E] hover:bg-[#b82319] text-white gap-2"
               >
                 {addQuizMutation.isPending ? (

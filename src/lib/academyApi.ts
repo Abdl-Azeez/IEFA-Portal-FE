@@ -249,12 +249,34 @@ function mapAcademyCourseApiResponse(
             };
           })(),
           lastAttempt: (() => {
-            const la = (lesson as Record<string, unknown>).lastAttempt;
+            const lessonRecord = lesson as Record<string, unknown>;
+            const firstQuiz = lesson.quizzes?.[0];
+            const quizRecord =
+              firstQuiz && typeof firstQuiz === "object"
+                ? (firstQuiz as Record<string, unknown>)
+                : null;
+            const quizUserProgress =
+              quizRecord?.userProgress &&
+              typeof quizRecord.userProgress === "object"
+                ? (quizRecord.userProgress as Record<string, unknown>)
+                : null;
+            const la =
+              lessonRecord.lastAttempt ?? quizUserProgress?.lastAttempt ?? null;
             if (!la || typeof la !== "object") return null;
             const laRec = la as Record<string, unknown>;
+            const status = (() => {
+              if (laRec.status === "passed" || laRec.status === "failed") {
+                return laRec.status;
+              }
+              if (typeof laRec.passed === "boolean") {
+                return laRec.passed ? "passed" : "failed";
+              }
+              return null;
+            })();
+            if (!status) return null;
             return {
               id: laRec.id as string | number,
-              status: laRec.status as "passed" | "failed" | "in_progress",
+              status,
               score: laRec.score !== undefined ? Number(laRec.score) : null,
               attemptNumber:
                 laRec.attemptNumber !== undefined
